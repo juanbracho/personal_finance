@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/analytics.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}
+
+{% block title %}Analytics - Personal Finance{% endblock %}
+
+{% block content %}
+<!-- Analytics Header -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="display-6 fw-bold text-primary">📊 Financial Analytics</h1>
+        <p class="lead text-muted">Advanced filtering and analysis of your financial data</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-outline-primary" id="toggleFilters">
+            <i class="fas fa-filter"></i> Filters
+        </button>
+        <button class="btn btn-primary" id="resetFilters">
+            <i class="fas fa-refresh"></i> Reset
+        </button>
+    </div>
+</div>
+
+<!-- Collapsible Filter Panel -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card filter-panel" id="filterPanel">
+            <div class="card-header">
+                <h5 class="mb-0">🔍 Filter Options</h5>
+            </div>
+            <div class="card-body">
+                <form id="analyticsFilters">
+                    <!-- Date Range Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="startDate" value="{{ default_start_date }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="endDate" value="{{ default_end_date }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Quick Presets</label>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="30">Last 30 Days</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="90">Last 3 Months</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="365">This Year</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="last-year">Last Year</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Select Filters Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="ownersFilter" class="form-label">Owners</label>
+                            <select class="form-select" id="ownersFilter" multiple size="4">
+                                <option value="all" selected>All Owners</option>
+                                {% for owner in available_owners %}
+                                <option value="{{ owner }}">{{ owner }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="categoriesFilter" class="form-label">Categories</label>
+                            <select class="form-select" id="categoriesFilter" multiple size="4">
+                                <option value="all" selected>All Categories</option>
+                                {% for category in available_categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="accountsFilter" class="form-label">Accounts</label>
+                            <select class="form-select" id="accountsFilter" multiple size="4">
+                                <option value="all" selected>All Accounts</option>
+                                {% for account in available_accounts %}
+                                <option value="{{ account }}">{{ account }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="typesFilter" class="form-label">Transaction Types</label>
+                            <select class="form-select" id="typesFilter" multiple size="4">
+                                <option value="all" selected>All Types</option>
+                                <option value="Needs">Needs</option>
+                                <option value="Wants">Wants</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Business">Business</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Amount Range Row -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="minAmount" class="form-label">Min Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="minAmount" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="maxAmount" class="form-label">Max Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="maxAmount" step="0.01" placeholder="No limit">
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="button" class="btn btn-success me-2" id="applyFilters">
+                                <i class="fas fa-search"></i> Apply Filters
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" id="clearFilters">
+                                <i class="fas fa-times"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div class="row mb-4" id="loadingIndicator" style="display: none;">
+    <div class="col-12">
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Updating charts with your filters...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1: Spending Trends -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Spending Trends Over Time</h5>
+            </div>
+            <div class="card-body">
+                <div id="spendingTrendsChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2: Category Analysis -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🥧 Category Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div id="categoryPieChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📊 Category Amounts</h5>
+            </div>
+            <div class="card-body">
+                <div id="categoryBarChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 3: Owner Comparison -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">👥 Owner Spending Comparison</h5>
+            </div>
+            <div class="card-body">
+                <div id="ownerComparisonChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📋 Filter Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="summaryStats">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-primary" id="totalTransactions">-</div>
+                            <div class="text-muted">Total Transactions</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-danger" id="totalAmount">-</div>
+                            <div class="text-muted">Total Amount</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-info" id="avgTransaction">-</div>
+                            <div class="text-muted">Avg Transaction</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-success" id="dateRange">-</div>
+                            <div class="text-muted">Date Range</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data for JavaScript -->
+<script>
+// Pass filter options to JavaScript
+window.analyticsData = {
+    availableOwners: {{ available_owners | tojson | safe }},
+    availableCategories: {{ available_categories | tojson | safe }},
+    availableAccounts: {{ available_accounts | tojson | safe }},
+    defaultStartDate: '{{ default_start_date }}',
+    defaultEndDate: '{{ default_end_date }}'
+};
+</script>
+{% endblock %}

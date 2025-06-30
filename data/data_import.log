@@ -1,0 +1,13 @@
+2025-06-30 14:24:37,274 - INFO - ✅ Database backup created: personal_finance_backup_20250630_142437.db
+2025-06-30 14:24:37,275 - INFO - ✅ Connected to personal_finance.db
+2025-06-30 14:24:37,294 - ERROR - ❌ Error loading Excel data: Excel file not found: data.xlsx
+2025-06-30 14:25:29,472 - INFO - ✅ Database backup created: personal_finance_backup_20250630_142529.db
+2025-06-30 14:25:29,473 - INFO - ✅ Connected to personal_finance.db
+2025-06-30 14:25:29,961 - INFO - Cleared transactions: 5878 rows deleted
+2025-06-30 14:25:29,962 - INFO - Cleared budget_templates: 23 rows deleted
+2025-06-30 14:25:29,963 - INFO - Cleared unexpected_expenses: 1 rows deleted
+2025-06-30 14:25:29,963 - INFO - Cleared monthly_budgets: 0 rows deleted
+2025-06-30 14:25:29,964 - INFO - Cleared debt_accounts: 5 rows deleted
+2025-06-30 14:25:29,964 - INFO - Cleared debt_payments: 2 rows deleted
+2025-06-30 14:25:29,965 - INFO - Cleared business_revenue: 0 rows deleted
+2025-06-30 14:25:30,600 - INFO - ✅ Database connection closed

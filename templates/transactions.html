@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/transactions.js') }}"></script>
+{% endblock %}
+
+{% block title %}Transactions - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="display-6 fw-bold text-primary">📝 Transactions</h1>
+        <p class="lead text-muted">View and manage all your financial transactions</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-primary btn-lg">
+            ➕ Add Transaction
+        </a>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Transactions</h5>
+                <small class="text-muted">
+                    Showing {{ transactions.items|length }} of {{ transactions.total }} transactions
+                </small>
+            </div>
+            <div class="card-body">
+                {% if transactions.items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th>Owner</th>
+                                    <th>Account</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions.items %}
+                                <tr>
+                                    <td>
+                                        {{ transaction.date.strftime('%Y-%m-%d') }}
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">{{ transaction.description }}</div>
+                                        {% if transaction.sub_category %}
+                                            <small class="text-muted">{{ transaction.sub_category }}</small>
+                                        {% endif %}
+                                        {% if transaction.is_business %}
+                                            <span class="badge bg-info ms-1">Business</span>
+                                        {% endif %}
+                                        {% if transaction.amount < 0 %}
+                                            <span class="badge income-badge ms-1">Income</span>
+                                        {% else %}
+                                            <span class="badge expense-badge ms-1">Expense</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if transaction.amount < 0 %}
+                                            <!-- Income/Refund (Negative) - Green -->
+                                            <span class="fw-bold text-success transaction-amount-income">
+                                                -${{ "%.2f"|format(transaction.amount|abs) }}
+                                            </span>
+                                            <small class="d-block text-success amount-label">Income</small>
+                                        {% else %}
+                                            <!-- Expense (Positive) - Red -->
+                                            <span class="fw-bold text-danger transaction-amount-expense">
+                                                ${{ "%.2f"|format(transaction.amount) }}
+                                            </span>
+                                            <small class="d-block text-muted amount-label">Expense</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ transaction.category }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 
+                                            'danger' if transaction.type == 'Needs' 
+                                            else 'warning' if transaction.type == 'Wants'
+                                            else 'success' if transaction.type == 'Savings'
+                                            else 'info' if transaction.type == 'Business'
+                                            else 'secondary'
+                                        }}">
+                                            {{ transaction.type }}
+                                        </span>
+                                    </td>
+                                    <td>{{ transaction.owner }}</td>
+                                    <td>{{ transaction.account_name }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="editTransaction({{ transaction.id }})"
+                                                    title="Edit Transaction">
+                                                ✏️
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" 
+                                                    onclick="deleteTransaction({{ transaction.id }}, '{{ transaction.description|e }}')"
+                                                    title="Delete Transaction">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if transactions.pages > 1 %}
+                    <nav aria-label="Transaction pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if transactions.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.prev_num) }}">Previous</a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for page_num in transactions.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != transactions.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('transactions.list_transactions', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">…</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if transactions.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.next_num) }}">Next</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    
+                {% else %}
+                    <div class="text-center py-5">
+                        <h4 class="text-muted">No Transactions Found</h4>
+                        <p class="text-muted mb-4">Start by adding your first transaction</p>
+                        <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-primary">
+                            ➕ Add Your First Transaction
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal fade" id="editTransactionModal" tabindex="-1" aria-labelledby="editTransactionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTransactionModalLabel">Edit Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTransactionForm">
+                    <input type="hidden" id="editTransactionId" value="">
+                    
+                    <!-- Basic Transaction Info -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editDate" class="form-label">Date *</label>
+                            <input type="date" class="form-control" id="editDate" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editAmount" class="form-label">Amount *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="editAmount" step="0.01" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editDescription" class="form-label">Description *</label>
+                        <input type="text" class="form-control" id="editDescription" required>
+                    </div>
+                    
+                    <!-- Categories -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editCategory" class="form-label">Category *</label>
+                            <select class="form-select" id="editCategory" required>
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editSubCategory" class="form-label">Sub-Category</label>
+                            <select class="form-select" id="editSubCategory">
+                                <option value="">Select sub-category...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editType" class="form-label">Type *</label>
+                            <select class="form-select" id="editType" required>
+                                <option value="">Select type...</option>
+                                <option value="Needs">Needs</option>
+                                <option value="Wants">Wants</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Business">Business</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="editIsBusiness">
+                                <label class="form-check-label" for="editIsBusiness">
+                                    💼 Business Transaction
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Account & Owner -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editAccountName" class="form-label">Account *</label>
+                            <select class="form-select" id="editAccountName" required>
+                                <option value="">Select account...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editOwner" class="form-label">Owner *</label>
+                            <select class="form-select" id="editOwner" required>
+                                <option value="">Select owner...</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTransactionEdit()">
+                    💾 Update Transaction
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
