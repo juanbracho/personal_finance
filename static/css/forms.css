@@ -1,0 +1,314 @@
+/* Form Styles for Transactions, Debts, and Other Forms */
+
+/* Transaction Specific Styles */
+.transaction-amount-income {
+    color: var(--success-color) !important;
+    font-weight: bold;
+}
+
+.transaction-amount-expense {
+    color: var(--danger-color) !important;
+    font-weight: bold;
+}
+
+.amount-label {
+    font-size: 0.75rem;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge.income-badge {
+    background-color: var(--success-color) !important;
+    color: white;
+}
+
+.badge.expense-badge {
+    background-color: var(--danger-color) !important;
+    color: white;
+}
+
+/* Form Section Headers */
+.form-section-header {
+    color: var(--primary-color);
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+}
+
+/* Quick Actions for Forms */
+.quick-actions-form {
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.quick-action-button {
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.quick-action-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Form Validation Styles */
+.form-control.is-valid {
+    border-color: var(--success-color);
+    box-shadow: 0 0 0 0.2rem rgba(39, 174, 96, 0.25);
+}
+
+.form-control.is-invalid {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+}
+
+.valid-feedback {
+    color: var(--success-color);
+    font-size: 0.875rem;
+}
+
+.invalid-feedback {
+    color: var(--danger-color);
+    font-size: 0.875rem;
+}
+
+/* Input Group Styling */
+.input-group .input-group-text {
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.input-group .form-control:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* Form Switch Styles */
+.form-check-input:checked {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+.form-check-input:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* Form Help Text */
+.form-text {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.form-text .btn-link {
+    color: var(--secondary-color);
+    text-decoration: none;
+    padding: 0;
+    font-size: 0.875rem;
+}
+
+.form-text .btn-link:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+/* Debt Form Specific */
+.debt-form-section {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.debt-progress-preview {
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+/* Transaction Form Specific */
+.transaction-form-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.transaction-quick-actions {
+    background: rgba(39, 174, 96, 0.05);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.transaction-tips {
+    background: rgba(243, 156, 18, 0.05);
+    border: 1px solid rgba(243, 156, 18, 0.2);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+/* Form Action Buttons */
+.form-actions {
+    border-top: 1px solid #e9ecef;
+    padding-top: 1rem;
+    margin-top: 2rem;
+}
+
+.form-actions .btn {
+    margin-left: 0.5rem;
+}
+
+.form-actions .btn:first-child {
+    margin-left: 0;
+}
+
+/* Form Error States */
+.form-error-container {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-success-container {
+    background: rgba(39, 174, 96, 0.1);
+    border: 1px solid rgba(39, 174, 96, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Similar Transactions Preview */
+.similar-transactions {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+.similar-transaction-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.similar-transaction-item:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+.similar-transaction-item:last-child {
+    border-bottom: none;
+}
+
+/* Responsive Form Styles */
+@media (max-width: 768px) {
+    .form-actions {
+        text-align: center;
+    }
+    
+    .form-actions .btn {
+        margin: 0.25rem;
+        width: 100%;
+    }
+    
+    .quick-actions-form .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .debt-form-section,
+    .transaction-form-container {
+        padding: 1rem;
+    }
+}
+
+/* ADD THESE STYLES TO THE END OF forms.css */
+
+/* Similar Transactions Styling */
+.similar-transactions-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.similar-transaction-item {
+    padding: 0.75rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #fff;
+}
+
+.similar-transaction-item:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+    border-color: var(--secondary-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.similar-transaction-item:last-child {
+    margin-bottom: 0;
+}
+
+.similar-transaction-item strong {
+    color: var(--primary-color);
+}
+
+.similar-transaction-item small {
+    font-size: 0.8rem;
+}
+
+/* Quick Action Buttons Enhancement */
+.quick-action-button {
+    transition: all 0.2s ease;
+}
+
+.quick-action-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Form Validation Enhancement */
+.form-control.is-valid, .form-select.is-valid {
+    border-color: var(--success-color);
+    box-shadow: 0 0 0 0.2rem rgba(39, 174, 96, 0.25);
+}
+
+.form-control.is-invalid, .form-select.is-invalid {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+}
+
+/* Add Category/Account/Owner Links */
+.form-text .btn-link {
+    font-size: 0.875rem;
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+.form-text .btn-link:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+/* Template Buttons */
+[data-template] {
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+[data-template]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}

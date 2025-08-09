@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
+{% block title %}Dashboard - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-6 fw-bold text-primary">💰 Financial Dashboard</h1>
+        <p class="lead text-muted">Your complete financial overview for {{ moment().format('MMMM YYYY') if moment else 'this month' }}</p>
+    </div>
+</div>
+
+<!-- Key Metrics Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Monthly Spending</div>
+            <div class="metric-value negative">${{ "%.2f"|format(total_monthly_spending) }}</div>
+            <small class="text-muted">Current Month</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card debt-card">
+            <div class="metric-label">Total Debt</div>
+            <div class="metric-value negative">${{ "%.2f"|format(total_debt) }}</div>
+            <small class="text-muted">All Active Debts</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card business-card">
+            <div class="metric-label">Business Revenue</div>
+            <div class="metric-value positive">${{ "%.2f"|format(business_revenue) }}</div>
+            <small class="text-muted">This Month</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Business Profit</div>
+            <div class="metric-value {{ 'positive' if business_profit > 0 else 'negative' }}">
+                ${{ "%.2f"|format(business_profit) }}
+            </div>
+            <small class="text-muted">Revenue - Expenses</small>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="filter-section">
+            <h5 class="mb-3">📊 Chart Filters</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="ownerFilter" class="form-label">Owner</label>
+                    <select class="form-select" id="ownerFilter" onchange="updateCharts()">
+                        <option value="all">All Owners</option>
+                        <option value="Cata">Cata</option>
+                        <option value="Suricata">Suricata</option>
+                        <option value="Cacas">Cacas</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="dateRangeFilter" class="form-label">Date Range</label>
+                    <select class="form-select" id="dateRangeFilter" onchange="updateCharts()">
+                        <option value="30">Last 30 Days</option>
+                        <option value="90">Last 3 Months</option>
+                        <option value="180">Last 6 Months</option>
+                        <option value="365">Last Year</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="includeBusinessFilter" checked onchange="updateCharts()">
+                        <label class="form-check-label" for="includeBusinessFilter">
+                            Include Business Expenses
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <button class="btn btn-primary mt-4" onclick="resetFilters()">
+                        🔄 Reset Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <!-- Monthly Spending Breakdown -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Monthly Spending by Type</h5>
+            </div>
+            <div class="card-body">
+                <div id="monthlySpendingChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Categories -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🏆 Top 5 Categories</h5>
+            </div>
+            <div class="card-body">
+                <div id="topCategoriesChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <!-- Category Spending with Filters -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📊 Category Spending Analysis</h5>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="chartType" id="barChart" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary btn-sm" for="barChart">Bar Chart</label>
+                    
+                    <input type="radio" class="btn-check" name="chartType" id="pieChart" autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm" for="pieChart">Pie Chart</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="categorySpendingChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Trends -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 12-Month Spending Trends</h5>
+            </div>
+            <div class="card-body">
+                <div id="monthlyTrendsChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">⚡ Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('debts.add_debt') }}" class="btn btn-primary w-100 mb-3">
+                            💳 Add Debt Account
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-success w-100 mb-3" onclick="alert('Coming soon!')">
+                            💰 Add Transaction
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-info w-100 mb-3" onclick="alert('Coming soon!')">
+                            💼 Add Business Revenue
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-warning w-100 mb-3" onclick="alert('Coming soon!')">
+                            📊 View Reports
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Loading dashboard charts...');
+    loadAllCharts();
+});
+
+// Load all charts
+function loadAllCharts() {
+    loadMonthlySpendingChart();
+    loadTopCategoriesChart();
+    loadCategorySpendingChart();
+    loadMonthlyTrendsChart();
+}
+
+// Monthly Spending Pie Chart
+function loadMonthlySpendingChart() {
+    const monthlyData = [
+        {% for type, amount in monthly_spending %}
+        {
+            type: '{{ type }}',
+            amount: {{ amount }}
+        },
+        {% endfor %}
+    ];
+    
+    if (monthlyData.length === 0) {
+        document.getElementById('monthlySpendingChart').innerHTML = 
+            '<div class="alert alert-info">No spending data for current month</div>';
+        return;
+    }
+    
+    const data = [{
+        labels: monthlyData.map(item => item.type),
+        values: monthlyData.map(item => item.amount),
+        type: 'pie',
+        hole: 0.4,
+        textinfo: 'label+percent',
+        textposition: 'outside',
+        marker: {
+            colors: ['#e74c3c', '#f39c12', '#27ae60', '#3498db']
+        }
+    }];
+    
+    const layout = {
+        ...chartConfig.layout,
+        title: 'Current Month Breakdown',
+        showlegend: true,
+        legend: {
+            orientation: 'h',
+            x: 0,
+            y: -0.2
+        }
+    };
+    
+    Plotly.newPlot('monthlySpendingChart', data, layout, chartConfig);
+}
+
+// Top Categories Bar Chart
+function loadTopCategoriesChart() {
+    const topCategories = [
+        {% for category, total, count in top_categories %}
+        {
+            category: '{{ category }}',
+            total: {{ total }},
+            count: {{ count }}
+        },
+        {% endfor %}
+    ];
+    
+    if (topCategories.length === 0) {
+        document.getElementById('topCategoriesChart').innerHTML = 
+            '<div class="alert alert-info">No category data for current month</div>';
+        return;
+    }
+    
+    const data = [{
+        x: topCategories.map(item => item.category),
+        y: topCategories.map(item => item.total),
+        type: 'bar',
+        marker: {
+            color: '#3498db',
+            opacity: 0.8
+        },
+        text: topCategories.map(item => `${item.total.toFixed(2)}`),
+        textposition: 'outside'
+    }];
+    
+    const layout = {
+        ...chartConfig.layout,
+        title: 'Top Spending Categories',
+        xaxis: { title: 'Category' },
+        yaxis: { title: 'Amount ($)' }
+    };
+    
+    Plotly.newPlot('topCategoriesChart', data, layout, chartConfig);
+}
+
+// Category Spending Chart (with filters)
+function loadCategorySpendingChart() {
+    updateCategoryChart();
+}
+
+// Monthly Trends Chart
+function loadMonthlyTrendsChart() {
+    showLoading('monthlyTrendsChart');
+    
+    fetch('/api/monthly_trends')
+        .then(response => response.json())
+        .then(data => {
+            if (data.length === 0) {
+                document.getElementById('monthlyTrendsChart').innerHTML = 
+                    '<div class="alert alert-info">No trend data available</div>';
+                return;
+            }
+            
+            // Group data by type
+            const types = ['Needs', 'Wants', 'Savings', 'Business'];
+            const traces = types.map(type => ({
+                x: data.map(item => item.month),
+                y: data.map(item => item[type] || 0),
+                name: type,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { width: 3 },
+                marker: { size: 8 }
+            }));
+            
+            const layout = {
+                ...chartConfig.layout,
+                title: '12-Month Spending Trends',
+                xaxis: { title: 'Month' },
+                yaxis: { title: 'Amount ($)' },
+                hovermode: 'x unified'
+            };
+            
+            Plotly.newPlot('monthlyTrendsChart', traces, layout, chartConfig);
+        })
+        .catch(error => {
+            console.error('Error loading monthly trends:', error);
+            showChartError('monthlyTrendsChart', error.message);
+        });
+}
+
+// Update category chart based on filters
+function updateCategoryChart() {
+    showLoading('categorySpendingChart');
+    
+    const owner = document.getElementById('ownerFilter').value;
+    const dateRange = document.getElementById('dateRangeFilter').value;
+    const includeBusiness = document.getElementById('includeBusinessFilter').checked;
+    
+    const params = new URLSearchParams({
+        owner: owner,
+        date_range: dateRange,
+        include_business: includeBusiness
+    });
+    
+    fetch(`/api/category_spending?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.length === 0) {
+                document.getElementById('categorySpendingChart').innerHTML = 
+                    '<div class="alert alert-info">No data found for selected filters</div>';
+                return;
+            }
+            
+            const chartType = document.querySelector('input[name="chartType"]:checked').id;
+            
+            let plotData, layout;
+            
+            if (chartType === 'barChart') {
+                plotData = [{
+                    x: data.map(item => item.category),
+                    y: data.map(item => item.total),
+                    type: 'bar',
+                    marker: {
+                        color: data.map((_, i) => `hsl(${i * 360 / data.length}, 70%, 50%)`),
+                        opacity: 0.8
+                    },
+                    text: data.map(item => `${item.total.toFixed(2)}`),
+                    textposition: 'outside'
+                }];
+                
+                layout = {
+                    ...chartConfig.layout,
+                    title: 'Category Spending (Filtered)',
+                    xaxis: { title: 'Category' },
+                    yaxis: { title: 'Amount ($)' }
+                };
+            } else {
+                plotData = [{
+                    labels: data.map(item => item.category),
+                    values: data.map(item => item.total),
+                    type: 'pie',
+                    textinfo: 'label+percent',
+                    textposition: 'outside'
+                }];
+                
+                layout = {
+                    ...chartConfig.layout,
+                    title: 'Category Spending Distribution (Filtered)',
+                    showlegend: true
+                };
+            }
+            
+            Plotly.newPlot('categorySpendingChart', plotData, layout, chartConfig);
+        })
+        .catch(error => {
+            console.error('Error loading category spending:', error);
+            showChartError('categorySpendingChart', error.message);
+        });
+}
+
+// Update all filterable charts
+function updateCharts() {
+    console.log('🔄 Updating charts with new filters...');
+    updateCategoryChart();
+    // Add other chart updates here as needed
+}
+
+// Reset all filters
+function resetFilters() {
+    document.getElementById('ownerFilter').value = 'all';
+    document.getElementById('dateRangeFilter').value = '30';
+    document.getElementById('includeBusinessFilter').checked = true;
+    document.getElementById('barChart').checked = true;
+    updateCharts();
+}
+
+// Chart type change handler
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'chartType') {
+        updateCategoryChart();
+    }
+});
+</script>
+{% endblock %}

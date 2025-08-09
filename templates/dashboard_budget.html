@@ -1,0 +1,301 @@
+<!-- dashboard_budget.html - Fixed Template Syntax -->
+<!-- Budget Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Initial Budget</div>
+            <div class="metric-value neutral">${{ "%.2f"|format(total_initial_budget) }}</div>
+            <small class="text-muted">Template Monthly</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Unexpected Expenses</div>
+            <div class="metric-value negative">${{ "%.2f"|format(total_unexpected_expenses) }}</div>
+            <small class="text-muted">{{ current_year }}-{{ "%02d"|format(current_month) }}</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Effective Budget</div>
+            <div class="metric-value neutral">${{ "%.2f"|format(total_effective_budget) }}</div>
+            <small class="text-muted">Initial + Unexpected</small>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Actual Spending</div>
+            <div class="metric-value {{ 'positive' if total_actual_spending <= total_effective_budget else 'negative' }}">
+                ${{ "%.2f"|format(total_actual_spending) }}
+            </div>
+            <small class="text-muted">Current Month</small>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Flow Visualization -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📊 Budget Flow for {{ current_year }}-{{ "%02d"|format(current_month) }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        <div class="budget-flow-step">
+                            <div class="budget-flow-amount text-primary">${{ "%.0f"|format(total_initial_budget) }}</div>
+                            <div class="budget-flow-label">Initial Budget</div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-center">
+                        <i class="fas fa-plus text-muted fa-2x"></i>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="budget-flow-step">
+                            <div class="budget-flow-amount text-warning">${{ "%.0f"|format(total_unexpected_expenses) }}</div>
+                            <div class="budget-flow-label">Unexpected</div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-center">
+                        <i class="fas fa-equals text-muted fa-2x"></i>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="budget-flow-step">
+                            <div class="budget-flow-amount text-info">${{ "%.0f"|format(total_effective_budget) }}</div>
+                            <div class="budget-flow-label">Effective Budget</div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-center">
+                        <i class="fas fa-arrow-right text-muted fa-2x"></i>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="budget-flow-step">
+                            <div class="budget-flow-amount {{ 'text-success' if total_actual_spending <= total_effective_budget else 'text-danger' }}">
+                                ${{ "%.0f"|format(total_actual_spending) }}
+                            </div>
+                            <div class="budget-flow-label">Actual Spending</div>
+                            <div class="budget-flow-status {{ 'text-success' if total_actual_spending <= total_effective_budget else 'text-danger' }}">
+                                {% set difference = total_effective_budget - total_actual_spending %}
+                                {% if difference > 0 %}
+                                    ${{ "%.0f"|format(difference) }} remaining
+                                {% elif difference == 0 %}
+                                    On budget
+                                {% else %}
+                                    ${{ "%.0f"|format(-difference) }} over budget
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Management Controls -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">💰 Budget Details</h5>
+                <div>
+                    <a href="{{ url_for('budgets.budget_management') }}" class="btn btn-outline-primary btn-sm">
+                        📋 Manage Initial Budgets
+                    </a>
+                    <a href="{{ url_for('budgets.budget_management') }}?year={{ current_year }}&month={{ current_month }}" class="btn btn-outline-warning btn-sm">
+                        💸 Manage Unexpected Expenses
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if budget_analysis %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="budgetTable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Initial Budget</th>
+                                <th>Unexpected</th>
+                                <th>Effective Budget</th>
+                                <th>Actual Spending</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in budget_analysis %}
+                            <tr class="budget-row" data-category="{{ item.category }}">
+                                <td class="fw-bold">{{ item.category }}</td>
+                                <td class="text-primary">${{ "%.2f"|format(item.initial_budget) }}</td>
+                                <td class="text-warning">
+                                    {% if item.unexpected_expenses > 0 %}
+                                        +${{ "%.2f"|format(item.unexpected_expenses) }}
+                                    {% else %}
+                                        $0.00
+                                    {% endif %}
+                                </td>
+                                <td class="text-info fw-bold">${{ "%.2f"|format(item.effective_budget) }}</td>
+                                <td class="fw-bold {{ 'text-success' if item.actual_spending <= item.effective_budget else 'text-danger' }}">
+                                    ${{ "%.2f"|format(item.actual_spending) }}
+                                </td>
+                                <td>
+                                    {% if item.status == 'over' %}
+                                        <span class="badge bg-danger">Over Budget</span>
+                                        <small class="d-block text-danger">+${{ "%.0f"|format(item.variance) }}</small>
+                                    {% elif item.status == 'under' %}
+                                        <span class="badge bg-success">Under Budget</span>
+                                        <small class="d-block text-success">-${{ "%.0f"|format(-item.variance) }}</small>
+                                    {% elif item.status == 'on_track' %}
+                                        <span class="badge bg-primary">On Track</span>
+                                        <small class="d-block text-muted">
+                                            {% if item.variance > 0 %}
+                                                +${{ "%.0f"|format(item.variance) }}
+                                            {% else %}
+                                                ${{ "%.0f"|format(item.variance) }}
+                                            {% endif %}
+                                        </small>
+                                    {% elif item.status == 'no_budget' %}
+                                        <span class="badge bg-secondary">No Budget</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-3">No budget data available for this period.</p>
+                    <a href="{{ url_for('budgets.budget_management') }}" class="btn btn-primary">
+                        📋 Set Up Your Budget
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Charts -->
+{% if budget_analysis %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📊 Budget vs Actual</h5>
+            </div>
+            <div class="card-body">
+                <div id="budgetVsActualChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Budget Impact Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div id="budgetImpactChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Insights -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">💡 Budget Insights</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        {% set over_budget_categories = budget_analysis | selectattr('status', 'equalto', 'over') | list %}
+                        <div class="alert alert-{{ 'danger' if over_budget_categories|length > 0 else 'success' }}">
+                            <h6>{% if over_budget_categories|length > 0 %}⚠️ Over Budget Categories{% else %}✅ Budget Performance{% endif %}</h6>
+                            <ul class="mb-0">
+                                {% if over_budget_categories %}
+                                    {% for item in over_budget_categories[:3] %}
+                                    <li>{{ item.category }}: ${{ "%.0f"|format(item.variance) }} over</li>
+                                    {% endfor %}
+                                    {% if over_budget_categories|length > 3 %}
+                                    <li><em>...and {{ over_budget_categories|length - 3 }} more</em></li>
+                                    {% endif %}
+                                {% else %}
+                                    <li>All categories within budget! 🎉</li>
+                                    <li>Total budget utilization: {{ "%.1f"|format((total_actual_spending / total_effective_budget * 100) if total_effective_budget > 0 else 0) }}%</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="alert alert-info">
+                            <h6>💸 Unexpected Expenses Impact</h6>
+                            <ul class="mb-0">
+                                {% if total_unexpected_expenses > 0 %}
+                                    <li>Added ${{ "%.0f"|format(total_unexpected_expenses) }} to budget</li>
+                                    <li>{{ "%.1f"|format(total_unexpected_expenses / total_initial_budget * 100) if total_initial_budget > 0 else 0 }}% increase from initial</li>
+                                    {% set categories_with_unexpected = budget_analysis | selectattr('unexpected_expenses', 'greaterthan', 0) | list %}
+                                    <li>{{ categories_with_unexpected|length }} categories affected</li>
+                                {% else %}
+                                    <li>No unexpected expenses this month! 👍</li>
+                                    <li>Budget matches initial template</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="alert alert-warning">
+                            <h6>📋 Recommendations</h6>
+                            {% set over_budget_count = budget_analysis | selectattr('status', 'equalto', 'over') | list | length %}
+                            {% set under_budget_count = budget_analysis | selectattr('status', 'equalto', 'under') | list | length %}
+                            {% set on_track_count = budget_analysis | selectattr('status', 'equalto', 'on_track') | list | length %}
+                            <ul class="mb-0">
+                                {% if over_budget_count > 0 %}
+                                    <li>Review {{ over_budget_count }} over-budget categories</li>
+                                {% endif %}
+                                {% if total_unexpected_expenses > total_initial_budget * 0.2 %}
+                                    <li>Consider updating initial budgets</li>
+                                {% endif %}
+                                {% if on_track_count > over_budget_count %}
+                                    <li>{{ on_track_count }} categories on track! 👍</li>
+                                {% endif %}
+                                {% if total_actual_spending <= total_effective_budget %}
+                                    <li>Great job staying within budget!</li>
+                                {% else %}
+                                    <li>Consider adjusting spending or budget</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Budget Actions -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>🚀 Quick Actions:</h6>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="{{ url_for('budgets.budget_management') }}" class="btn btn-outline-primary btn-sm">
+                                📋 Update Initial Budgets
+                            </a>
+                            <a href="{{ url_for('budgets.budget_management') }}?year={{ current_year }}&month={{ current_month }}" class="btn btn-outline-warning btn-sm">
+                                💸 Manage Unexpected Expenses
+                            </a>
+                            <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-outline-success btn-sm">
+                                💰 Add Transaction
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
