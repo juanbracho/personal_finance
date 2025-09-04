@@ -1,6 +1,5 @@
 # Folders to ignore
 /Documentation
-/Data
 /.claude
 
 # Python
@@ -66,5 +65,4 @@ node_modules/
 .ipynb_checkpoints
 
 # Database
-*.db
 *.sqlite3
