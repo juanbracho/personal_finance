@@ -1,7 +1,3 @@
-# Folders to ignore
-/Documentation
-/.claude
-
 # Python
 __pycache__/
 *.py[cod]
@@ -60,9 +56,3 @@ Thumbs.db
 
 # Node modules (if any)
 node_modules/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Database
-*.sqlite3
