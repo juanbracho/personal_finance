@@ -49,7 +49,7 @@
                         <div class="col-md-8">
                             <label class="form-label">Quick Presets</label>
                             <div class="btn-group" role="group">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="30">30 Days</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="this-month">This Month</button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="90">3 Months</button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="365">This Year</button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="last-year">Last Year</button>
@@ -150,17 +150,50 @@
     </div>
 </div>
 
+<!-- Monthly Spending Matrix Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <h5 class="mb-0">📅 Year-Over-Year Monthly Spending Table</h5>
+                    <div class="d-flex align-items-center gap-3 mt-2 mt-md-0">
+                        <!-- View Toggle -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="yoyViewType" id="yoyViewYearly" value="yearly" checked>
+                            <label class="btn btn-outline-primary" for="yoyViewYearly">Yearly Total</label>
+                            <input type="radio" class="btn-check" name="yoyViewType" id="yoyViewCategory" value="category">
+                            <label class="btn btn-outline-primary" for="yoyViewCategory">Filtered View</label>
+                        </div>
+                        <!-- Filter Selector -->
+                        <div id="yoyCategorySelector" style="display: none;">
+                            <select class="form-select form-select-sm" id="yoyCategorySelect" style="min-width: 200px;">
+                                <option value="">Select Filter...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="monthlySpendingMatrixContainer">
+                    <div class="text-center text-muted">Loading table...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Data Tables Row: Category & Subcategory Analysis -->
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0">🏆 Top 10 Categories by Amount</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
                 <div class="table-responsive">
                     <table class="table table-sm table-striped">
-                        <thead>
+                        <thead class="sticky-top bg-white">
                             <tr>
                                 <th>#</th>
                                 <th>Category</th>
@@ -176,15 +209,15 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0">🎯 Top 10 Categories by Transactions</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
                 <div class="table-responsive">
                     <table class="table table-sm table-striped">
-                        <thead>
+                        <thead class="sticky-top bg-white">
                             <tr>
                                 <th>#</th>
                                 <th>Category</th>
@@ -200,15 +233,17 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+</div>
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0">🔍 Top 10 Subcategories by Amount</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
                 <div class="table-responsive">
                     <table class="table table-sm table-striped">
-                        <thead>
+                        <thead class="sticky-top bg-white">
                             <tr>
                                 <th>#</th>
                                 <th>Subcategory</th>
@@ -224,18 +259,26 @@
             </div>
         </div>
     </div>
-</div>
-
-<!-- Monthly Spending Matrix Table -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">📅 Year-Over-Year Monthly Spending Table</h5>
+                <h5 class="mb-0">💳 Transaction Types</h5>
             </div>
-            <div class="card-body">
-                <div id="monthlySpendingMatrixContainer">
-                    <div class="text-center text-muted">Loading table...</div>
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTypesTable">
+                            <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

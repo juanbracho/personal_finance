@@ -18,15 +18,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeAnalytics() {
     console.log('📊 Initializing analytics page...');
-    
+
     // Setup event listeners
     setupFilterEventListeners();
     setupPresetButtons();
     setupToggleFilters();
-    
+    setupYoYControls();
+
     // Load initial data
     loadInitialCharts();
-    
+
     console.log('✅ Analytics page initialized');
 }
 
@@ -112,16 +113,17 @@ function setupToggleFilters() {
 
 function applyDatePreset(preset) {
     console.log(`📅 Applying date preset: ${preset}`);
-    
+
     const startDate = document.getElementById('startDate');
     const endDate = document.getElementById('endDate');
     const today = new Date();
-    
+
     let start, end = today;
-    
+
     switch(preset) {
-        case '30':
-            start = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+        case 'this-month':
+            start = new Date(today.getFullYear(), today.getMonth(), 1); // First day of current month
+            end = today; // Today
             break;
         case '90':
             start = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000));
@@ -136,10 +138,18 @@ function applyDatePreset(preset) {
         default:
             return;
     }
-    
-    if (startDate) startDate.value = start.toISOString().split('T')[0];
-    if (endDate) endDate.value = end.toISOString().split('T')[0];
-    
+
+    // Format dates in local timezone (avoid toISOString() which converts to UTC)
+    const formatLocalDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    if (startDate) startDate.value = formatLocalDate(start);
+    if (endDate) endDate.value = formatLocalDate(end);
+
     // Auto-apply filters after preset
     setTimeout(applyFilters, 100);
 }
@@ -284,12 +294,13 @@ function applyFilters() {
 
 function loadAllCharts() {
     console.log('📈 Loading all charts with current filters...');
-    
+
     // Load charts and tables in sequence
     Promise.all([
         loadSpendingTrends(),
         loadCategoryTables(),
         loadSubcategoryTable(),
+        loadTransactionTypesTable(),
         loadOwnerComparison()
     ]).then(() => {
         showLoading(false);
@@ -379,9 +390,9 @@ function loadSubcategoryTable() {
         });
 }
 
-function loadOwnerComparison() {
-    console.log('👥 Loading owner comparison chart...');
-    
+function loadTransactionTypesTable() {
+    console.log('💳 Loading transaction types table...');
+
     const params = new URLSearchParams();
     Object.keys(analyticsState.currentFilters).forEach(key => {
         const value = analyticsState.currentFilters[key];
@@ -391,7 +402,32 @@ function loadOwnerComparison() {
             params.append(key, value);
         }
     });
-    
+
+    return fetch(`/analytics/api/transaction_types_breakdown?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            renderTransactionTypesTable(data);
+            analyticsState.chartData.transactionTypes = data;
+        })
+        .catch(error => {
+            console.error('Error loading transaction types:', error);
+            showTableError('transactionTypesTable', 'Error loading transaction types data');
+        });
+}
+
+function loadOwnerComparison() {
+    console.log('👥 Loading owner comparison chart...');
+
+    const params = new URLSearchParams();
+    Object.keys(analyticsState.currentFilters).forEach(key => {
+        const value = analyticsState.currentFilters[key];
+        if (Array.isArray(value)) {
+            value.forEach(v => params.append(key, v));
+        } else if (value !== null && value !== '') {
+            params.append(key, value);
+        }
+    });
+
     return fetch(`/analytics/api/owner_comparison?${params}`)
         .then(response => response.json())
         .then(data => {
@@ -584,15 +620,15 @@ function renderCategoryCountsTable(data) {
 
 function renderSubcategoryTable(data) {
     console.log('🔍 Rendering subcategory table with data:', data);
-    
+
     const tbody = document.getElementById('subcategoryAmountsTable');
     if (!tbody) return;
-    
+
     if (!data || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No subcategory data available</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = '';
     data.slice(0, 10).forEach((item, index) => {
         const row = document.createElement('tr');
@@ -602,6 +638,30 @@ function renderSubcategoryTable(data) {
                 ${item.subcategory}
                 <br><small class="text-muted">${item.category}</small>
             </td>
+            <td class="text-end fw-bold">$${item.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            <td class="text-end text-muted">${item.transaction_count}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function renderTransactionTypesTable(data) {
+    console.log('💳 Rendering transaction types table with data:', data);
+
+    const tbody = document.getElementById('transactionTypesTable');
+    if (!tbody) return;
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No transaction types data available</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="fw-bold">${index + 1}</td>
+            <td>${item.type}</td>
             <td class="text-end fw-bold">$${item.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             <td class="text-end text-muted">${item.transaction_count}</td>
         `;
@@ -830,11 +890,122 @@ function renderFilteredTransactionsTable(transactions) {
     });
 }
 
+function setupYoYControls() {
+    console.log('📅 Setting up Year-over-Year controls...');
+
+    // Setup toggle event listeners
+    const yearlyRadio = document.getElementById('yoyViewYearly');
+    const categoryRadio = document.getElementById('yoyViewCategory');
+    const categorySelector = document.getElementById('yoyCategorySelector');
+    const categorySelect = document.getElementById('yoyCategorySelect');
+
+    if (yearlyRadio && categoryRadio && categorySelector) {
+        // Handle toggle change
+        const handleToggleChange = () => {
+            const viewType = document.querySelector('input[name="yoyViewType"]:checked')?.value;
+            if (viewType === 'category') {
+                categorySelector.style.display = 'block';
+                populateYoYCategorySelect();
+            } else {
+                categorySelector.style.display = 'none';
+            }
+            loadMonthlySpendingMatrix();
+        };
+
+        yearlyRadio.addEventListener('change', handleToggleChange);
+        categoryRadio.addEventListener('change', handleToggleChange);
+
+        // Handle category selection change
+        if (categorySelect) {
+            categorySelect.addEventListener('change', () => {
+                loadMonthlySpendingMatrix();
+            });
+        }
+    }
+}
+
+function populateYoYCategorySelect() {
+    const categorySelect = document.getElementById('yoyCategorySelect');
+    if (!categorySelect) return;
+
+    // Fetch categories, subcategories, and owners from the database
+    fetch('/analytics/api/filtered_transactions')
+        .then(res => res.json())
+        .then(data => {
+            // Extract unique categories, subcategories, and owners
+            const categories = new Set();
+            const subcategories = new Set();
+            const owners = new Set();
+
+            data.forEach(txn => {
+                if (txn.category) categories.add(txn.category);
+                if (txn.sub_category) subcategories.add(txn.sub_category);
+                if (txn.owner) owners.add(txn.owner);
+            });
+
+            // Build options
+            let options = '<option value="">Select Filter...</option>';
+
+            // Add category options
+            if (categories.size > 0) {
+                options += '<optgroup label="Categories">';
+                Array.from(categories).sort().forEach(cat => {
+                    options += `<option value="category:${cat}">${cat}</option>`;
+                });
+                options += '</optgroup>';
+            }
+
+            // Add subcategory options
+            if (subcategories.size > 0) {
+                options += '<optgroup label="Subcategories">';
+                Array.from(subcategories).sort().forEach(subcat => {
+                    options += `<option value="subcategory:${subcat}">${subcat}</option>`;
+                });
+                options += '</optgroup>';
+            }
+
+            // Add owner options
+            if (owners.size > 0) {
+                options += '<optgroup label="Owners">';
+                Array.from(owners).sort().forEach(owner => {
+                    options += `<option value="owner:${owner}">${owner}</option>`;
+                });
+                options += '</optgroup>';
+            }
+
+            categorySelect.innerHTML = options;
+        })
+        .catch(err => {
+            console.error('Error loading filter options:', err);
+        });
+}
+
 function loadMonthlySpendingMatrix() {
     const container = document.getElementById('monthlySpendingMatrixContainer');
     if (!container) return;
+
+    // Get current view type and selected category
+    const viewType = document.querySelector('input[name="yoyViewType"]:checked')?.value || 'yearly';
+    const categoryValue = document.getElementById('yoyCategorySelect')?.value || '';
+
     container.innerHTML = '<div class="text-center text-muted">Loading table...</div>';
-    fetch('/analytics/api/monthly_spending_matrix')
+
+    // Build API URL with parameters
+    let apiUrl = '/analytics/api/monthly_spending_matrix';
+    const params = new URLSearchParams();
+
+    if (viewType === 'category' && categoryValue) {
+        // Parse category value (format: "category:value" or "subcategory:value")
+        const [filterType, filterValue] = categoryValue.split(':');
+        params.append('filter_type', filterType);
+        params.append('filter_value', filterValue);
+    }
+
+    if (params.toString()) {
+        apiUrl += '?' + params.toString();
+    }
+
+    fetch(apiUrl)
         .then(res => res.json())
         .then(matrix => {
             if (!matrix || Object.keys(matrix).length === 0) {

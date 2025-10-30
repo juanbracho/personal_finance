@@ -551,9 +551,106 @@ def api_owner_comparison():
         
         print(f"👥 Returning comparison for {len(result_list)} owners")
         return jsonify(result_list)
-        
+
     except Exception as e:
         print(f"❌ Error in owner comparison API: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@analytics_bp.route('/api/transaction_types_breakdown')
+def api_transaction_types_breakdown():
+    """Get transaction types breakdown data with filters"""
+
+    try:
+        # Get filter parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        owners = request.args.getlist('owners')
+        categories = request.args.getlist('categories')
+        subcategories = request.args.getlist('subcategories')
+        accounts = request.args.getlist('accounts')
+        types = request.args.getlist('types')
+        min_amount = request.args.get('min_amount', type=float)
+        max_amount = request.args.get('max_amount', type=float)
+
+        print(f"💳 API: Getting transaction types breakdown")
+
+        conn = sqlite3.connect('data/personal_finance.db')
+
+        # Build filters
+        filters = []
+        params = []
+
+        if start_date:
+            filters.append("date >= ?")
+            params.append(start_date)
+        if end_date:
+            filters.append("date <= ?")
+            params.append(end_date)
+        if owners and 'all' not in owners:
+            placeholders = ','.join(['?' for _ in owners])
+            filters.append(f"owner IN ({placeholders})")
+            params.extend(owners)
+        if categories and 'all' not in categories:
+            placeholders = ','.join(['?' for _ in categories])
+            filters.append(f"category IN ({placeholders})")
+            params.extend(categories)
+        if subcategories and 'all' not in subcategories:
+            placeholders = ','.join(['?' for _ in subcategories])
+            filters.append(f"sub_category IN ({placeholders})")
+            params.extend(subcategories)
+        if accounts and 'all' not in accounts:
+            placeholders = ','.join(['?' for _ in accounts])
+            filters.append(f"account_name IN ({placeholders})")
+            params.extend(accounts)
+        if types and 'all' not in types:
+            placeholders = ','.join(['?' for _ in types])
+            filters.append(f"type IN ({placeholders})")
+            params.extend(types)
+        if min_amount is not None:
+            filters.append("amount >= ?")
+            params.append(min_amount)
+        if max_amount is not None:
+            filters.append("amount <= ?")
+            params.append(max_amount)
+
+        filters.append("COALESCE(is_active, 1) = 1")
+        where_clause = "WHERE " + " AND ".join(filters)
+
+        # Transaction types breakdown query
+        breakdown_query = f"""
+        SELECT
+            type,
+            SUM(amount) as total,
+            COUNT(*) as transaction_count,
+            AVG(amount) as avg_amount
+        FROM transactions
+        {where_clause}
+        GROUP BY type
+        ORDER BY total DESC
+        """
+
+        breakdown_df = pd.read_sql_query(breakdown_query, conn, params=params)
+        conn.close()
+
+        # Calculate percentages
+        total_amount = breakdown_df['total'].sum()
+
+        result = []
+        for _, row in breakdown_df.iterrows():
+            percentage = (float(row['total']) / total_amount * 100) if total_amount > 0 else 0
+            result.append({
+                'type': row['type'],
+                'total': float(row['total']),
+                'transaction_count': int(row['transaction_count']),
+                'avg_amount': float(row['avg_amount']),
+                'percentage': percentage
+            })
+
+        print(f"💳 Returning breakdown for {len(result)} transaction types")
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"❌ Error in transaction types breakdown API: {e}")
         return jsonify({'error': str(e)}), 500
 
 @analytics_bp.route('/api/filtered_transactions')
@@ -627,23 +724,50 @@ def api_filtered_transactions():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def get_monthly_spending_matrix(conn):
+def get_monthly_spending_matrix(conn, filter_type=None, filter_value=None):
     import pandas as pd
-    # Query: total spending per month per year
+    # Build query with optional category/subcategory/owner filter
     query = '''
         SELECT strftime('%Y', date) as year, strftime('%m', date) as month, SUM(amount) as total
         FROM transactions
-        WHERE amount > 0 AND COALESCE(is_active, 1) = 1
+        WHERE COALESCE(is_active, 1) = 1
+    '''
+    params = []
+
+    # Add category, subcategory, or owner filter if specified
+    if filter_type == 'category' and filter_value:
+        query += ' AND category = ?'
+        params.append(filter_value)
+    elif filter_type == 'subcategory' and filter_value:
+        query += ' AND sub_category = ?'
+        params.append(filter_value)
+    elif filter_type == 'owner' and filter_value:
+        query += ' AND owner = ?'
+        params.append(filter_value)
+
+    query += '''
         GROUP BY year, month
         ORDER BY year, month
     '''
-    df = pd.read_sql_query(query, conn)
+
+    df = pd.read_sql_query(query, conn, params=params if params else None)
     if df.empty:
         return {}
     # Pivot to year as rows, months as columns
     pivot = df.pivot(index='year', columns='month', values='total').fillna(0)
     # Calculate percent change from previous year for each month
-    pct_change = pivot.pct_change().fillna(0) * 100
+    # Handle cases where previous value is 0 or values cross zero
+    pct_change = pivot.copy()
+    for col in pivot.columns:
+        for i in range(1, len(pivot)):
+            prev_val = pivot.iloc[i-1][col]
+            curr_val = pivot.iloc[i][col]
+            if prev_val != 0:
+                pct_change.iloc[i][col] = ((curr_val - prev_val) / abs(prev_val)) * 100
+            else:
+                pct_change.iloc[i][col] = 0
+        pct_change.iloc[0][col] = 0
+
     # Build result: {year: {month: {total, pct_change}}}
     result = {}
     for year in pivot.index:
@@ -656,11 +780,16 @@ def get_monthly_spending_matrix(conn):
 
 @analytics_bp.route('/api/monthly_spending_matrix')
 def api_monthly_spending_matrix():
-    """Return a matrix of total spending per month per year, with percent change from previous year"""
+    """Return a matrix of total spending per month per year, with percent change from previous year.
+    Supports optional filtering by category, subcategory, or owner via query parameters."""
     import sqlite3
     try:
+        # Get filter parameters from query string
+        filter_type = request.args.get('filter_type', None)  # 'category', 'subcategory', or 'owner'
+        filter_value = request.args.get('filter_value', None)  # The actual filter value
+
         conn = sqlite3.connect('data/personal_finance.db')
-        matrix = get_monthly_spending_matrix(conn)
+        matrix = get_monthly_spending_matrix(conn, filter_type, filter_value)
         conn.close()
         return jsonify(matrix)
     except Exception as e:

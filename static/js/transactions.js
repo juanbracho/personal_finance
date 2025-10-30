@@ -484,11 +484,7 @@ function handleQuickAction(buttonText, button) {
 
 function fillQuickAction(subCategory, category, type, avgAmount, isBusiness) {
     console.log(`⚡ Quick action: ${subCategory} (${category}, ${type})`);
-    
-    // Set today's date
-    const dateInput = document.getElementById('date');
-    if (dateInput) dateInput.value = FinanceUtils.getTodaysDate();
-    
+
     // Fill form fields
     const descriptionInput = document.getElementById('description');
     const categorySelect = document.getElementById('category');
@@ -522,15 +518,13 @@ function fillQuickAction(subCategory, category, type, avgAmount, isBusiness) {
 
 function fillIncomeTemplate() {
     console.log('💰 Filling income template...');
-    
-    const dateInput = document.getElementById('date');
+
     const descriptionInput = document.getElementById('description');
     const categorySelect = document.getElementById('category');
     const typeSelect = document.getElementById('type');
     const businessCheckbox = document.getElementById('is_business');
     const amountInput = document.getElementById('amount');
-    
-    if (dateInput) dateInput.value = FinanceUtils.getTodaysDate();
+
     if (descriptionInput) descriptionInput.value = 'Income/Refund';
     if (categorySelect) categorySelect.value = 'Savings';
     if (typeSelect) typeSelect.value = 'Savings';
@@ -543,16 +537,14 @@ function fillIncomeTemplate() {
 
 function fillBusinessIncomeTemplate() {
     console.log('💼 Filling business income template...');
-    
-    const dateInput = document.getElementById('date');
+
     const descriptionInput = document.getElementById('description');
     const categorySelect = document.getElementById('category');
     const subCategorySelect = document.getElementById('sub_category');
     const typeSelect = document.getElementById('type');
     const businessCheckbox = document.getElementById('is_business');
     const amountInput = document.getElementById('amount');
-    
-    if (dateInput) dateInput.value = FinanceUtils.getTodaysDate();
+
     if (descriptionInput) descriptionInput.value = 'Girasoul Revenue';
     if (categorySelect) categorySelect.value = 'Business';
     if (subCategorySelect) subCategorySelect.value = 'Girasoul';
