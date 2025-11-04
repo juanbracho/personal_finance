@@ -40,7 +40,7 @@
     <div class="col-md-4">
         <div class="card metric-card">
             <div class="metric-label">Active Accounts</div>
-            <div class="metric-value neutral">{{ debts|length }}</div>
+            <div class="metric-value neutral">{{ active_count }}</div>
             <small class="text-muted">Debt Accounts</small>
         </div>
     </div>
@@ -50,8 +50,18 @@
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">💳 Your Debt Accounts</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="showPaidOffToggle"
+                           {{ 'checked' if show_paid_off else '' }}
+                           onchange="togglePaidOffDebts(this.checked)">
+                    <label class="form-check-label" for="showPaidOffToggle">
+                        Show Paid-Off Debts
+                    </label>
+                </div>
             </div>
             <div class="card-body">
                 {% if debts %}
@@ -72,21 +82,34 @@
                             </thead>
                             <tbody>
                                 {% for debt in debts %}
-                                <tr>
+                                <tr class="{{ 'table-success' if debt.is_active == 0 else '' }}">
                                     <td>
-                                        <div class="fw-bold">{{ debt.name }}</div>
-                                        {% if debt.account_number_last4 %}
-                                            <small class="text-muted">****{{ debt.account_number_last4 }}</small>
-                                        {% endif %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div>
+                                                <div class="fw-bold">{{ debt.name }}</div>
+                                                {% if debt.account_number_last4 %}
+                                                    <small class="text-muted">****{{ debt.account_number_last4 }}</small>
+                                                {% endif %}
+                                            </div>
+                                            {% if debt.is_active == 0 %}
+                                                <span class="badge bg-success">Paid Off</span>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     <td>
                                         <span class="badge bg-secondary">{{ debt.debt_type }}</span>
                                     </td>
                                     <td>{{ debt.owner }}</td>
                                     <td>
-                                        <span class="fw-bold text-danger">
-                                            ${{ "%.2f"|format(debt.current_balance) }}
-                                        </span>
+                                        {% if debt.is_active == 0 %}
+                                            <span class="fw-bold text-success">
+                                                ${{ "%.2f"|format(debt.current_balance) }}
+                                            </span>
+                                        {% else %}
+                                            <span class="fw-bold text-danger">
+                                                ${{ "%.2f"|format(debt.current_balance) }}
+                                            </span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if debt.minimum_payment %}
@@ -132,20 +155,25 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button class="btn btn-success btn-sm" 
-                                                    onclick="showPaymentModal({{ debt.id }}, '{{ debt.name }}', {{ debt.current_balance }}, {{ debt.minimum_payment if debt.minimum_payment else 'null' }})" 
+                                            <button class="btn btn-success btn-sm"
+                                                    onclick="showPaymentModal({{ debt.id }}, '{{ debt.name }}', {{ debt.current_balance }}, {{ debt.minimum_payment if debt.minimum_payment else 'null' }})"
                                                     title="Make Payment">
                                                 💰
                                             </button>
-                                            <button class="btn btn-info btn-sm" 
+                                            <button class="btn btn-info btn-sm"
                                                     onclick="editDebt({{ debt.id }})"
                                                     title="Edit Account">
                                                 ✏️
                                             </button>
-                                            <button class="btn btn-outline-secondary btn-sm" 
-                                                    onclick="alert('History feature coming soon!')"
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    onclick="showPaymentHistory({{ debt.id }}, '{{ debt.name }}')"
                                                     title="Payment History">
                                                 📊
+                                            </button>
+                                            <button class="btn btn-danger btn-sm"
+                                                    onclick="deleteDebt({{ debt.id }}, '{{ debt.name }}')"
+                                                    title="Delete Account">
+                                                🗑️
                                             </button>
                                         </div>
                                     </td>
@@ -533,6 +561,109 @@
                 <button type="button" class="btn btn-primary" id="saveDebtEditBtn" onclick="saveDebtEdit()">
                     💾 Save Changes
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment History Modal -->
+<div class="modal fade" id="paymentHistoryModal" tabindex="-1" aria-labelledby="paymentHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentHistoryModalLabel">Payment History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Summary Section -->
+                <div class="row mb-4">
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small">Original Balance</h6>
+                                <h5 class="text-primary mb-0" id="historyOriginalBalance">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small">Current Balance</h6>
+                                <h5 class="text-danger mb-0" id="historyCurrentBalance">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small">Total Charges</h6>
+                                <h5 class="text-warning mb-0" id="historyTotalCharges">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small">Total Paid</h6>
+                                <h5 class="text-success mb-0" id="historyTotalPaid">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small"># Payments</h6>
+                                <h5 class="text-info mb-0" id="historyPaymentCount">0</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        <div class="card text-center">
+                            <div class="card-body p-2">
+                                <h6 class="text-muted mb-2 small">Avg Payment</h6>
+                                <h5 class="text-secondary mb-0" id="historyAvgPayment">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment History Table -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Principal</th>
+                                <th>Interest</th>
+                                <th>Balance After</th>
+                                <th>Type</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentHistoryTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="paymentHistoryEmpty" class="text-center py-5" style="display: none;">
+                    <div class="mb-3">
+                        <i class="fas fa-history fa-3x text-muted"></i>
+                    </div>
+                    <h5 class="text-muted">No Payment History</h5>
+                    <p class="text-muted">No payments have been made to this debt account yet.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

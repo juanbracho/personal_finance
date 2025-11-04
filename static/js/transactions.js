@@ -34,31 +34,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeTransactionForm() {
     console.log('📝 Initializing transaction form...');
-    
+
     setupFormValidation();
     setTodaysDate();
     loadFormData();
     setupDynamicDropdowns();
     setupSimilarTransactionSearch();
-    
+    setupCreditHandling();  // NEW: Setup credit checkbox handling
+
     // Add event listeners
     const descriptionInput = document.getElementById('description');
     if (descriptionInput) {
         descriptionInput.addEventListener('input', debounce(searchSimilarTransactions, 300));
     }
-    
+
     const amountInput = document.getElementById('amount');
     if (amountInput) {
         amountInput.addEventListener('input', validateAmount);
     }
-    
+
     // Setup quick action handlers
     setupQuickActionHandlers();
 }
 
 function loadFormData() {
     console.log('📊 Loading form data from server...');
-    
+
     fetch('/transactions/api/get_form_data')
         .then(response => response.json())
         .then(data => {
@@ -70,6 +71,131 @@ function loadFormData() {
             FinanceUtils.showAlert('Error loading form data', 'warning');
         });
 }
+
+// ============================================================================
+// CREDIT/DEBT ACCOUNT HANDLING (NEW - Phase 3)
+// ============================================================================
+
+function setupCreditHandling() {
+    console.log('💳 Setting up credit checkbox handling...');
+
+    const creditCheckbox = document.getElementById('is_credit');
+    if (!creditCheckbox) return;
+
+    // Listen to credit checkbox changes
+    creditCheckbox.addEventListener('change', handleCreditToggle);
+}
+
+function handleCreditToggle() {
+    const creditCheckbox = document.getElementById('is_credit');
+    const creditWarning = document.getElementById('creditWarning');
+    const accountSelect = document.getElementById('account_name');
+
+    if (!creditCheckbox || !creditWarning || !accountSelect) return;
+
+    if (creditCheckbox.checked) {
+        // Credit mode: Load and show debt accounts
+        creditWarning.style.display = 'block';
+        console.log('💳 Credit mode enabled - loading debt accounts...');
+        loadDebtAccounts();
+    } else {
+        // Regular mode: Show regular accounts from formData
+        creditWarning.style.display = 'none';
+        console.log('💵 Regular transaction mode - loading regular accounts...');
+        loadRegularAccounts();
+    }
+}
+
+function loadDebtAccounts() {
+    console.log('💳 Loading debt accounts...');
+
+    fetch('/api/accounts/list')
+        .then(response => response.json())
+        .then(data => {
+            console.log('💳 Received accounts:', data);
+            // Filter to only debt accounts
+            const debtAccounts = data.filter(acc => acc.is_debt);
+            console.log(`💳 Found ${debtAccounts.length} debt accounts`);
+            populateAccountDropdown(debtAccounts, true);
+        })
+        .catch(error => {
+            console.error('❌ Error loading debt accounts:', error);
+            FinanceUtils.showAlert('Error loading debt accounts. Make sure you have debt accounts created.', 'warning');
+        });
+}
+
+function loadRegularAccounts() {
+    console.log('💵 Loading regular accounts...');
+
+    // Use accounts from formData (existing transaction accounts)
+    const regularAccounts = transactionState.formData.accounts || [];
+    console.log(`💵 Found ${regularAccounts.length} regular accounts`);
+
+    const accountSelect = document.getElementById('account_name');
+    if (!accountSelect) return;
+
+    // Save current selection
+    const currentValue = accountSelect.value;
+
+    // Clear existing options except the first one
+    accountSelect.innerHTML = '<option value="">Select account...</option>';
+
+    // Add regular accounts
+    regularAccounts.forEach(accountName => {
+        const option = document.createElement('option');
+        option.value = accountName;
+        option.textContent = accountName;
+        accountSelect.appendChild(option);
+    });
+
+    // Restore selection if it still exists
+    if (currentValue && regularAccounts.includes(currentValue)) {
+        accountSelect.value = currentValue;
+    }
+
+    console.log(`💵 Added ${regularAccounts.length} regular accounts to dropdown`);
+}
+
+function populateAccountDropdown(accounts, isDebtMode = false) {
+    const accountSelect = document.getElementById('account_name');
+    if (!accountSelect) return;
+
+    // Save current selection
+    const currentValue = accountSelect.value;
+
+    // Clear existing options
+    accountSelect.innerHTML = '<option value="">Select account...</option>';
+
+    // Add accounts
+    accounts.forEach(account => {
+        const option = document.createElement('option');
+
+        if (isDebtMode) {
+            // Debt accounts with indicator
+            option.value = account.name;
+            option.textContent = `💳 ${account.name} (${account.account_type})`;
+            option.dataset.isDebt = 'true';
+            option.dataset.debtAccountId = account.debt_account_id || '';
+        } else {
+            // Regular accounts
+            option.value = account;
+            option.textContent = account;
+        }
+
+        accountSelect.appendChild(option);
+    });
+
+    // Try to restore selection
+    if (currentValue) {
+        accountSelect.value = currentValue;
+    }
+
+    console.log(`💳 Added ${accounts.length} accounts to dropdown (debt mode: ${isDebtMode})`);
+}
+
+// ============================================================================
+// FORM VALIDATION
+// ============================================================================
 
 function setupFormValidation() {
     const form = document.getElementById('transactionForm');
@@ -873,7 +999,7 @@ function loadEditFormData() {
 
 function populateEditForm(transaction) {
     console.log('📝 Populating edit form with transaction data:', transaction);
-    
+
     // Set form values
     document.getElementById('editTransactionId').value = transaction.id;
     document.getElementById('editDate').value = transaction.date;
@@ -884,14 +1010,21 @@ function populateEditForm(transaction) {
     document.getElementById('editType').value = transaction.type;
     document.getElementById('editAccountName').value = transaction.account_name;
     document.getElementById('editOwner').value = transaction.owner;
-    document.getElementById('editIsBusiness').checked = transaction.is_business;
+
+    // Set is_business checkbox if it exists
+    const editIsBusiness = document.getElementById('editIsBusiness');
+    if (editIsBusiness) {
+        editIsBusiness.checked = transaction.is_business;
+    }
 }
 
 function saveTransactionEdit() {
     console.log('💾 Saving transaction edit...');
-    
+
     // Get form data
     const transactionId = document.getElementById('editTransactionId').value;
+    const editIsBusiness = document.getElementById('editIsBusiness');
+
     const formData = {
         account_name: document.getElementById('editAccountName').value,
         date: document.getElementById('editDate').value,
@@ -901,7 +1034,7 @@ function saveTransactionEdit() {
         category: document.getElementById('editCategory').value,
         type: document.getElementById('editType').value,
         owner: document.getElementById('editOwner').value,
-        is_business: document.getElementById('editIsBusiness').checked
+        is_business: editIsBusiness ? editIsBusiness.checked : false
     };
     
     // Validate required fields
@@ -1101,3 +1234,6 @@ function fillQuickActionFromPattern(pattern) {
 }
 // Call loadQuickActions on page load
 document.addEventListener('DOMContentLoaded', loadQuickActions);
+
+// Export handleCreditToggle for global access (called from HTML)
+window.handleCreditToggle = handleCreditToggle;

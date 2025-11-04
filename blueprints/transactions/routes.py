@@ -151,10 +151,12 @@ def add_transaction():
             transaction_type = request.form.get('type', '').strip()
             owner = request.form.get('owner', '').strip()
             is_business = request.form.get('is_business') == 'on'
+            is_credit = request.form.get('is_credit') == 'on'  # NEW: Credit transaction flag
             save_and_add_another = request.form.get('save_and_add_another') == 'true'
-            
+
             print(f"📋 Form data: {description}, ${amount_str}, {category}, {owner}")
             print(f"📋 Save and add another: {save_and_add_another}")
+            print(f"💳 Is credit: {is_credit}")
             
             # Validation
             if not all([account_name, date_str, description, amount_str, category, transaction_type, owner]):
@@ -179,56 +181,124 @@ def add_transaction():
                 print(f"💚 Adding INCOME transaction: {description} = ${amount}")
             else:
                 print(f"🔴 Adding EXPENSE transaction: {description} = ${amount}")
-            
+
             conn = sqlite3.connect('data/personal_finance.db')
             cursor = conn.cursor()
-            
-            # Handle new category - add to budget templates if not exists
-            if category:
-                cursor.execute("SELECT id FROM budget_templates WHERE category = ?", (category,))
-                if not cursor.fetchone():
-                    print(f"➕ Adding new category to budget templates: {category}")
+
+            # NEW: Check if this is a credit transaction
+            if is_credit:
+                print(f"💳 Processing credit transaction...")
+
+                # Find debt account by name
+                cursor.execute("""
+                    SELECT id, current_balance
+                    FROM debt_accounts
+                    WHERE name = ? AND is_active = 1
+                """, (account_name,))
+
+                debt_result = cursor.fetchone()
+                if not debt_result:
+                    # Try to find any debt account with this name
                     cursor.execute("""
-                        INSERT INTO budget_templates (category, budget_amount, notes, is_active, created_at, updated_at)
-                        VALUES (?, 0.00, 'Added from transaction form', 1, ?, ?)
-                    """, (category, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
-            
-            # Insert transaction
-            cursor.execute("""
-                INSERT INTO transactions 
-                (account_name, date, description, amount, sub_category, category, type, owner, is_business, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-            """, (
-                account_name,
-                transaction_date.strftime('%Y-%m-%d'),
-                description,
-                amount,
-                sub_category if sub_category else None,
-                category,
-                transaction_type,
-                owner,
-                is_business,
-                datetime.utcnow().isoformat(),
-                datetime.utcnow().isoformat()
-            ))
-            
-            transaction_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
-            
-            # Success message
-            transaction_display = "Income" if amount < 0 else "Expense"
-            amount_display = f"${abs(amount):.2f}"
-            
-            print(f"✅ Added transaction ID {transaction_id}: {description} - {transaction_display} {amount_display}")
+                        SELECT id, current_balance
+                        FROM debt_accounts
+                        WHERE name = ?
+                    """, (account_name,))
+                    debt_result = cursor.fetchone()
+
+                if not debt_result:
+                    flash(f'Debt account "{account_name}" not found', 'error')
+                    raise ValueError(f"Debt account not found: {account_name}")
+
+                debt_account_id, current_balance = debt_result
+
+                # Create debt charge record
+                cursor.execute("""
+                    INSERT INTO debt_charges
+                    (debt_account_id, charge_amount, charge_date, description, category, charge_type, is_paid, notes, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
+                """, (
+                    debt_account_id,
+                    amount,
+                    transaction_date.strftime('%Y-%m-%d'),
+                    description,
+                    category,
+                    'Purchase',
+                    sub_category if sub_category else None,
+                    datetime.utcnow().isoformat()
+                ))
+
+                charge_id = cursor.lastrowid
+
+                # Update debt balance and reopen if paid off
+                new_balance = float(current_balance) + amount
+                cursor.execute("""
+                    UPDATE debt_accounts
+                    SET current_balance = ?,
+                        is_active = 1,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (new_balance, datetime.utcnow().isoformat(), debt_account_id))
+
+                conn.commit()
+                conn.close()
+
+                print(f"✅ Added debt charge ID {charge_id}: {description} - ${amount:.2f}")
+                print(f"💳 Debt balance updated: ${current_balance:.2f} → ${new_balance:.2f}")
+
+                # Success message
+                amount_display = f"${abs(amount):.2f}"
+                success_msg = f'Credit charge added successfully! {amount_display} - {description} on {account_name}'
+
+            else:
+                # REGULAR TRANSACTION (existing flow)
+                # Handle new category - add to budget templates if not exists
+                if category:
+                    cursor.execute("SELECT id FROM budget_templates WHERE category = ?", (category,))
+                    if not cursor.fetchone():
+                        print(f"➕ Adding new category to budget templates: {category}")
+                        cursor.execute("""
+                            INSERT INTO budget_templates (category, budget_amount, notes, is_active, created_at, updated_at)
+                            VALUES (?, 0.00, 'Added from transaction form', 1, ?, ?)
+                        """, (category, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
+
+                # Insert transaction
+                cursor.execute("""
+                    INSERT INTO transactions
+                    (account_name, date, description, amount, sub_category, category, type, owner, is_business, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """, (
+                    account_name,
+                    transaction_date.strftime('%Y-%m-%d'),
+                    description,
+                    amount,
+                    sub_category if sub_category else None,
+                    category,
+                    transaction_type,
+                    owner,
+                    is_business,
+                    datetime.utcnow().isoformat(),
+                    datetime.utcnow().isoformat()
+                ))
+
+                transaction_id = cursor.lastrowid
+                conn.commit()
+                conn.close()
+
+                # Success message
+                transaction_display = "Income" if amount < 0 else "Expense"
+                amount_display = f"${abs(amount):.2f}"
+                success_msg = f'{transaction_display} added successfully! {amount_display} - {description}'
+
+                print(f"✅ Added transaction ID {transaction_id}: {description} - {transaction_display} {amount_display}")
             
             # Handle redirect based on save_and_add_another parameter
             if save_and_add_another:
-                flash(f'{transaction_display} saved successfully! {amount_display} - {description}. Add another transaction below.', 'success')
+                flash(f'{success_msg} Add another transaction below.', 'success')
                 return redirect(url_for('transactions.add_transaction'))
             else:
-                flash(f'{transaction_display} added successfully! {amount_display} - {description}', 'success')
-                return redirect(url_for('transactions.list_transactions'))
+                flash(success_msg, 'success')
+                return redirect(url_for('transactions.list_transactions') if not is_credit else url_for('debts.list_debts'))
             
         except Exception as e:
             print(f"❌ Error adding transaction: {e}")

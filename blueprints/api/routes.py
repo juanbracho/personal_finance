@@ -1090,60 +1090,126 @@ def edit_account(account_name):
 @api_bp.route('/categories/statistics')
 def api_categories_statistics():
     """Get statistics for all category types"""
-    
+
     try:
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
-        
+
         conn = sqlite3.connect('data/personal_finance.db')
         cursor = conn.cursor()
-        
+
         # Build date filter
         date_filter = "strftime('%Y', date) = ?"
         params = [str(year)]
-        
+
         if month != 'all':
             date_filter += " AND strftime('%m', date) = ?"
             params.append(f"{int(month):02d}")
-        
+
         # Get counts for each type
         stats = {}
-        
+
         # Categories count - FIX query
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT category) FROM transactions 
+            SELECT COUNT(DISTINCT category) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['categories'] = cursor.fetchone()[0] or 0
-        
-        # Subcategories count - FIX query  
+
+        # Subcategories count - FIX query
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT sub_category) FROM transactions 
+            SELECT COUNT(DISTINCT sub_category) FROM transactions
             WHERE {date_filter} AND sub_category IS NOT NULL AND sub_category != '' AND COALESCE(is_active, 1) = 1
         """, params)
         stats['subcategories'] = cursor.fetchone()[0] or 0
-        
+
         # Owners count - FIX query
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT owner) FROM transactions 
+            SELECT COUNT(DISTINCT owner) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['owners'] = cursor.fetchone()[0] or 0
-        
+
         # Accounts count - FIX query
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT account_name) FROM transactions 
+            SELECT COUNT(DISTINCT account_name) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['accounts'] = cursor.fetchone()[0] or 0
-        
+
         conn.close()
-        
+
         print(f"📊 Statistics for {year}-{month}: {stats}")
         return jsonify(stats)
-        
+
     except Exception as e:
         print(f"❌ Error getting statistics: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'categories': 0, 'subcategories': 0, 'owners': 0, 'accounts': 0}), 500
+
+@api_bp.route('/accounts/list')
+def get_accounts_list():
+    """Get all accounts (regular + debt accounts) for transaction form dropdown"""
+
+    try:
+        print("💳 Getting accounts list for transaction form")
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        accounts_list = []
+
+        # Get regular accounts from accounts table
+        cursor.execute("""
+            SELECT id, name, account_type, is_debt, debt_account_id
+            FROM accounts
+            WHERE is_active = 1
+            ORDER BY name
+        """)
+
+        regular_accounts = cursor.fetchall()
+        for account in regular_accounts:
+            accounts_list.append({
+                'id': account[0],
+                'name': account[1],
+                'account_type': account[2],
+                'is_debt': bool(account[3]),
+                'debt_account_id': account[4]
+            })
+
+        # Get debt accounts and add them
+        cursor.execute("""
+            SELECT id, name, debt_type
+            FROM debt_accounts
+            WHERE is_active = 1
+            ORDER BY name
+        """)
+
+        debt_accounts = cursor.fetchall()
+        for debt in debt_accounts:
+            # Check if this debt account is already in accounts table
+            existing = next((a for a in accounts_list if a.get('debt_account_id') == debt[0]), None)
+            if not existing:
+                # Add debt account
+                accounts_list.append({
+                    'id': f"debt_{debt[0]}",  # Prefix with debt_ to distinguish
+                    'name': debt[1],
+                    'account_type': debt[2],  # Credit Card, Car Loan, etc.
+                    'is_debt': True,
+                    'debt_account_id': debt[0]
+                })
+
+        conn.close()
+
+        # Sort by name
+        accounts_list.sort(key=lambda x: x['name'])
+
+        print(f"💳 Returning {len(accounts_list)} accounts")
+        return jsonify(accounts_list)
+
+    except Exception as e:
+        print(f"❌ Error getting accounts list: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([]), 500
