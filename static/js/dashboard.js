@@ -50,6 +50,12 @@ function loadViewSpecificContent() {
             break;
     }
 }
+
+// Budget view - no charts needed, server-rendered
+function loadBudgetCharts() {
+    console.log('Budget view loaded (server-rendered)');
+}
+
 // Overview Charts
 function loadOverviewCharts() {
     console.log('📊 Loading enhanced overview charts...');

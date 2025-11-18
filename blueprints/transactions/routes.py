@@ -777,3 +777,36 @@ def api_common_transaction_patterns():
         print(f"❌ Error in common transaction patterns API: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@transactions_bp.route('/api/subcategories')
+def api_get_subcategories():
+    """Get distinct subcategories for a given category"""
+    import sqlite3
+    import traceback
+
+    category = request.args.get('category')
+
+    if not category:
+        return jsonify({'error': 'Category parameter required'}), 400
+
+    try:
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT DISTINCT sub_category
+            FROM transactions
+            WHERE category = ?
+            AND sub_category IS NOT NULL
+            AND sub_category != ''
+            ORDER BY sub_category
+        """, (category,))
+
+        subcategories = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        return jsonify(subcategories)
+    except Exception as e:
+        print(f"❌ Error getting subcategories: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

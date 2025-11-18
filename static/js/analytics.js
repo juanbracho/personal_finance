@@ -862,7 +862,7 @@ function fetchFilteredTransactions() {
             renderFilteredTransactionsTable(data);
         })
         .catch(err => {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Error loading transactions</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-danger text-center">Error loading transactions</td></tr>`;
         });
 }
 
@@ -870,13 +870,16 @@ function renderFilteredTransactionsTable(transactions) {
     const tbody = document.getElementById('filteredTransactionsBody');
     if (!tbody) return;
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No transactions found for current filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No transactions found for current filters.</td></tr>';
         return;
     }
     tbody.innerHTML = '';
     transactions.forEach(tx => {
         const row = document.createElement('tr');
         row.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="transaction-checkbox" data-transaction-id="${tx.id}" onchange="window.Analytics.handleTransactionCheckboxChange(this)">
+            </td>
             <td>${tx.date}</td>
             <td>${tx.description || ''}</td>
             <td class="text-end">$${parseFloat(tx.amount).toFixed(2)}</td>
@@ -885,9 +888,183 @@ function renderFilteredTransactionsTable(transactions) {
             <td>${tx.owner || ''}</td>
             <td>${tx.account_name || ''}</td>
             <td>${tx.type || ''}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="editTransactionFromAnalytics(${tx.id})" title="Edit">
+                    <i class="bi bi-pencil"></i> ✏️
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteTransactionFromAnalytics(${tx.id}, '${tx.description}')" title="Delete">
+                    <i class="bi bi-trash"></i> 🗑️
+                </button>
+            </td>
         `;
         tbody.appendChild(row);
     });
+}
+
+// ============================================================================
+// TRANSACTION EDITING FROM ANALYTICS
+// ============================================================================
+
+async function editTransactionFromAnalytics(transactionId) {
+    console.log(`Editing transaction ${transactionId} from analytics`);
+
+    try {
+        // Fetch transaction details
+        const response = await fetch(`/transactions/api/get_transaction/${transactionId}`);
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to load transaction');
+        }
+
+        const tx = data.transaction;
+
+        // Populate form fields
+        document.getElementById('editTransactionId').value = tx.id;
+        document.getElementById('editDate').value = tx.date;
+        document.getElementById('editDescription').value = tx.description;
+        document.getElementById('editAmount').value = tx.amount;
+        document.getElementById('editType').value = tx.type;
+        document.getElementById('editIsBusiness').checked = tx.is_business;
+
+        // Load dropdowns and set values
+        await loadEditFormDropdowns();
+
+        document.getElementById('editCategory').value = tx.category;
+        await loadEditSubcategories();
+        document.getElementById('editSubCategory').value = tx.sub_category || '';
+        document.getElementById('editOwner').value = tx.owner;
+        document.getElementById('editAccountName').value = tx.account_name;
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('editTransactionModal'));
+        modal.show();
+
+    } catch (error) {
+        console.error('Error loading transaction for editing:', error);
+        alert('Failed to load transaction details: ' + error.message);
+    }
+}
+
+async function loadEditFormDropdowns() {
+    // Load categories
+    const categorySelect = document.getElementById('editCategory');
+    const categories = window.analyticsData.availableCategories || [];
+    categorySelect.innerHTML = '<option value="">Select category...</option>' +
+        categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+
+    // Load owners
+    const ownerSelect = document.getElementById('editOwner');
+    const owners = window.analyticsData.availableOwners || [];
+    ownerSelect.innerHTML = '<option value="">Select owner...</option>' +
+        owners.map(owner => `<option value="${owner}">${owner}</option>`).join('');
+
+    // Load accounts
+    const accountSelect = document.getElementById('editAccountName');
+    const accounts = window.analyticsData.availableAccounts || [];
+    accountSelect.innerHTML = '<option value="">Select account...</option>' +
+        accounts.map(acc => `<option value="${acc}">${acc}</option>`).join('');
+}
+
+async function loadEditSubcategories() {
+    const category = document.getElementById('editCategory').value;
+    const subcategorySelect = document.getElementById('editSubCategory');
+
+    if (!category) {
+        subcategorySelect.innerHTML = '<option value="">Select subcategory...</option>';
+        return;
+    }
+
+    try {
+        // Fetch subcategories for selected category
+        const response = await fetch(`/transactions/api/subcategories?category=${encodeURIComponent(category)}`);
+        const subcategories = await response.json();
+
+        subcategorySelect.innerHTML = '<option value="">Select subcategory...</option>' +
+            subcategories.map(sub => `<option value="${sub}">${sub}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading subcategories:', error);
+        subcategorySelect.innerHTML = '<option value="">Error loading subcategories</option>';
+    }
+}
+
+async function saveTransactionFromAnalytics() {
+    const transactionId = document.getElementById('editTransactionId').value;
+
+    const data = {
+        account_name: document.getElementById('editAccountName').value,
+        date: document.getElementById('editDate').value,
+        description: document.getElementById('editDescription').value,
+        amount: parseFloat(document.getElementById('editAmount').value),
+        sub_category: document.getElementById('editSubCategory').value || null,
+        category: document.getElementById('editCategory').value,
+        type: document.getElementById('editType').value,
+        owner: document.getElementById('editOwner').value,
+        is_business: document.getElementById('editIsBusiness').checked
+    };
+
+    // Validation
+    if (!data.account_name || !data.date || !data.description || !data.amount || !data.category || !data.type || !data.owner) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/transactions/api/update_transaction/${transactionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('Transaction updated successfully!');
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('editTransactionModal')).hide();
+
+            // Reload filtered transactions
+            fetchFilteredTransactions();
+
+            // Reload all charts to reflect changes
+            applyFilters();
+        } else {
+            throw new Error(result.error || 'Failed to update transaction');
+        }
+    } catch (error) {
+        console.error('Error updating transaction:', error);
+        alert('Failed to update transaction: ' + error.message);
+    }
+}
+
+async function deleteTransactionFromAnalytics(transactionId, description) {
+    if (!confirm(`Are you sure you want to delete this transaction?\n\n${description}`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/transactions/api/delete_transaction/${transactionId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert('Transaction deleted successfully!');
+
+            // Reload filtered transactions
+            fetchFilteredTransactions();
+
+            // Reload all charts to reflect changes
+            applyFilters();
+        } else {
+            throw new Error(result.error || 'Failed to delete transaction');
+        }
+    } catch (error) {
+        console.error('Error deleting transaction:', error);
+        alert('Failed to delete transaction: ' + error.message);
+    }
 }
 
 function setupYoYControls() {
@@ -1065,10 +1242,217 @@ if (window.location.pathname.includes('/analytics')) {
     document.addEventListener('DOMContentLoaded', fetchFilteredTransactions);
 }
 
+// ============================================================================
+// BULK EDIT FUNCTIONALITY
+// ============================================================================
+
+let selectedTransactions = new Set();
+
+// Initialize bulk edit functionality
+if (window.location.pathname.includes('/analytics')) {
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeBulkEdit();
+    });
+}
+
+function initializeBulkEdit() {
+    console.log('🔧 Setting up bulk edit functionality...');
+
+    // Select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAllTransactions');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.transaction-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = this.checked;
+                const transactionId = parseInt(cb.getAttribute('data-transaction-id'));
+                if (this.checked) {
+                    selectedTransactions.add(transactionId);
+                } else {
+                    selectedTransactions.delete(transactionId);
+                }
+            });
+            updateBulkEditUI();
+        });
+    }
+
+    // Bulk edit button
+    const bulkEditBtn = document.getElementById('bulkEditBtn');
+    if (bulkEditBtn) {
+        bulkEditBtn.addEventListener('click', showBulkEditModal);
+    }
+
+    // Save bulk edit button
+    const saveBulkEditBtn = document.getElementById('saveBulkEdit');
+    if (saveBulkEditBtn) {
+        saveBulkEditBtn.addEventListener('click', saveBulkEdit);
+    }
+
+    console.log('✅ Bulk edit functionality initialized');
+}
+
+function handleTransactionCheckboxChange(checkbox) {
+    const transactionId = parseInt(checkbox.getAttribute('data-transaction-id'));
+
+    if (checkbox.checked) {
+        selectedTransactions.add(transactionId);
+    } else {
+        selectedTransactions.delete(transactionId);
+    }
+
+    updateBulkEditUI();
+
+    // Update select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAllTransactions');
+    const allCheckboxes = document.querySelectorAll('.transaction-checkbox');
+    const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = allChecked && allCheckboxes.length > 0;
+    }
+}
+
+function updateBulkEditUI() {
+    const count = selectedTransactions.size;
+    const bulkEditControls = document.getElementById('bulkEditControls');
+    const selectedCountSpan = document.getElementById('selectedCount');
+
+    if (bulkEditControls) {
+        bulkEditControls.style.display = count > 0 ? 'block' : 'none';
+    }
+
+    if (selectedCountSpan) {
+        selectedCountSpan.textContent = `${count} selected`;
+    }
+}
+
+function showBulkEditModal() {
+    const count = selectedTransactions.size;
+
+    if (count === 0) {
+        alert('Please select at least one transaction');
+        return;
+    }
+
+    // Update modal counts
+    document.getElementById('bulkEditCount').textContent = count;
+    document.getElementById('bulkEditCountFooter').textContent = count;
+
+    // Reset form
+    document.getElementById('bulkEditForm').reset();
+    document.getElementById('bulkEditSubCategory').innerHTML = '<option value="">-- Don\'t Change --</option>';
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('bulkEditModal'));
+    modal.show();
+}
+
+function updateBulkEditSubcategories() {
+    const categorySelect = document.getElementById('bulkEditCategory');
+    const subcategorySelect = document.getElementById('bulkEditSubCategory');
+    const selectedCategory = categorySelect.value;
+
+    // Clear existing subcategories
+    subcategorySelect.innerHTML = '<option value="">-- Don\'t Change --</option>';
+
+    if (!selectedCategory || !window.analyticsData || !window.analyticsData.availableSubcategories) {
+        return;
+    }
+
+    // Filter subcategories by selected category
+    const subcategories = window.analyticsData.availableSubcategories.filter(
+        subcat => subcat.category === selectedCategory
+    );
+
+    // Add filtered subcategories to dropdown
+    subcategories.forEach(subcat => {
+        const option = document.createElement('option');
+        option.value = subcat.subcategory;
+        option.textContent = subcat.subcategory;
+        subcategorySelect.appendChild(option);
+    });
+}
+
+async function saveBulkEdit() {
+    const transactionIds = Array.from(selectedTransactions);
+
+    // Collect updates from form
+    const updates = {};
+
+    const category = document.getElementById('bulkEditCategory').value;
+    if (category) updates.category = category;
+
+    const subCategory = document.getElementById('bulkEditSubCategory').value;
+    if (subCategory) updates.sub_category = subCategory;
+
+    const type = document.getElementById('bulkEditType').value;
+    if (type) updates.type = type;
+
+    const account = document.getElementById('bulkEditAccount').value;
+    if (account) updates.account_name = account;
+
+    const owner = document.getElementById('bulkEditOwner').value;
+    if (owner) updates.owner = owner;
+
+    // Validate that at least one field is being updated
+    if (Object.keys(updates).length === 0) {
+        alert('Please select at least one field to update');
+        return;
+    }
+
+    // Confirm action
+    const updateFields = Object.keys(updates).join(', ');
+    if (!confirm(`Update ${transactionIds.length} transactions?\n\nFields: ${updateFields}`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/analytics/api/bulk_update_transactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                transaction_ids: transactionIds,
+                updates: updates
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkEditModal'));
+            modal.hide();
+
+            // Clear selections
+            selectedTransactions.clear();
+            updateBulkEditUI();
+
+            // Uncheck all checkboxes
+            document.querySelectorAll('.transaction-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectAllTransactions').checked = false;
+
+            // Refresh the transaction list
+            fetchFilteredTransactions();
+
+            // Show success message
+            alert(`Successfully updated ${result.rows_updated} transactions!`);
+        } else {
+            alert(`Error: ${result.error || 'Unknown error occurred'}`);
+        }
+    } catch (error) {
+        console.error('Error updating transactions:', error);
+        alert(`Error updating transactions: ${error.message}`);
+    }
+}
+
 // Export analytics functions
 window.Analytics = {
     applyFilters,
     resetAllFilters,
     clearAllFilters,
-    loadAllCharts
+    loadAllCharts,
+    handleTransactionCheckboxChange,
+    updateBulkEditSubcategories,
+    saveBulkEdit
 };

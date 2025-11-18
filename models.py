@@ -85,7 +85,7 @@ class DebtAccount(db.Model):
 
 class DebtPayment(db.Model):
     __tablename__ = 'debt_payments'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     debt_account_id = db.Column(db.Integer, nullable=False)
     payment_amount = db.Column(db.Numeric(10, 2), nullable=False)
@@ -95,3 +95,38 @@ class DebtPayment(db.Model):
     balance_after_payment = db.Column(db.Numeric(10, 2), nullable=False)
     payment_type = db.Column(db.String(20), default='Regular')
     notes = db.Column(db.Text)
+
+class BudgetSubcategoryTemplate(db.Model):
+    """Model for subcategory-level budget templates"""
+    __tablename__ = 'budget_subcategory_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(100), nullable=False)
+    sub_category = db.Column(db.String(100), nullable=False)
+    budget_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    notes = db.Column(db.Text)
+    budget_by_category = db.Column(db.Boolean, default=False)  # If True, budget is at category level
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('category', 'sub_category'),)
+
+class BudgetCommitment(db.Model):
+    """Model for tracking monthly financial commitments (recurring expenses)"""
+    __tablename__ = 'budget_commitments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
+    sub_category = db.Column(db.String(100), nullable=False)
+    estimated_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    due_day_of_month = db.Column(db.Integer, nullable=False)  # 1-31
+    is_fixed = db.Column(db.Boolean, default=True)  # True = fixed amount, False = variable estimate
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.CheckConstraint('due_day_of_month >= 1 AND due_day_of_month <= 31'),
+    )

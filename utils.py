@@ -138,7 +138,38 @@ def create_personal_finance_tables(cursor):
             FOREIGN KEY (debt_account_id) REFERENCES debt_accounts(id)
         )
     ''')
-    
+
+    # Budget subcategory templates table
+    cursor.execute('''
+        CREATE TABLE budget_subcategory_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            sub_category TEXT NOT NULL,
+            budget_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            notes TEXT,
+            is_active BOOLEAN DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(category, sub_category)
+        )
+    ''')
+
+    # Budget commitments table
+    cursor.execute('''
+        CREATE TABLE budget_commitments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            sub_category TEXT NOT NULL,
+            estimated_amount DECIMAL(10,2) NOT NULL,
+            due_day_of_month INTEGER NOT NULL CHECK(due_day_of_month >= 1 AND due_day_of_month <= 31),
+            is_fixed BOOLEAN DEFAULT 1,
+            is_active BOOLEAN DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     print("✅ All personal finance tables created")
 
 def initialize_basic_data(cursor):
@@ -176,13 +207,52 @@ def initialize_basic_data(cursor):
 def ensure_budget_tables(conn):
     """Legacy function - now just ensures tables exist (for backward compatibility)"""
     cursor = conn.cursor()
-    
+
     # Check if tables exist, if not, create them
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budget_templates'")
     if not cursor.fetchone():
         print("⚠️ Budget tables missing, creating them...")
         create_personal_finance_tables(cursor)
         initialize_basic_data(cursor)
+        conn.commit()
+
+    # Check for new subcategory budget tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budget_subcategory_templates'")
+    if not cursor.fetchone():
+        print("⚠️ Subcategory budget table missing, creating it...")
+        cursor.execute('''
+            CREATE TABLE budget_subcategory_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                sub_category TEXT NOT NULL,
+                budget_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+                notes TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(category, sub_category)
+            )
+        ''')
+        conn.commit()
+
+    # Check for commitments table
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budget_commitments'")
+    if not cursor.fetchone():
+        print("⚠️ Budget commitments table missing, creating it...")
+        cursor.execute('''
+            CREATE TABLE budget_commitments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                sub_category TEXT NOT NULL,
+                estimated_amount DECIMAL(10,2) NOT NULL,
+                due_day_of_month INTEGER NOT NULL CHECK(due_day_of_month >= 1 AND due_day_of_month <= 31),
+                is_fixed BOOLEAN DEFAULT 1,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
 
 def get_available_years_and_owners():

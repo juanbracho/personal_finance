@@ -15,7 +15,10 @@
       "Bash(gh auth:*)",
       "Read(//var/folders/38/284bjv3d6kvgbvb2cz2cnw340000gn/T/TemporaryItems/NSIRD_screencaptureui_dZT19F/**)",
       "Read(//Users/elcacas/Desktop/**)",
-      "Read(//var/folders/38/284bjv3d6kvgbvb2cz2cnw340000gn/T/TemporaryItems/NSIRD_screencaptureui_OYJiZt/**)"
+      "Read(//var/folders/38/284bjv3d6kvgbvb2cz2cnw340000gn/T/TemporaryItems/NSIRD_screencaptureui_OYJiZt/**)",
+      "WebSearch",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
     ],
     "deny": []
   }

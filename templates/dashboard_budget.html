@@ -117,7 +117,7 @@
                     <table class="table table-hover" id="budgetTable">
                         <thead>
                             <tr>
-                                <th>Category</th>
+                                <th>Category / Subcategory</th>
                                 <th>Initial Budget</th>
                                 <th>Unexpected</th>
                                 <th>Effective Budget</th>
@@ -127,8 +127,19 @@
                         </thead>
                         <tbody>
                             {% for item in budget_analysis %}
-                            <tr class="budget-row" data-category="{{ item.category }}">
-                                <td class="fw-bold">{{ item.category }}</td>
+                            <!-- Category Row -->
+                            <tr class="budget-row {{ 'category-level-budget' if item.budget_by_category else 'has-subcategories' }}"
+                                data-category="{{ item.category }}"
+                                style="background-color: {{ '#f8f9fa' if not item.budget_by_category else 'inherit' }};">
+                                <td class="fw-bold">
+                                    {% if not item.budget_by_category and item.subcategories %}
+                                    <i class="fas fa-chevron-right toggle-icon me-2" style="cursor: pointer;" onclick="toggleSubcategories('{{ item.category }}')"></i>
+                                    {% endif %}
+                                    {{ item.category }}
+                                    {% if item.budget_by_category %}
+                                    <span class="badge bg-info ms-2" style="font-size: 0.7rem;">Category Budget</span>
+                                    {% endif %}
+                                </td>
                                 <td class="text-primary">${{ "%.2f"|format(item.initial_budget) }}</td>
                                 <td class="text-warning">
                                     {% if item.unexpected_expenses > 0 %}
@@ -162,10 +173,61 @@
                                     {% endif %}
                                 </td>
                             </tr>
+
+                            <!-- Subcategory Rows (only for subcategory-level budgets) -->
+                            {% if not item.budget_by_category and item.subcategories %}
+                                {% for subcat in item.subcategories %}
+                                <tr class="subcategory-row" data-parent-category="{{ item.category }}" style="display: none;">
+                                    <td class="ps-5" style="font-size: 0.9rem;">
+                                        <i class="fas fa-angle-right me-2 text-muted"></i>{{ subcat.sub_category }}
+                                    </td>
+                                    <td class="text-primary" style="font-size: 0.9rem;">${{ "%.2f"|format(subcat.budget_amount) }}</td>
+                                    <td class="text-muted" style="font-size: 0.9rem;">-</td>
+                                    <td class="text-info" style="font-size: 0.9rem;">${{ "%.2f"|format(subcat.budget_amount) }}</td>
+                                    <td style="font-size: 0.9rem;" class="{{ 'text-success' if subcat.actual_spending <= subcat.budget_amount else 'text-danger' }}">
+                                        ${{ "%.2f"|format(subcat.actual_spending) }}
+                                    </td>
+                                    <td style="font-size: 0.9rem;">
+                                        {% if subcat.status == 'over' %}
+                                            <span class="badge bg-danger" style="font-size: 0.7rem;">Over</span>
+                                            <small class="d-block text-danger">+${{ "%.0f"|format(subcat.variance) }}</small>
+                                        {% elif subcat.status == 'under' %}
+                                            <span class="badge bg-success" style="font-size: 0.7rem;">Under</span>
+                                            <small class="d-block text-success">-${{ "%.0f"|format(-subcat.variance) }}</small>
+                                        {% elif subcat.status == 'on_track' %}
+                                            <span class="badge bg-primary" style="font-size: 0.7rem;">On Track</span>
+                                        {% elif subcat.status == 'no_budget' %}
+                                            <span class="badge bg-secondary" style="font-size: 0.7rem;">No Budget</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% endif %}
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+
+                <script>
+                function toggleSubcategories(category) {
+                    // Find all subcategory rows for this category
+                    const subcategoryRows = document.querySelectorAll(`tr.subcategory-row[data-parent-category="${category}"]`);
+                    const toggleIcon = document.querySelector(`tr.budget-row[data-category="${category}"] .toggle-icon`);
+
+                    // Toggle visibility
+                    subcategoryRows.forEach(row => {
+                        if (row.style.display === 'none') {
+                            row.style.display = 'table-row';
+                            toggleIcon.classList.remove('fa-chevron-right');
+                            toggleIcon.classList.add('fa-chevron-down');
+                        } else {
+                            row.style.display = 'none';
+                            toggleIcon.classList.remove('fa-chevron-down');
+                            toggleIcon.classList.add('fa-chevron-right');
+                        }
+                    });
+                }
+                </script>
                 {% else %}
                 <div class="text-center py-4">
                     <p class="text-muted mb-3">No budget data available for this period.</p>

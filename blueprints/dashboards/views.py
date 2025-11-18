@@ -290,102 +290,214 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                              error=str(e))
 
 def dashboard_budget_view(year, month, owner, available_years, available_owners):
-    """Dashboard Budget Management - Updated with unexpected expenses logic"""
-    
+    """Dashboard Budget Management - Updated with subcategory budgets, commitments, and living budget"""
+
     try:
         conn = sqlite3.connect('data/personal_finance.db')
-        
+
         # Ensure budget tables exist
         ensure_budget_tables(conn)
-        
+
         # Get filter for actual spending
         spending_filter = "strftime('%m', date) = ? AND strftime('%Y', date) = ?"
         spending_params = [f"{month:02d}", str(year)]
-        
+
         if owner != 'all':
             spending_filter += " AND owner = ?"
             spending_params.append(owner)
-        
-        # Get actual spending for selected month
+
+        # Get actual spending by subcategory for selected month
         actual_spending_query = f"""
-        SELECT 
+        SELECT
             category,
+            sub_category,
             SUM(amount) as actual_amount,
             COUNT(*) as transaction_count
-        FROM transactions 
-        WHERE {spending_filter} AND COALESCE(is_active, 1) = 1
-        GROUP BY category
-        ORDER BY actual_amount DESC
+        FROM transactions
+        WHERE {spending_filter}
+        AND sub_category IS NOT NULL
+        AND sub_category != ''
+        AND type IN ('Needs', 'Wants', 'Business')
+        AND COALESCE(is_active, 1) = 1
+        GROUP BY category, sub_category
+        ORDER BY category, sub_category
         """
         actual_spending_df = pd.read_sql_query(actual_spending_query, conn, params=spending_params)
-        
-        # Get initial budgets (template budgets)
-        initial_budgets_query = """
-        SELECT category, budget_amount, notes
-        FROM budget_templates 
-        WHERE is_active = 1
-        ORDER BY category
+
+        # Get subcategory budgets - ONLY show budgets that have amounts set
+        subcategory_budgets_query = """
+        SELECT category, sub_category, budget_amount, notes, budget_by_category
+        FROM budget_subcategory_templates
+        WHERE is_active = 1 AND budget_amount > 0
+        ORDER BY category, sub_category
         """
-        initial_budgets_df = pd.read_sql_query(initial_budgets_query, conn)
-        
-        # Get unexpected expenses for selected month/year
+        subcategory_budgets_df = pd.read_sql_query(subcategory_budgets_query, conn)
+
+        print(f"📋 Found {len(subcategory_budgets_df)} subcategory budgets with amounts > 0")
+
+        # Group by category to check budget_by_category flag
+        category_budget_mode = {}
+        for _, row in subcategory_budgets_df.iterrows():
+            if row['category'] not in category_budget_mode:
+                category_budget_mode[row['category']] = bool(row['budget_by_category'])
+
+        # Get commitments summary
+        commitments_query = """
+        SELECT COALESCE(SUM(estimated_amount), 0) as total_commitments,
+               COALESCE(SUM(CASE WHEN is_fixed = 1 THEN estimated_amount ELSE 0 END), 0) as total_fixed,
+               COALESCE(SUM(CASE WHEN is_fixed = 0 THEN estimated_amount ELSE 0 END), 0) as total_variable,
+               COUNT(*) as count
+        FROM budget_commitments
+        WHERE is_active = 1
+        """
+        commitments_df = pd.read_sql_query(commitments_query, conn)
+
+        # Get unexpected expenses for selected month/year (still by category for compatibility)
         unexpected_expenses_query = """
         SELECT category, SUM(amount) as total_unexpected
-        FROM unexpected_expenses 
+        FROM unexpected_expenses
         WHERE month = ? AND year = ? AND is_active = 1
         GROUP BY category
         ORDER BY category
         """
         unexpected_expenses_df = pd.read_sql_query(unexpected_expenses_query, conn, params=[month, year])
-        
+
         conn.close()
-        
-        # Create budget analysis with unexpected expenses
+
+        # Create budget analysis by subcategory
         budget_analysis = []
-        initial_budget_dict = {row['category']: float(row['budget_amount']) for _, row in initial_budgets_df.iterrows()}
-        unexpected_expenses_dict = {row['category']: float(row['total_unexpected']) for _, row in unexpected_expenses_df.iterrows()}
-        actual_spending_dict = {row['category']: float(row['actual_amount']) for _, row in actual_spending_df.iterrows()}
-        
-        # Get all unique categories
-        all_categories = set(initial_budget_dict.keys()) | set(unexpected_expenses_dict.keys()) | set(actual_spending_dict.keys())
-        
-        for category in sorted(all_categories):
-            initial_budget = initial_budget_dict.get(category, 0.0)
-            unexpected_expenses = unexpected_expenses_dict.get(category, 0.0)
-            effective_budget = initial_budget + unexpected_expenses
-            actual_spending = actual_spending_dict.get(category, 0.0)
-            
+
+        # Create dictionaries for lookup
+        subcategory_budget_dict = {}
+        for _, row in subcategory_budgets_df.iterrows():
+            key = f"{row['category']}|{row['sub_category']}"
+            subcategory_budget_dict[key] = float(row['budget_amount'])
+
+        actual_spending_dict = {}
+        for _, row in actual_spending_df.iterrows():
+            key = f"{row['category']}|{row['sub_category']}"
+            actual_spending_dict[key] = float(row['actual_amount'])
+
+        unexpected_expenses_dict = {row['category']: float(row['total_unexpected'])
+                                    for _, row in unexpected_expenses_df.iterrows()}
+
+        # Get all unique subcategory combinations
+        all_subcategories = set(subcategory_budget_dict.keys()) | set(actual_spending_dict.keys())
+
+        print(f"📊 Unique subcategories to process: {len(all_subcategories)}")
+        print(f"📊 Budget dict entries: {len(subcategory_budget_dict)}")
+        print(f"📊 Spending dict entries: {len(actual_spending_dict)}")
+
+        # Group by category for display
+        category_groups = {}
+
+        for subcat_key in sorted(all_subcategories):
+            category, sub_category = subcat_key.split('|')
+
+            budget_amount = subcategory_budget_dict.get(subcat_key, 0.0)
+            actual_spending = actual_spending_dict.get(subcat_key, 0.0)
+
             # Calculate variance and status
-            variance = actual_spending - effective_budget
-            variance_pct = (variance / effective_budget * 100) if effective_budget > 0 else 0
-            
+            variance = actual_spending - budget_amount
+            variance_pct = (variance / budget_amount * 100) if budget_amount > 0 else 0
+
             # Determine status
-            if effective_budget == 0:
-                status = 'no_budget'
-            elif variance > 50:  # Over by more than $50
+            if budget_amount == 0 and actual_spending > 0:
+                # No budget but has spending = over budget
                 status = 'over'
-            elif variance < -50:  # Under by more than $50
+            elif budget_amount == 0 and actual_spending == 0:
+                # No budget and no spending = no budget
+                status = 'no_budget'
+            elif variance > 20:  # Over by more than $20 (subcategories are more granular)
+                status = 'over'
+            elif variance < -20:  # Under by more than $20
                 status = 'under'
             else:
                 status = 'on_track'
-            
-            budget_analysis.append({
-                'category': category,
-                'initial_budget': initial_budget,
-                'unexpected_expenses': unexpected_expenses,
-                'effective_budget': effective_budget,
+
+            subcat_data = {
+                'sub_category': sub_category,
+                'budget_amount': budget_amount,
                 'actual_spending': actual_spending,
                 'variance': variance,
                 'variance_pct': variance_pct,
                 'status': status
+            }
+
+            if category not in category_groups:
+                category_groups[category] = {
+                    'category': category,
+                    'subcategories': [],
+                    'total_budget': 0,
+                    'total_actual': 0,
+                    'unexpected_expenses': unexpected_expenses_dict.get(category, 0.0)
+                }
+
+            category_groups[category]['subcategories'].append(subcat_data)
+            category_groups[category]['total_budget'] += budget_amount
+            category_groups[category]['total_actual'] += actual_spending
+
+        # Convert to list for template and format for display
+        budget_analysis = []
+        for cat_data in category_groups.values():
+            category = cat_data['category']
+            is_category_level = category_budget_mode.get(category, False)
+
+            initial_budget = cat_data['total_budget']
+            unexpected = cat_data['unexpected_expenses']
+            effective_budget = initial_budget + unexpected
+            actual_spending = cat_data['total_actual']
+            variance = actual_spending - effective_budget
+
+            # Determine status
+            if effective_budget == 0 and actual_spending > 0:
+                # No budget (even with unexpected expenses) but has spending = over budget
+                status = 'over'
+            elif effective_budget == 0 and actual_spending == 0:
+                # No budget and no spending = no budget
+                status = 'no_budget'
+            elif variance > 50:
+                status = 'over'
+            elif variance < -50:
+                status = 'under'
+            else:
+                status = 'on_track'
+
+            budget_analysis.append({
+                'category': category,
+                'initial_budget': initial_budget,
+                'unexpected_expenses': unexpected,
+                'effective_budget': effective_budget,
+                'actual_spending': actual_spending,
+                'variance': variance,
+                'status': status,
+                'subcategories': cat_data['subcategories'],
+                'budget_by_category': is_category_level  # Add flag to template
             })
-        
+
+        print(f"📊 Budget analysis count: {len(budget_analysis)}")
+        if len(budget_analysis) > 0:
+            print(f"📊 Total budget: {sum([item['initial_budget'] for item in budget_analysis])}")
+            print(f"📊 First category: {budget_analysis[0]['category']}")
+        else:
+            print("⚠️ WARNING: budget_analysis is EMPTY!")
+            print(f"⚠️ category_groups had {len(category_groups)} groups")
+
         # Calculate totals
-        total_initial_budget = sum([item['initial_budget'] for item in budget_analysis])
+        total_budget = sum([item['initial_budget'] for item in budget_analysis])
         total_unexpected_expenses = sum([item['unexpected_expenses'] for item in budget_analysis])
-        total_effective_budget = sum([item['effective_budget'] for item in budget_analysis])
+        total_effective_budget = total_budget + total_unexpected_expenses
         total_actual_spending = sum([item['actual_spending'] for item in budget_analysis])
-        
+
+        # Commitments data
+        total_commitments = float(commitments_df['total_commitments'].iloc[0]) if not commitments_df.empty else 0.0
+        total_fixed_commitments = float(commitments_df['total_fixed'].iloc[0]) if not commitments_df.empty else 0.0
+        total_variable_commitments = float(commitments_df['total_variable'].iloc[0]) if not commitments_df.empty else 0.0
+        commitment_count = int(commitments_df['count'].iloc[0]) if not commitments_df.empty else 0
+
+        # Living budget = Total Budget - Commitments
+        living_budget = total_budget - total_commitments
+
         return render_template('enhanced_dashboard.html',
                              view='budget',
                              current_year=year,
@@ -394,10 +506,15 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                              available_years=available_years,
                              available_owners=available_owners,
                              budget_analysis=budget_analysis,
-                             total_initial_budget=total_initial_budget,
+                             total_initial_budget=total_budget,
                              total_unexpected_expenses=total_unexpected_expenses,
                              total_effective_budget=total_effective_budget,
                              total_actual_spending=total_actual_spending,
+                             total_commitments=total_commitments,
+                             total_fixed_commitments=total_fixed_commitments,
+                             total_variable_commitments=total_variable_commitments,
+                             commitment_count=commitment_count,
+                             living_budget=living_budget,
                              # Add defaults for other views
                              current_total=0,
                              prev_year_total=0,
@@ -416,7 +533,7 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
         print(f"❌ Error in budget view: {e}")
         import traceback
         traceback.print_exc()
-        return render_template('enhanced_dashboard.html', 
+        return render_template('enhanced_dashboard.html',
                              view='budget',
                              current_year=year,
                              current_month=month,
@@ -428,6 +545,11 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                              total_unexpected_expenses=0,
                              total_effective_budget=0,
                              total_actual_spending=0,
+                             total_commitments=0,
+                             total_fixed_commitments=0,
+                             total_variable_commitments=0,
+                             commitment_count=0,
+                             living_budget=0,
                              current_total=0,
                              prev_year_total=0,
                              month_change=0,
@@ -440,6 +562,11 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                              category_trends={},
                              monthly_data=[],
                              categories_data=[],
+                             budget_performance={'over_budget_count': 0, 'under_budget_count': 0, 'on_track_count': 0},
+                             recent_transactions=[],
+                             monthly_trend=[],
+                             total_debt=0,
+                             owner_comparison=[],
                              error=str(e))
 
 def dashboard_categories_view(available_years, available_owners):

@@ -708,7 +708,7 @@ def api_filtered_transactions():
         filters.append("COALESCE(is_active, 1) = 1")
         where_clause = "WHERE " + " AND ".join(filters) if filters else ""
         query = f"""
-        SELECT date, description, amount, category, sub_category, owner, account_name, type
+        SELECT id, date, description, amount, category, sub_category, owner, account_name, type
         FROM transactions
         {where_clause}
         ORDER BY date DESC
@@ -794,6 +794,83 @@ def api_monthly_spending_matrix():
         return jsonify(matrix)
     except Exception as e:
         print(f"❌ Error in monthly spending matrix API: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@analytics_bp.route('/api/bulk_update_transactions', methods=['POST'])
+def api_bulk_update_transactions():
+    """Bulk update multiple transactions with new classification fields"""
+    try:
+        data = request.get_json()
+        transaction_ids = data.get('transaction_ids', [])
+        updates = data.get('updates', {})
+
+        if not transaction_ids:
+            return jsonify({'error': 'No transaction IDs provided'}), 400
+
+        if not updates:
+            return jsonify({'error': 'No updates provided'}), 400
+
+        print(f"🔄 Bulk updating {len(transaction_ids)} transactions with: {updates}")
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        # Build UPDATE query dynamically based on provided fields
+        set_clauses = []
+        params = []
+
+        if 'category' in updates and updates['category']:
+            set_clauses.append("category = ?")
+            params.append(updates['category'])
+
+        if 'sub_category' in updates and updates['sub_category']:
+            set_clauses.append("sub_category = ?")
+            params.append(updates['sub_category'])
+
+        if 'type' in updates and updates['type']:
+            set_clauses.append("type = ?")
+            params.append(updates['type'])
+
+        if 'account_name' in updates and updates['account_name']:
+            set_clauses.append("account_name = ?")
+            params.append(updates['account_name'])
+
+        if 'owner' in updates and updates['owner']:
+            set_clauses.append("owner = ?")
+            params.append(updates['owner'])
+
+        if not set_clauses:
+            return jsonify({'error': 'No valid update fields provided'}), 400
+
+        # Create placeholders for IN clause
+        placeholders = ','.join(['?' for _ in transaction_ids])
+
+        # Build and execute query
+        query = f"""
+            UPDATE transactions
+            SET {', '.join(set_clauses)}
+            WHERE id IN ({placeholders})
+        """
+
+        params.extend(transaction_ids)
+
+        cursor.execute(query, params)
+        conn.commit()
+        rows_updated = cursor.rowcount
+        conn.close()
+
+        print(f"✅ Successfully updated {rows_updated} transactions")
+
+        return jsonify({
+            'success': True,
+            'rows_updated': rows_updated,
+            'message': f'Successfully updated {rows_updated} transactions'
+        })
+
+    except Exception as e:
+        print(f"❌ Error in bulk update API: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

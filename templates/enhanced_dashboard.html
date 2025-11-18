@@ -10,16 +10,16 @@
 // Pass template data to JavaScript
 window.templateData = {
     monthlySpending: [
-        {% if monthly_spending %}
+        {% if monthly_spending and monthly_spending|length > 0 %}
             {% for type, amount, count in monthly_spending %}
-            { type: '{{ type }}', amount: {{ amount }}, count: {{ count }} }{{ ',' if not loop.last else '' }}
+            { type: '{{ type }}', amount: {{ amount }}, count: {{ count }} }{{ ',' if not loop.last }}
             {% endfor %}
         {% endif %}
     ],
     topCategories: [
-        {% if top_categories %}
+        {% if top_categories and top_categories|length > 0 %}
             {% for category, total, count in top_categories %}
-            { category: '{{ category }}', total: {{ total }}, count: {{ count }} }{{ ',' if not loop.last else '' }}
+            { category: '{{ category }}', total: {{ total }}, count: {{ count }} }{{ ',' if not loop.last }}
             {% endfor %}
         {% endif %}
     ],
