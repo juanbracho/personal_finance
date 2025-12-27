@@ -24,9 +24,14 @@ data/
 backup-*
 Desktop/data/
 
-# Update packages
+# Update packages and distribution files
 *.zip
 *-manifest.json
+*UPDATE*.md
+*README_FOR_DISTRIBUTION*
+build_update_package.py
+update_executor.sh
+version.json
 
 # Python cache files
 __pycache__/
