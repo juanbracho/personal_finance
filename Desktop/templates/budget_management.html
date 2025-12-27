@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/budget.css') }}" rel="stylesheet">
+<style>
+.nav-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 500;
+}
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    font-weight: 600;
+}
+.subcategory-group {
+    background: #f8f9fa;
+    border-left: 3px solid #0d6efd;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+}
+.subcategory-row {
+    padding: 0.5rem;
+    background: white;
+    margin: 0.25rem 0;
+    border-radius: 0.25rem;
+}
+.collapse-icon {
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-size: 0.8rem;
+}
+button[aria-expanded="true"] .collapse-icon {
+    transform: rotate(180deg);
+}
+button[aria-expanded="false"] .collapse-icon {
+    transform: rotate(-90deg);
+}
+.commitment-card {
+    border-left: 4px solid #198754;
+    margin-bottom: 0.75rem;
+}
+.commitment-card.fixed {
+    border-left-color: #0dcaf0;
+}
+.recommendation-badge {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+.confidence-high { background-color: #d1e7dd; color: #0f5132; }
+.confidence-medium { background-color: #fff3cd; color: #664d03; }
+.confidence-low { background-color: #f8d7da; color: #842029; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/budget_v2.js') }}"></script>
+{% endblock %}
+{% block title %}Budget Management - Personal Finance{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="display-6 fw-bold text-primary">💰 Budget Management</h1>
+        <p class="lead text-muted">Manage subcategory budgets, commitments, and get AI-powered recommendations</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <!-- Month/Year Selector -->
+        <form method="GET" class="d-flex gap-2" id="timeFilterForm">
+            <select name="year" class="form-select form-select-sm" id="yearSelect">
+                {% for year in available_years %}
+                <option value="{{ year }}" {{ 'selected' if year == selected_year else '' }}>{{ year }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="month" class="form-select form-select-sm" id="monthSelect">
+                {% for month_num, month_name in [(1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'), (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'), (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')] %}
+                <option value="{{ month_num }}" {{ 'selected' if month_num == selected_month else '' }}>{{ month_name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Total Budget</div>
+            <div class="metric-value neutral" id="totalBudget">$0.00</div>
+            <small class="text-muted">All Subcategories</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Total Commitments</div>
+            <div class="metric-value neutral" id="totalCommitments">$0.00</div>
+            <small class="text-muted"><span id="commitmentCount">0</span> Fixed Expenses</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Living Budget</div>
+            <div class="metric-value positive" id="livingBudget">$0.00</div>
+            <small class="text-muted">Budget - Commitments</small>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="metric-label">Unexpected Expenses</div>
+            <div class="metric-value negative" id="totalUnexpectedExpenses">$0.00</div>
+            <small class="text-muted">{{ selected_year }}-{{ "%02d"|format(selected_month) }}</small>
+        </div>
+    </div>
+</div>
+
+<!-- Main Tabs -->
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="budgetTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="subcategories-tab" data-bs-toggle="tab"
+                        data-bs-target="#subcategories" type="button" role="tab">
+                    📊 Subcategory Budgets
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="commitments-tab" data-bs-toggle="tab"
+                        data-bs-target="#commitments" type="button" role="tab">
+                    📌 Commitments
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="unexpected-tab" data-bs-toggle="tab"
+                        data-bs-target="#unexpected" type="button" role="tab">
+                    💸 Unexpected Expenses
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card-body">
+        <div class="tab-content" id="budgetTabContent">
+            <!-- SUBCATEGORY BUDGETS TAB -->
+            <div class="tab-pane fade show active" id="subcategories" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Subcategory Budget Management</h5>
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="saveAllSubcategoryBudgets()">
+                            💾 Save All
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="syncSubcategoryTemplates()" title="Sync budget categories with current transactions">
+                            🔄 Sync Categories
+                        </button>
+                    </div>
+                </div>
+
+                <div id="subcategoryLoadingMessage" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading subcategory budgets...</p>
+                </div>
+
+                <div id="subcategoryBudgetContainer" style="display: none;">
+                    <!-- Subcategory budgets will be rendered here grouped by category -->
+                </div>
+            </div>
+
+            <!-- COMMITMENTS TAB -->
+            <div class="tab-pane fade" id="commitments" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="mb-0">Monthly Commitments</h5>
+                        <small class="text-muted">Track fixed and variable recurring expenses</small>
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddCommitmentModal()">
+                        ➕ Add Commitment
+                    </button>
+                </div>
+
+                <div id="commitmentLoadingMessage" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading commitments...</p>
+                </div>
+
+                <div id="commitmentsContainer" style="display: none;">
+                    <!-- Commitments will be rendered here -->
+                </div>
+
+                <div id="noCommitments" class="text-center py-5" style="display: none;">
+                    <p class="text-muted mb-3">No commitments added yet.</p>
+                    <button class="btn btn-primary" onclick="showAddCommitmentModal()">
+                        ➕ Add Your First Commitment
+                    </button>
+                </div>
+
+                <!-- Commitment Summaries -->
+                <div id="commitmentSummaries" style="display: none;">
+                    <!-- Summary Tables Row -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">📊 Summary by Category</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="sticky-top bg-white">
+                                                <tr>
+                                                    <th style="cursor: pointer;" onclick="sortCommitmentCategory('category', 'category')">
+                                                        Category <i class="fas fa-sort" id="sort-icon-category-category"></i>
+                                                    </th>
+                                                    <th class="text-end" style="cursor: pointer;" onclick="sortCommitmentCategory('count', 'category')">
+                                                        Count <i class="fas fa-sort" id="sort-icon-category-count"></i>
+                                                    </th>
+                                                    <th class="text-end" style="cursor: pointer;" onclick="sortCommitmentCategory('total', 'category')">
+                                                        Total <i class="fas fa-sort" id="sort-icon-category-total"></i>
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="commitmentsByCategoryBody">
+                                                <tr><td colspan="3" class="text-center text-muted">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">📋 Summary by Subcategory</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="sticky-top bg-white">
+                                                <tr>
+                                                    <th style="cursor: pointer;" onclick="sortCommitmentCategory('category', 'subcategory')">
+                                                        Category <i class="fas fa-sort" id="sort-icon-subcategory-category"></i>
+                                                    </th>
+                                                    <th style="cursor: pointer;" onclick="sortCommitmentCategory('subcategory', 'subcategory')">
+                                                        Subcategory <i class="fas fa-sort" id="sort-icon-subcategory-subcategory"></i>
+                                                    </th>
+                                                    <th class="text-end" style="cursor: pointer;" onclick="sortCommitmentCategory('count', 'subcategory')">
+                                                        Count <i class="fas fa-sort" id="sort-icon-subcategory-count"></i>
+                                                    </th>
+                                                    <th class="text-end" style="cursor: pointer;" onclick="sortCommitmentCategory('total', 'subcategory')">
+                                                        Total <i class="fas fa-sort" id="sort-icon-subcategory-total"></i>
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="commitmentsBySubcategoryBody">
+                                                <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daily Commitment Timeline Chart -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">📅 Commitment Payment Timeline</h6>
+                                    <small class="text-muted">Shows when commitments are due throughout the month</small>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="commitmentTimelineChart" style="max-height: 300px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UNEXPECTED EXPENSES TAB -->
+            <div class="tab-pane fade" id="unexpected" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="mb-0">Unexpected Expenses for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</h5>
+                        <small class="text-muted">One-time expenses beyond your regular budget</small>
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddUnexpectedExpenseModal()">
+                        ➕ Add Unexpected Expense
+                    </button>
+                </div>
+
+                <div id="unexpectedLoadingMessage" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading unexpected expenses...</p>
+                </div>
+
+                <div class="table-responsive" id="unexpectedExpensesTableContainer" style="display: none;">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Added On</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unexpectedExpensesTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="noUnexpectedExpenses" class="text-center py-5" style="display: none;">
+                    <p class="text-muted mb-3">No unexpected expenses for this month yet.</p>
+                    <button class="btn btn-primary" onclick="showAddUnexpectedExpenseModal()">
+                        ➕ Add Your First Unexpected Expense
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Recommendations Modal -->
+<div class="modal fade" id="recommendationsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🤖 AI-Powered Budget Recommendations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="recommendationsLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">Analyzing your spending history...</p>
+                </div>
+
+                <div id="recommendationsContent" style="display: none;">
+                    <div class="alert alert-info mb-3">
+                        <strong>How it works:</strong> ML-powered recommendations analyze your spending patterns using historical data to predict future budget needs with high accuracy.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox" id="selectAllRecommendations" onchange="toggleAllRecommendations(this.checked)">
+                                    </th>
+                                    <th>Category</th>
+                                    <th>Subcategory</th>
+                                    <th>Current Budget</th>
+                                    <th>Recommended</th>
+                                    <th>6mo Avg</th>
+                                    <th>3mo Avg</th>
+                                    <th>Last Month</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recommendationsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="applySelectedRecommendations()">
+                    Apply Selected Recommendations
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Commitment Modal -->
+<div class="modal fade" id="commitmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="commitmentModalLabel">Add Commitment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="commitmentForm">
+                    <input type="hidden" id="commitmentId" value="">
+
+                    <div class="mb-3">
+                        <label for="commitmentName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="commitmentName" required
+                               placeholder="e.g., Rent, Car Payment, Insurance">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="commitmentCategory" class="form-label">Category *</label>
+                            <select class="form-select" id="commitmentCategory" required onchange="loadSubcategoriesForCommitment()">
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="commitmentSubCategory" class="form-label">Subcategory *</label>
+                            <select class="form-select" id="commitmentSubCategory" required>
+                                <option value="">Select subcategory...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="commitmentAmount" class="form-label">Estimated Amount *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="commitmentAmount"
+                                       step="0.01" min="0" required placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="commitmentDueDay" class="form-label">Due Day of Month *</label>
+                            <input type="number" class="form-control" id="commitmentDueDay"
+                                   min="1" max="31" required placeholder="15">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="commitmentIsFixed" checked>
+                            <label class="form-check-label" for="commitmentIsFixed">
+                                Fixed amount (uncheck if amount varies monthly)
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCommitment()">
+                    Save Commitment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Unexpected Expense Modal -->
+<div class="modal fade" id="unexpectedExpenseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="unexpectedExpenseModalLabel">Add Unexpected Expense</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="unexpectedExpenseForm">
+                    <input type="hidden" id="unexpectedExpenseId" value="">
+
+                    <div class="mb-3">
+                        <label for="unexpectedCategory" class="form-label">Category *</label>
+                        <select class="form-select" id="unexpectedCategory" required>
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="unexpectedDescription" class="form-label">Description *</label>
+                        <input type="text" class="form-control" id="unexpectedDescription" required
+                               placeholder="e.g., Car repair, Medical emergency">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="unexpectedAmount" class="form-label">Amount *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="unexpectedAmount"
+                                   step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUnexpectedExpense()">
+                    Save Expense
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize the page with selected year and month from server
+window.SELECTED_YEAR = {{ selected_year }};
+window.SELECTED_MONTH = {{ selected_month }};
+</script>
+
+{% endblock %}

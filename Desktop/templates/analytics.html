@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/analytics.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}
+
+{% block title %}Analytics - Personal Finance{% endblock %}
+
+{% block content %}
+<!-- Analytics Header -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="display-6 fw-bold text-primary">📊 Financial Analytics</h1>
+        <p class="lead text-muted">Advanced filtering and analysis of your financial data</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <button class="btn btn-outline-primary" id="toggleFilters">
+            <i class="fas fa-filter"></i> Filters
+        </button>
+        <button class="btn btn-primary" id="resetFilters">
+            <i class="fas fa-refresh"></i> Reset
+        </button>
+    </div>
+</div>
+
+<!-- Collapsible Filter Panel -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card filter-panel" id="filterPanel">
+            <div class="card-header">
+                <h5 class="mb-0">🔍 Filter Options</h5>
+            </div>
+            <div class="card-body">
+                <form id="analyticsFilters">
+                    <!-- Date Range Row -->
+                    <div class="row mb-3 align-items-end">
+                        <div class="col-md-2">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control form-control-sm" id="startDate" value="{{ default_start_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control form-control-sm" id="endDate" value="{{ default_end_date }}">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Quick Presets</label>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="this-month">This Month</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="90">3 Months</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="365">This Year</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-preset="last-year">Last Year</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compact Multi-Select Filters -->
+                    <div class="row mb-3">
+                        <div class="col-md-2">
+                            <label for="ownersFilter" class="form-label">Owners</label>
+                            <select class="form-select form-select-sm" id="ownersFilter" multiple size="3">
+                                <option value="all" selected>All Owners</option>
+                                {% for owner in available_owners %}
+                                <option value="{{ owner }}">{{ owner }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="categoriesFilter" class="form-label">Categories</label>
+                            <select class="form-select form-select-sm" id="categoriesFilter" multiple size="3">
+                                <option value="all" selected>All Categories</option>
+                                {% for category in available_categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="subcategoriesFilter" class="form-label">Subcategories</label>
+                            <select class="form-select form-select-sm" id="subcategoriesFilter" multiple size="3">
+                                <option value="all" selected>All Subcategories</option>
+                                {% for subcategory in available_subcategories %}
+                                <option value="{{ subcategory.subcategory }}" data-category="{{ subcategory.category }}">{{ subcategory.subcategory }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="accountsFilter" class="form-label">Accounts</label>
+                            <select class="form-select form-select-sm" id="accountsFilter" multiple size="3">
+                                <option value="all" selected>All Accounts</option>
+                                {% for account in available_accounts %}
+                                <option value="{{ account }}">{{ account }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="typesFilter" class="form-label">Transaction Types</label>
+                            <select class="form-select form-select-sm" id="typesFilter" multiple size="3">
+                                <option value="all" selected>All Types</option>
+                                <option value="Needs">Needs</option>
+                                <option value="Wants">Wants</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Business">Business</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Amount Range and Actions Row -->
+                    <div class="row mb-3 align-items-end">
+                        <div class="col-md-2">
+                            <label for="minAmount" class="form-label">Min Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="minAmount" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="maxAmount" class="form-label">Max Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="maxAmount" step="0.01" placeholder="No limit">
+                            </div>
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-success btn-sm me-2" id="applyFilters">
+                                <i class="fas fa-search"></i> Apply Filters
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" id="clearFilters">
+                                <i class="fas fa-times"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div class="row mb-4" id="loadingIndicator" style="display: none;">
+    <div class="col-12">
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Updating charts with your filters...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Spending Matrix Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <h5 class="mb-0">📅 Year-Over-Year Monthly Spending Table</h5>
+                    <div class="d-flex align-items-center gap-3 mt-2 mt-md-0">
+                        <!-- View Toggle -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="yoyViewType" id="yoyViewYearly" value="yearly" checked>
+                            <label class="btn btn-outline-primary" for="yoyViewYearly">Yearly Total</label>
+                            <input type="radio" class="btn-check" name="yoyViewType" id="yoyViewCategory" value="category">
+                            <label class="btn btn-outline-primary" for="yoyViewCategory">Filtered View</label>
+                        </div>
+                        <!-- Filter Selector -->
+                        <div id="yoyCategorySelector" style="display: none;">
+                            <select class="form-select form-select-sm" id="yoyCategorySelect" style="min-width: 200px;">
+                                <option value="">Select Filter...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="monthlySpendingMatrixContainer">
+                    <div class="text-center text-muted">Loading table...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Tables Row: Category & Subcategory Analysis -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">🏆 Top 10 Categories by Amount</h5>
+            </div>
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoryAmountsTable">
+                            <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">🎯 Top 10 Categories by Transactions</h5>
+            </div>
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Category</th>
+                                <th>Count</th>
+                                <th>Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoryCountsTable">
+                            <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">🔍 Top 10 Subcategories by Amount</h5>
+            </div>
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Subcategory</th>
+                                <th>Amount</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subcategoryAmountsTable">
+                            <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">💳 Transaction Types</h5>
+            </div>
+            <div class="card-body" style="height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTypesTable">
+                            <tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📋 Filter Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="summaryStats">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-primary" id="totalTransactions">-</div>
+                            <div class="text-muted">Total Transactions</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-danger" id="totalAmount">-</div>
+                            <div class="text-muted">Total Amount</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-info" id="avgTransaction">-</div>
+                            <div class="text-muted">Avg Transaction</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-success" id="dateRange">-</div>
+                            <div class="text-muted">Date Range</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Filtered Transactions Table -->
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Filtered Transactions (up to 100) - Click to Edit</h6>
+                        <div id="bulkEditControls" style="display: none;">
+                            <span class="text-muted me-3" id="selectedCount">0 selected</span>
+                            <button type="button" class="btn btn-primary btn-sm" id="bulkEditBtn">
+                                <i class="fas fa-edit"></i> Bulk Edit
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" id="selectAllTransactions" title="Select All">
+                                    </th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th>Category</th>
+                                    <th>Subcategory</th>
+                                    <th>Owner</th>
+                                    <th>Account</th>
+                                    <th>Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="filteredTransactionsBody">
+                                <tr><td colspan="10" class="text-center text-muted">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- End Filtered Transactions Table -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Edit Modal -->
+<div class="modal fade" id="editTransactionModal" tabindex="-1" aria-labelledby="editTransactionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTransactionModalLabel">Edit Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTransactionForm">
+                    <input type="hidden" id="editTransactionId">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editDate" class="form-label">Date *</label>
+                            <input type="date" class="form-control" id="editDate" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editAmount" class="form-label">Amount *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="editAmount" step="0.01" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editDescription" class="form-label">Description *</label>
+                        <input type="text" class="form-control" id="editDescription" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editCategory" class="form-label">Category *</label>
+                            <select class="form-select" id="editCategory" required onchange="loadEditSubcategories()">
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editSubCategory" class="form-label">Subcategory</label>
+                            <select class="form-select" id="editSubCategory">
+                                <option value="">Select subcategory...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="editType" class="form-label">Type *</label>
+                            <select class="form-select" id="editType" required>
+                                <option value="">Select type...</option>
+                                <option value="Needs">Needs</option>
+                                <option value="Wants">Wants</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Business">Business</option>
+                                <option value="Income">Income</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="editOwner" class="form-label">Owner *</label>
+                            <select class="form-select" id="editOwner" required>
+                                <option value="">Select owner...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="editAccountName" class="form-label">Account *</label>
+                            <select class="form-select" id="editAccountName" required>
+                                <option value="">Select account...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editIsBusiness">
+                            <label class="form-check-label" for="editIsBusiness">
+                                Business Transaction
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTransactionFromAnalytics()">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Edit Modal -->
+<div class="modal fade" id="bulkEditModal" tabindex="-1" aria-labelledby="bulkEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkEditModalLabel">Bulk Edit Transactions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    You are editing <strong><span id="bulkEditCount">0</span> transactions</strong>.
+                    Only fill in the fields you want to update. Empty fields will not be changed.
+                </div>
+
+                <form id="bulkEditForm">
+                    <div class="mb-3">
+                        <label for="bulkEditCategory" class="form-label">Category</label>
+                        <select class="form-select" id="bulkEditCategory" onchange="updateBulkEditSubcategories()">
+                            <option value="">-- Don't Change --</option>
+                            {% for category in available_categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bulkEditSubCategory" class="form-label">Subcategory</label>
+                        <select class="form-select" id="bulkEditSubCategory">
+                            <option value="">-- Don't Change --</option>
+                        </select>
+                        <small class="text-muted">Select a category first to see subcategories</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bulkEditType" class="form-label">Type</label>
+                        <select class="form-select" id="bulkEditType">
+                            <option value="">-- Don't Change --</option>
+                            <option value="Needs">Needs</option>
+                            <option value="Wants">Wants</option>
+                            <option value="Savings">Savings</option>
+                            <option value="Business">Business</option>
+                            <option value="Income">Income</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bulkEditAccount" class="form-label">Account</label>
+                        <select class="form-select" id="bulkEditAccount">
+                            <option value="">-- Don't Change --</option>
+                            {% for account in available_accounts %}
+                            <option value="{{ account }}">{{ account }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bulkEditOwner" class="form-label">Owner</label>
+                        <select class="form-select" id="bulkEditOwner">
+                            <option value="">-- Don't Change --</option>
+                            {% for owner in available_owners %}
+                            <option value="{{ owner }}">{{ owner }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBulkEdit">
+                    <i class="fas fa-save"></i> Update <span id="bulkEditCountFooter">0</span> Transactions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data for JavaScript -->
+<script>
+// Pass filter options to JavaScript
+window.analyticsData = {
+    availableOwners: {{ available_owners | tojson | safe }},
+    availableCategories: {{ available_categories | tojson | safe }},
+    availableSubcategories: {{ available_subcategories | tojson | safe }},
+    availableAccounts: {{ available_accounts | tojson | safe }},
+    defaultStartDate: '{{ default_start_date }}',
+    defaultEndDate: '{{ default_end_date }}'
+};
+</script>
+{% endblock %}

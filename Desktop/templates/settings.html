@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Finance Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-cog"></i> Settings
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- App Version -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Application Version</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Version:</strong> <span class="badge bg-primary">v{{ version }}</span></p>
+                    <p><strong>Build Date:</strong> {{ build_date }}</p>
+                    <p><strong>Build Number:</strong> {{ build_number }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Information -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-database"></i> Database Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if db_exists %}
+                        <p><strong>Status:</strong> <span class="badge bg-success">Active</span></p>
+                        <p><strong>Size:</strong> {{ "%.2f"|format(db_size / 1024 / 1024) }} MB</p>
+                        <p><strong>Last Modified:</strong> {{ db_modified.strftime('%Y-%m-%d %H:%M:%S') if db_modified else 'Unknown' }}</p>
+                    {% else %}
+                        <p><strong>Status:</strong> <span class="badge bg-warning">No database found</span></p>
+                        <p class="text-muted small">A new database will be created when you add your first transaction.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Database -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-export"></i> Export Database</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <strong>Important:</strong> Always export your database before installing updates!
+                    </p>
+                    <button id="downloadBtn" onclick="downloadDatabase()" class="btn btn-success w-100 mb-2" {% if not db_exists %}disabled{% endif %}>
+                        <i class="fas fa-download"></i> Export Database (Download)
+                    </button>
+                    <p class="text-muted small mb-0">
+                        Saves your database to your Downloads folder with timestamp
+                    </p>
+                    <div id="downloadFeedback" class="alert alert-success mt-2" style="display: none;">
+                        <i class="fas fa-check-circle"></i> <span id="downloadMessage"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Install Update -->
+        <div class="col-md-12 mb-4">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-sync-alt"></i> Install Update</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle"></i> Install a new version of the Finance Dashboard app from an update package file.
+                        <br><strong>Important:</strong> Always export your database before installing updates!
+                    </p>
+
+                    <div id="updateNormalState">
+                        <button onclick="selectUpdateFile()" class="btn btn-info btn-lg w-100 mb-2">
+                            <i class="fas fa-file-archive"></i> Select Update Package (.zip)
+                        </button>
+                        <input type="file" id="updateFileInput" accept=".zip" style="display: none;" onchange="handleUpdateFileSelected()">
+                    </div>
+
+                    <div id="updateProgressState" style="display: none;">
+                        <div class="progress mb-3" style="height: 30px;">
+                            <div id="updateProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">
+                                <span id="updateProgressText">0%</span>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <strong id="updateStatusTitle">Processing...</strong>
+                            <p id="updateStatusMessage" class="mb-0 small"></p>
+                        </div>
+                    </div>
+
+                    <div id="updateErrorState" class="alert alert-danger mt-3" style="display: none;">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Update Failed</h6>
+                        <p id="updateErrorMessage" class="mb-0"></p>
+                        <button onclick="resetUpdateUI()" class="btn btn-sm btn-outline-danger mt-2">Try Again</button>
+                    </div>
+
+                    <div id="updateSuccessState" class="alert alert-success mt-3" style="display: none;">
+                        <h6><i class="fas fa-check-circle"></i> Update Successful!</h6>
+                        <p id="updateSuccessMessage" class="mb-0"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Import Database -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-import"></i> Import Database</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Restore your database from a previously exported backup file (.db)
+                    </p>
+                    <form action="{{ url_for('settings.upload_database') }}" method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="database_file" class="form-label">Select Database File:</label>
+                            <input type="file" class="form-control" id="database_file" name="database_file" accept=".db" required>
+                        </div>
+                        <button type="submit" class="btn btn-info w-100" onclick="return confirm('This will replace your current database. Your current data will be backed up first. Continue?')">
+                            <i class="fas fa-upload"></i> Import Database (Upload & Restore)
+                        </button>
+                    </form>
+                    <p class="text-muted small mt-2 mb-0">
+                        <i class="fas fa-shield-alt"></i> Your current database will be backed up before importing
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Local Backups -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-save"></i> Local Backups</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Create backup copies stored in the app's backup folder
+                    </p>
+                    <form action="{{ url_for('settings.create_backup') }}" method="POST">
+                        <button type="submit" class="btn btn-warning w-100" {% if not db_exists %}disabled{% endif %}>
+                            <i class="fas fa-save"></i> Create Local Backup
+                        </button>
+                    </form>
+                    <p class="text-muted small mt-2 mb-0">
+                        Location: <code>data/backups/</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup History -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Backup History</h5>
+                </div>
+                <div class="card-body">
+                    {% if backups %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for backup in backups %}
+                                        <tr>
+                                            <td><i class="fas fa-file-archive text-muted"></i> {{ backup.filename }}</td>
+                                            <td>{{ "%.2f"|format(backup.size / 1024 / 1024) }} MB</td>
+                                            <td>{{ backup.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                            <td>
+                                                <form action="{{ url_for('settings.restore_backup', filename=backup.filename) }}" method="POST" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('This will replace your current database with this backup. Continue?')">
+                                                        <i class="fas fa-undo"></i> Restore
+                                                    </button>
+                                                </form>
+                                                <form action="{{ url_for('settings.delete_backup', filename=backup.filename) }}" method="POST" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this backup?')">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center mb-0">No local backups found. Create a backup to get started!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DANGER ZONE -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-danger">Delete All Data</h6>
+                    <p class="text-muted">
+                        Permanently delete all your financial data from the database. This action cannot be undone!
+                        A backup will be automatically created before deletion.
+                    </p>
+
+                    <form action="{{ url_for('settings.delete_all_data') }}" method="POST" id="deleteForm" class="mt-3">
+                        <div class="mb-3">
+                            <label for="confirmation" class="form-label fw-bold">
+                                Type <code>DELETE ALL DATA</code> to confirm:
+                            </label>
+                            <input type="text" class="form-control" id="confirmation" name="confirmation" placeholder="DELETE ALL DATA" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger" {% if not db_exists %}disabled{% endif %} onclick="return confirmDelete()">
+                            <i class="fas fa-trash-alt"></i> Delete All Data Permanently
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Notes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle"></i> Important Notes:</h6>
+                <ul class="mb-0">
+                    <li><strong>Before Updates:</strong> Always export your database before updating the app</li>
+                    <li><strong>After Updates:</strong> Import your exported database to restore your data</li>
+                    <li><strong>Backup Location:</strong> Local backups are stored in <code>data/backups/</code> folder inside the app</li>
+                    <li><strong>Export Location:</strong> Exported databases are saved to your Downloads folder</li>
+                    <li><strong>File Format:</strong> Only <code>.db</code> files are accepted for import</li>
+                    <li><strong>Safety:</strong> A backup is automatically created before any restore or delete operation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== UPDATE SYSTEM ====================
+
+function selectUpdateFile() {
+    document.getElementById('updateFileInput').click();
+}
+
+function handleUpdateFileSelected() {
+    const fileInput = document.getElementById('updateFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    // Validate file type
+    if (!file.name.endsWith('.zip')) {
+        showUpdateError('Invalid file type. Please select a .zip update package.');
+        fileInput.value = '';
+        return;
+    }
+
+    // Confirm before proceeding
+    if (!confirm(`Install update from: ${file.name}\n\nMake sure you've exported your database first!\n\nContinue with update?`)) {
+        fileInput.value = '';
+        return;
+    }
+
+    // Start upload
+    uploadUpdatePackage(file);
+}
+
+function uploadUpdatePackage(file) {
+    // Hide normal state, show progress
+    document.getElementById('updateNormalState').style.display = 'none';
+    document.getElementById('updateProgressState').style.display = 'block';
+    document.getElementById('updateErrorState').style.display = 'none';
+    document.getElementById('updateSuccessState').style.display = 'none';
+
+    setUpdateProgress(10, 'Uploading update package...');
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('update_file', file);
+
+    // Upload via XHR for progress tracking
+    const xhr = new XMLHttpRequest();
+
+    // Upload progress
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 50); // 0-50% for upload
+            setUpdateProgress(percentComplete, 'Uploading update package...');
+        }
+    });
+
+    // Response handler
+    xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+
+            if (response.success) {
+                setUpdateProgress(100, 'Update installed successfully!');
+
+                // Show success message
+                setTimeout(() => {
+                    document.getElementById('updateProgressState').style.display = 'none';
+                    document.getElementById('updateSuccessState').style.display = 'block';
+                    document.getElementById('updateSuccessMessage').textContent = response.message || 'Update completed. The app is restarting...';
+
+                    // If auto-restart is happening, show countdown
+                    if (response.restarting) {
+                        showRestartCountdown();
+                    }
+                }, 500);
+            } else {
+                showUpdateError(response.message || 'Update failed. Please try again.');
+            }
+        } else {
+            showUpdateError(`Server error (${xhr.status}). Please try again.`);
+        }
+    });
+
+    // Error handler
+    xhr.addEventListener('error', () => {
+        showUpdateError('Network error. Please check your connection and try again.');
+    });
+
+    // Send request
+    xhr.open('POST', '{{ url_for("settings.install_update") }}');
+    xhr.send(formData);
+
+    // Simulate validation progress
+    setTimeout(() => setUpdateProgress(60, 'Validating update package...'), 1000);
+    setTimeout(() => setUpdateProgress(75, 'Extracting files...'), 2000);
+    setTimeout(() => setUpdateProgress(90, 'Installing update...'), 3000);
+}
+
+function setUpdateProgress(percent, message) {
+    const progressBar = document.getElementById('updateProgressBar');
+    const progressText = document.getElementById('updateProgressText');
+    const statusMessage = document.getElementById('updateStatusMessage');
+
+    progressBar.style.width = percent + '%';
+    progressText.textContent = percent + '%';
+    statusMessage.textContent = message;
+}
+
+function showUpdateError(message) {
+    document.getElementById('updateNormalState').style.display = 'none';
+    document.getElementById('updateProgressState').style.display = 'none';
+    document.getElementById('updateErrorState').style.display = 'block';
+    document.getElementById('updateErrorMessage').textContent = message;
+
+    // Reset file input
+    document.getElementById('updateFileInput').value = '';
+}
+
+function resetUpdateUI() {
+    document.getElementById('updateNormalState').style.display = 'block';
+    document.getElementById('updateProgressState').style.display = 'none';
+    document.getElementById('updateErrorState').style.display = 'none';
+    document.getElementById('updateSuccessState').style.display = 'none';
+    document.getElementById('updateFileInput').value = '';
+}
+
+function showRestartCountdown() {
+    let countdown = 5;
+    const successMessage = document.getElementById('updateSuccessMessage');
+
+    const interval = setInterval(() => {
+        successMessage.textContent = `Update successful! App will restart in ${countdown} seconds...`;
+        countdown--;
+
+        if (countdown < 0) {
+            clearInterval(interval);
+            successMessage.textContent = 'Restarting now...';
+
+            // Poll for reconnection
+            setTimeout(checkAppReconnection, 2000);
+        }
+    }, 1000);
+}
+
+function checkAppReconnection() {
+    const successMessage = document.getElementById('updateSuccessMessage');
+    successMessage.textContent = 'Waiting for app to restart...';
+
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds
+
+    const interval = setInterval(() => {
+        fetch('{{ url_for("settings.index") }}')
+            .then(response => {
+                if (response.ok) {
+                    clearInterval(interval);
+                    successMessage.textContent = 'Update complete! Reloading page...';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
+            })
+            .catch(() => {
+                // Still waiting...
+                attempts++;
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    successMessage.textContent = 'Update complete! Please manually refresh the page.';
+                }
+            });
+    }, 1000);
+}
+
+// ==================== DATABASE FUNCTIONS ====================
+
+function confirmDelete() {
+    const confirmation = document.getElementById('confirmation').value;
+    if (confirmation !== 'DELETE ALL DATA') {
+        alert('Please type "DELETE ALL DATA" exactly to confirm deletion.');
+        return false;
+    }
+    return confirm('⚠️ FINAL WARNING ⚠️\n\nThis will DELETE ALL your financial data!\n\nA backup will be created, but this action cannot be easily undone.\n\nAre you absolutely sure?');
+}
+
+function downloadDatabase() {
+    const btn = document.getElementById('downloadBtn');
+    const feedback = document.getElementById('downloadFeedback');
+    const message = document.getElementById('downloadMessage');
+
+    // Show loading state
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+    btn.disabled = true;
+    feedback.style.display = 'none';
+
+    // Generate timestamp for filename
+    const now = new Date();
+    const timestamp = now.getFullYear() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') + '_' +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+    const filename = `finance_dashboard_backup_${timestamp}.db`;
+
+    // Trigger download using a hidden iframe to avoid page navigation
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = '{{ url_for("settings.download_database") }}';
+    document.body.appendChild(iframe);
+
+    // Show success message after a short delay
+    setTimeout(() => {
+        btn.innerHTML = '<i class="fas fa-download"></i> Export Database (Download)';
+        btn.disabled = false;
+
+        // Show success feedback
+        message.textContent = `Database exported successfully! Look for ${filename} in your Downloads folder.`;
+        feedback.style.display = 'block';
+        feedback.className = 'alert alert-success mt-2';
+
+        // Remove iframe after download starts
+        setTimeout(() => {
+            document.body.removeChild(iframe);
+        }, 2000);
+
+        // Hide feedback after 10 seconds
+        setTimeout(() => {
+            feedback.style.display = 'none';
+        }, 10000);
+    }, 1000);
+}
+</script>
+{% endblock %}
