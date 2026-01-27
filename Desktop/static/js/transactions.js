@@ -906,14 +906,21 @@ function editTransaction(transactionId) {
 
 function deleteTransaction(transactionId, description) {
     console.log(`🗑️ Deleting transaction ID: ${transactionId}`);
-    
+
     // Show confirmation dialog
-    const confirmMessage = `Are you sure you want to delete this transaction?\n\n"${description}"\n\nThis will mark it as inactive (not permanently delete it).`;
-    
+    const confirmMessage = `Are you sure you want to delete this transaction?\n\n"${description}"`;
+
     if (!confirm(confirmMessage)) {
         return;
     }
-    
+
+    // Find and fade out the row immediately for smooth UX
+    const row = document.querySelector(`button[onclick*="deleteTransaction(${transactionId}"]`)?.closest('tr');
+    if (row) {
+        row.style.transition = 'opacity 0.3s ease';
+        row.style.opacity = '0.5';
+    }
+
     // Delete the transaction
     fetch(`/transactions/api/delete_transaction/${transactionId}`, {
         method: 'DELETE',
@@ -924,21 +931,26 @@ function deleteTransaction(transactionId, description) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            FinanceUtils.showAlert(result.message + '\n\nPlease refresh the page to see changes.', 'success');
-            
-            // Option to auto-refresh after 3 seconds
+            // Remove the row with animation
+            if (row) {
+                row.style.opacity = '0';
+                setTimeout(() => {
+                    row.remove();
+                }, 300);
+            }
+            // Refresh page after brief delay to update counts
             setTimeout(() => {
-                if (confirm('Would you like to refresh the page now to see the changes?')) {
-                    window.location.reload();
-                }
-            }, 3000);
-            
+                window.location.reload();
+            }, 500);
         } else {
+            // Restore row opacity on error
+            if (row) row.style.opacity = '1';
             FinanceUtils.showAlert(`Error deleting transaction: ${result.error}`, 'danger');
         }
     })
     .catch(error => {
         console.error('Error deleting transaction:', error);
+        if (row) row.style.opacity = '1';
         FinanceUtils.showAlert('Error deleting transaction', 'danger');
     });
 }
@@ -1071,22 +1083,15 @@ function saveTransactionEdit() {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            FinanceUtils.showAlert(result.message + '\n\nPlease refresh the page to see changes.', 'success');
-            
-            // Hide modal
+            // Hide modal immediately
             const modal = document.getElementById('editTransactionModal');
             if (typeof bootstrap !== 'undefined' && modal) {
                 const bsModal = bootstrap.Modal.getInstance(modal);
                 if (bsModal) bsModal.hide();
             }
-            
-            // Option to auto-refresh after 3 seconds
-            setTimeout(() => {
-                if (confirm('Would you like to refresh the page now to see the changes?')) {
-                    window.location.reload();
-                }
-            }, 3000);
-            
+
+            // Refresh page to show changes
+            window.location.reload();
         } else {
             FinanceUtils.showAlert(`Error updating transaction: ${result.error}`, 'danger');
         }

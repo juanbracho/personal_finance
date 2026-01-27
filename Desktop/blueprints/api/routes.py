@@ -1216,26 +1216,30 @@ def get_accounts_list():
 
 @api_bp.route('/transactions/by-subcategory')
 def get_transactions_by_subcategory():
-    """Get transactions for a specific subcategory and month for budget drill-down"""
+    """Get transactions for a specific category/subcategory and month for budget drill-down.
+    If subcategory is not provided, returns all transactions for the category."""
 
     try:
         # Get parameters
         category = request.args.get('category')
-        subcategory = request.args.get('subcategory')
+        subcategory = request.args.get('subcategory')  # Optional - if not provided, fetch all for category
         year = request.args.get('year', type=int)
         month = request.args.get('month', type=int)
         owner = request.args.get('owner', 'all')
 
-        # Validate required parameters
-        if not all([category, subcategory, year, month]):
-            return jsonify({'error': 'Missing required parameters: category, subcategory, year, month'}), 400
+        # Validate required parameters (subcategory is now optional)
+        if not all([category, year, month]):
+            return jsonify({'error': 'Missing required parameters: category, year, month'}), 400
 
-        print(f"📊 Fetching transactions: {category} > {subcategory} for {year}-{month:02d}")
+        if subcategory:
+            print(f"📊 Fetching transactions: {category} > {subcategory} for {year}-{month:02d}")
+        else:
+            print(f"📊 Fetching all transactions for category: {category} for {year}-{month:02d}")
 
         conn = sqlite3.connect('data/personal_finance.db')
         conn.row_factory = sqlite3.Row
 
-        # Build query
+        # Build query - subcategory filter is optional
         query = """
         SELECT
             id,
@@ -1244,15 +1248,20 @@ def get_transactions_by_subcategory():
             amount,
             account_name,
             owner,
-            type
+            type,
+            sub_category
         FROM transactions
         WHERE category = ?
-        AND sub_category = ?
         AND strftime('%Y', date) = ?
         AND strftime('%m', date) = ?
         AND COALESCE(is_active, 1) = 1
         """
-        params = [category, subcategory, str(year), f"{month:02d}"]
+        params = [category, str(year), f"{month:02d}"]
+
+        # Add subcategory filter only if provided
+        if subcategory:
+            query += " AND sub_category = ?"
+            params.append(subcategory)
 
         # Add owner filter if not 'all'
         if owner != 'all':
@@ -1276,7 +1285,8 @@ def get_transactions_by_subcategory():
                 'amount': float(row['amount']),
                 'account_name': row['account_name'] or 'N/A',
                 'owner': row['owner'] or 'Unknown',
-                'type': row['type'] or ''
+                'type': row['type'] or '',
+                'sub_category': row['sub_category'] or ''
             })
 
         conn.close()

@@ -323,10 +323,10 @@ function uploadUpdatePackage(file) {
 
     // Response handler
     xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
+        try {
             const response = JSON.parse(xhr.responseText);
 
-            if (response.success) {
+            if (xhr.status === 200 && response.success) {
                 setUpdateProgress(100, 'Update installed successfully!');
 
                 // Show success message
@@ -341,10 +341,11 @@ function uploadUpdatePackage(file) {
                     }
                 }, 500);
             } else {
-                showUpdateError(response.message || 'Update failed. Please try again.');
+                // Show actual error message from server
+                showUpdateError(response.message || `Server error (${xhr.status}). Please try again.`);
             }
-        } else {
-            showUpdateError(`Server error (${xhr.status}). Please try again.`);
+        } catch (e) {
+            showUpdateError(`Server error (${xhr.status}). Invalid response from server.`);
         }
     });
 

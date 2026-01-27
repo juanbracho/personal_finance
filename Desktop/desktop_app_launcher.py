@@ -10,16 +10,96 @@ import time
 import threading
 import atexit
 import signal
+import shutil
 from pathlib import Path
 
-# Ensure data directory exists
-data_dir = Path(__file__).parent / 'data'
-data_dir.mkdir(parents=True, exist_ok=True)
+def get_bundle_path():
+    """Get the path where bundled resources are located"""
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS)
+    else:
+        return Path(__file__).parent
 
-# Set up working directory (important for relative paths)
-os.chdir(Path(__file__).parent)
+def get_user_data_path():
+    """Get writable user data path for the application"""
+    if sys.platform == 'darwin':
+        # macOS: ~/Library/Application Support/FinanceDashboard
+        user_data = Path.home() / 'Library' / 'Application Support' / 'FinanceDashboard'
+    elif sys.platform == 'win32':
+        # Windows: %APPDATA%/FinanceDashboard
+        user_data = Path(os.environ.get('APPDATA', Path.home())) / 'FinanceDashboard'
+    else:
+        # Linux: ~/.local/share/FinanceDashboard
+        user_data = Path.home() / '.local' / 'share' / 'FinanceDashboard'
 
-# Initialize Flask app
+    return user_data
+
+def setup_data_directory():
+    """Setup writable data directory, copying from bundle if needed"""
+    bundle_path = get_bundle_path()
+
+    if getattr(sys, 'frozen', False):
+        # Running as packaged app - use user data directory
+        user_data_path = get_user_data_path()
+        user_data_path.mkdir(parents=True, exist_ok=True)
+
+        # Create data subdirectory
+        data_dir = user_data_path / 'data'
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create backups subdirectory
+        backups_dir = data_dir / 'backups'
+        backups_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy database from bundle if user doesn't have one yet
+        bundle_db = bundle_path / 'data' / 'personal_finance.db'
+        user_db = data_dir / 'personal_finance.db'
+
+        if bundle_db.exists() and not user_db.exists():
+            print(f"Copying database to user data directory...")
+            shutil.copy2(bundle_db, user_db)
+            print(f"Database copied to: {user_db}")
+
+        # Copy templates, static, and other resources to user directory
+        for resource in ['templates', 'static', 'version.json']:
+            bundle_resource = bundle_path / resource
+            user_resource = user_data_path / resource
+
+            if bundle_resource.exists():
+                if bundle_resource.is_dir():
+                    if user_resource.exists():
+                        shutil.rmtree(user_resource)
+                    shutil.copytree(bundle_resource, user_resource)
+                else:
+                    shutil.copy2(bundle_resource, user_resource)
+
+        # Copy blueprints
+        bundle_blueprints = bundle_path / 'blueprints'
+        if bundle_blueprints.exists():
+            # We need blueprints in the path, so add bundle_path to sys.path
+            if str(bundle_path) not in sys.path:
+                sys.path.insert(0, str(bundle_path))
+
+        # Set working directory to user data path
+        os.chdir(user_data_path)
+        print(f"[APP] User data directory: {user_data_path}")
+        print(f"[APP] Working directory: {os.getcwd()}")
+
+        return user_data_path
+    else:
+        # Running from source - use source directory
+        data_dir = bundle_path / 'data'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        os.chdir(bundle_path)
+        print(f"[DEV] Source directory: {bundle_path}")
+        print(f"[DEV] Working directory: {os.getcwd()}")
+
+        return bundle_path
+
+# Setup data directory before importing app
+WORKING_PATH = setup_data_directory()
+
+# Now import Flask app (after working directory is set)
 from app import create_app, initialize_personal_finance_database, test_database_connection
 
 app = None

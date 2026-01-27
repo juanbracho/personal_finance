@@ -5,6 +5,9 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% if view == 'budget' %}
+<script src="{{ url_for('static', filename='js/budget.js') }}"></script>
+{% endif %}
 <!-- Keep any template-specific data passing scripts here -->
 <script>
 // Pass template data to JavaScript
@@ -187,4 +190,19 @@ window.budgetAnalysisData = [
         </div>
     </div>
 </div>
+
+{% if view == 'budget' and budget_analysis %}
+<script>
+// Load budget charts when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof loadBudgetCharts === 'function') {
+        loadBudgetCharts();
+    } else if (window.BudgetManager && typeof window.BudgetManager.loadBudgetCharts === 'function') {
+        window.BudgetManager.loadBudgetCharts();
+    } else {
+        console.warn('loadBudgetCharts function not found');
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

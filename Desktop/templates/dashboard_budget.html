@@ -128,11 +128,18 @@
                         <tbody>
                             {% for item in budget_analysis %}
                             <!-- Category Row -->
-                            <tr class="budget-row {{ 'category-level-budget' if item.budget_by_category else 'has-subcategories' }}"
+                            <tr class="budget-row {{ 'category-level-budget clickable-category' if item.budget_by_category else 'has-subcategories' }}"
                                 data-category="{{ item.category }}"
-                                style="background-color: {{ '#f8f9fa' if not item.budget_by_category else 'inherit' }};">
+                                {% if item.budget_by_category %}
+                                style="cursor: pointer;"
+                                onclick="toggleCategoryTransactions(event, '{{ item.category }}')"
+                                {% else %}
+                                style="background-color: #f8f9fa;"
+                                {% endif %}>
                                 <td class="fw-bold">
-                                    {% if not item.budget_by_category and item.subcategories %}
+                                    {% if item.budget_by_category %}
+                                    <i class="fas fa-chevron-right toggle-icon-cat me-2" style="cursor: pointer;"></i>
+                                    {% elif item.subcategories %}
                                     <i class="fas fa-chevron-right toggle-icon me-2" style="cursor: pointer;" onclick="toggleSubcategories('{{ item.category }}')"></i>
                                     {% endif %}
                                     {{ item.category }}
@@ -218,6 +225,10 @@
                     background-color: #e9ecef !important;
                 }
 
+                .clickable-category:hover {
+                    background-color: #e9ecef !important;
+                }
+
                 .transaction-row {
                     border-left: 3px solid #6c757d;
                     background-color: #f8f9fa !important;
@@ -227,8 +238,21 @@
                     background-color: #e9ecef !important;
                 }
 
+                .transaction-row-cat {
+                    border-left: 3px solid #17a2b8;
+                    background-color: #f0f9ff !important;
+                }
+
+                .transaction-row-cat:hover {
+                    background-color: #e1f3fa !important;
+                }
+
                 .ps-7 {
                     padding-left: 4rem !important;
+                }
+
+                .ps-5-cat {
+                    padding-left: 2.5rem !important;
                 }
                 </style>
 
@@ -365,6 +389,105 @@
 
                     } catch (error) {
                         console.error('Error loading transactions:', error);
+                        toggleIcon.classList.remove('fa-spinner', 'fa-spin');
+                        toggleIcon.classList.add('fa-chevron-right');
+                        alert('Failed to load transactions. Please try again.');
+                    }
+                }
+
+                async function toggleCategoryTransactions(event, category) {
+                    event.stopPropagation();
+
+                    const categoryRow = event.currentTarget;
+                    const toggleIcon = categoryRow.querySelector('.toggle-icon-cat');
+                    const cacheKey = `cat|${category}|{{ current_year }}|{{ current_month }}`;
+
+                    // Check if transactions are already displayed
+                    const existingTransRows = document.querySelectorAll(`tr.transaction-row-cat[data-category-key="${cacheKey}"]`);
+
+                    if (existingTransRows.length > 0) {
+                        // Collapse - remove transaction rows
+                        existingTransRows.forEach(row => row.remove());
+                        toggleIcon.classList.remove('fa-chevron-down');
+                        toggleIcon.classList.add('fa-chevron-right');
+                        return;
+                    }
+
+                    // Expand - fetch and display transactions
+                    toggleIcon.classList.remove('fa-chevron-right');
+                    toggleIcon.classList.add('fa-spinner', 'fa-spin');
+
+                    try {
+                        // Check cache first
+                        let data = transactionCache[cacheKey];
+
+                        if (!data) {
+                            // Fetch from API (without subcategory - fetches all for category)
+                            const response = await fetch(
+                                `/api/transactions/by-subcategory?` +
+                                `category=${encodeURIComponent(category)}&` +
+                                `year={{ current_year }}&` +
+                                `month={{ current_month }}&` +
+                                `owner={{ current_owner }}`
+                            );
+
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+
+                            data = await response.json();
+                            transactionCache[cacheKey] = data;
+                        }
+
+                        const transactions = data.transactions;
+
+                        if (transactions.length === 0) {
+                            // No transactions found
+                            const noDataRow = document.createElement('tr');
+                            noDataRow.className = 'transaction-row-cat';
+                            noDataRow.setAttribute('data-category-key', cacheKey);
+                            noDataRow.innerHTML = `
+                                <td colspan="6" class="text-center text-muted ps-5-cat" style="font-size: 0.85rem; font-style: italic;">
+                                    No transactions found for this category
+                                </td>
+                            `;
+                            categoryRow.insertAdjacentElement('afterend', noDataRow);
+                        } else {
+                            // Create transaction rows
+                            let lastInsertedRow = categoryRow;
+                            for (let i = 0; i < transactions.length; i++) {
+                                const trans = transactions[i];
+                                const transRow = document.createElement('tr');
+                                transRow.className = 'transaction-row-cat';
+                                transRow.setAttribute('data-category-key', cacheKey);
+
+                                transRow.innerHTML = `
+                                    <td class="ps-5-cat" style="font-size: 0.85rem;">
+                                        <i class="fas fa-receipt me-2 text-info" style="font-size: 0.7rem;"></i>
+                                        ${escapeHtml(trans.description)}
+                                        <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                            ${formatDate(trans.date)} • ${escapeHtml(trans.account_name)}
+                                            ${trans.sub_category ? ' • <em>' + escapeHtml(trans.sub_category) + '</em>' : ''}
+                                        </small>
+                                    </td>
+                                    <td colspan="3" style="font-size: 0.85rem;"></td>
+                                    <td class="text-end fw-bold" style="font-size: 0.85rem;">
+                                        $${trans.amount.toFixed(2)}
+                                    </td>
+                                    <td style="font-size: 0.85rem;"></td>
+                                `;
+
+                                lastInsertedRow.insertAdjacentElement('afterend', transRow);
+                                lastInsertedRow = transRow;
+                            }
+                        }
+
+                        // Update icon to expanded state
+                        toggleIcon.classList.remove('fa-spinner', 'fa-spin');
+                        toggleIcon.classList.add('fa-chevron-down');
+
+                    } catch (error) {
+                        console.error('Error loading category transactions:', error);
                         toggleIcon.classList.remove('fa-spinner', 'fa-spin');
                         toggleIcon.classList.add('fa-chevron-right');
                         alert('Failed to load transactions. Please try again.');

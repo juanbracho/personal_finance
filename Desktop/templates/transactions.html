@@ -15,8 +15,11 @@
         <h1 class="display-6 fw-bold text-primary">📝 Transactions</h1>
         <p class="lead text-muted">View and manage all your financial transactions</p>
     </div>
-    <div class="col-md-4 text-end">
-        <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-primary btn-lg">
+    <div class="col-md-4 d-flex justify-content-end align-items-center gap-2 flex-nowrap">
+        <a href="{{ url_for('transactions.bulk_transaction') }}" class="btn btn-outline-primary">
+            📦 Bulk Transaction
+        </a>
+        <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-primary">
             ➕ Add Transaction
         </a>
     </div>

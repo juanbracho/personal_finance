@@ -63,20 +63,6 @@ button[aria-expanded="false"] .collapse-icon {
         <p class="lead text-muted">Manage subcategory budgets, commitments, and get AI-powered recommendations</p>
     </div>
     <div class="col-md-4 text-end">
-        <!-- Month/Year Selector -->
-        <form method="GET" class="d-flex gap-2" id="timeFilterForm">
-            <select name="year" class="form-select form-select-sm" id="yearSelect">
-                {% for year in available_years %}
-                <option value="{{ year }}" {{ 'selected' if year == selected_year else '' }}>{{ year }}</option>
-                {% endfor %}
-            </select>
-
-            <select name="month" class="form-select form-select-sm" id="monthSelect">
-                {% for month_num, month_name in [(1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'), (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'), (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')] %}
-                <option value="{{ month_num }}" {{ 'selected' if month_num == selected_month else '' }}>{{ month_name }}</option>
-                {% endfor %}
-            </select>
-        </form>
     </div>
 </div>
 
@@ -110,7 +96,7 @@ button[aria-expanded="false"] .collapse-icon {
         <div class="card metric-card">
             <div class="metric-label">Unexpected Expenses</div>
             <div class="metric-value negative" id="totalUnexpectedExpenses">$0.00</div>
-            <small class="text-muted">{{ selected_year }}-{{ "%02d"|format(selected_month) }}</small>
+            <small class="text-muted" id="unexpectedMonthSummary">{{ selected_year }}-{{ "%02d"|format(selected_month) }}</small>
         </div>
     </div>
 </div>
@@ -282,12 +268,24 @@ button[aria-expanded="false"] .collapse-icon {
             <div class="tab-pane fade" id="unexpected" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
-                        <h5 class="mb-0">Unexpected Expenses for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</h5>
+                        <h5 class="mb-0">Unexpected Expenses for <span id="unexpectedMonthLabel">{{ selected_year }}-{{ "%02d"|format(selected_month) }}</span></h5>
                         <small class="text-muted">One-time expenses beyond your regular budget</small>
                     </div>
-                    <button class="btn btn-primary" onclick="showAddUnexpectedExpenseModal()">
-                        ➕ Add Unexpected Expense
-                    </button>
+                    <div class="d-flex gap-2 align-items-center">
+                        <select class="form-select form-select-sm" id="unexpectedMonthSelect" style="width: auto;" onchange="changeUnexpectedMonth()">
+                            {% for month_num, month_name in [(1, 'Jan'), (2, 'Feb'), (3, 'Mar'), (4, 'Apr'), (5, 'May'), (6, 'Jun'), (7, 'Jul'), (8, 'Aug'), (9, 'Sep'), (10, 'Oct'), (11, 'Nov'), (12, 'Dec')] %}
+                            <option value="{{ month_num }}" {{ 'selected' if month_num == selected_month else '' }}>{{ month_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <select class="form-select form-select-sm" id="unexpectedYearSelect" style="width: auto;" onchange="changeUnexpectedMonth()">
+                            {% for year in available_years %}
+                            <option value="{{ year }}" {{ 'selected' if year == selected_year else '' }}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-primary" onclick="showAddUnexpectedExpenseModal()">
+                            ➕ Add Unexpected Expense
+                        </button>
+                    </div>
                 </div>
 
                 <div id="unexpectedLoadingMessage" class="text-center py-4">

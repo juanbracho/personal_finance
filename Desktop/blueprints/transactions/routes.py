@@ -9,9 +9,9 @@ transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions'
 @transactions_bp.route('/')
 def list_transactions():
     """List all transactions with pagination"""
-    
+
     print("📝 Loading transactions page...")
-    
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 50
@@ -20,22 +20,6 @@ def list_transactions():
         # Use raw SQL for consistency
         conn = sqlite3.connect('data/personal_finance.db')
         cursor = conn.cursor()
-        
-        # First, ensure is_active column exists and set defaults
-        try:
-            cursor.execute("ALTER TABLE transactions ADD COLUMN is_active BOOLEAN DEFAULT 1")
-            print("📄 Added is_active column to transactions table")
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
-        
-        # Update any NULL is_active values to 1 (active)
-        cursor.execute("UPDATE transactions SET is_active = 1 WHERE is_active IS NULL")
-        updated_count = cursor.rowcount
-        if updated_count > 0:
-            print(f"📄 Updated {updated_count} transactions to set is_active = 1")
-        
-        conn.commit()
         
         # Debug: Check total transactions
         cursor.execute("SELECT COUNT(*) as total FROM transactions")
@@ -67,7 +51,7 @@ def list_transactions():
         """
         cursor.execute(transactions_query, [per_page, offset])
         transactions_data = cursor.fetchall()
-        
+
         # Get column names
         column_names = [description[0] for description in cursor.description]
         print(f"📊 Found {len(transactions_data)} transactions for page {page}")
@@ -118,7 +102,7 @@ def list_transactions():
         print(f"❌ Error in transactions route: {e}")
         import traceback
         traceback.print_exc()
-        
+
         # Return empty pagination
         empty_pagination = type('Pagination', (), {})()
         empty_pagination.items = []
@@ -128,7 +112,7 @@ def list_transactions():
         empty_pagination.has_prev = False
         empty_pagination.has_next = False
         empty_pagination.iter_pages = lambda: []
-        
+
         return render_template('transactions.html', transactions=empty_pagination)
 
 @transactions_bp.route('/add', methods=['GET', 'POST'])
@@ -375,6 +359,187 @@ def add_transaction():
         
         # Return form with default lists
         return render_template('add_transaction.html',
+                             categories=[],
+                             sub_categories=[],
+                             accounts=['Venture', 'Cacas', 'Cata'],
+                             owners=['Cata', 'Suricata', 'Cacas'])
+
+@transactions_bp.route('/bulk', methods=['GET', 'POST'])
+def bulk_transaction():
+    """Add multiple transactions with shared common fields"""
+    import json
+
+    print("📦 Loading bulk transaction page...")
+
+    if request.method == 'POST':
+        try:
+            print("📥 Processing bulk transaction form submission...")
+
+            # Get common fields
+            account_name = request.form.get('account_name', '').strip()
+            category = request.form.get('category', '').strip()
+            sub_category = request.form.get('sub_category', '').strip()
+            transaction_type = request.form.get('type', '').strip()
+            owner = request.form.get('owner', '').strip()
+
+            # Validate common fields
+            if not all([account_name, category, transaction_type, owner]):
+                flash('All required common fields must be filled out', 'error')
+                raise ValueError("Missing required common fields")
+
+            # Parse transaction items from JSON
+            items_json = request.form.get('transaction_items', '[]')
+            items = json.loads(items_json)
+
+            if not items:
+                flash('At least one transaction item is required', 'error')
+                raise ValueError("No transaction items provided")
+
+            print(f"📋 Processing {len(items)} transaction items")
+
+            conn = sqlite3.connect('data/personal_finance.db')
+            cursor = conn.cursor()
+
+            # Handle new category - add to budget templates if not exists
+            if category:
+                cursor.execute("SELECT id FROM budget_templates WHERE category = ?", (category,))
+                if not cursor.fetchone():
+                    print(f"➕ Adding new category to budget templates: {category}")
+                    cursor.execute("""
+                        INSERT INTO budget_templates (category, budget_amount, notes, is_active, created_at, updated_at)
+                        VALUES (?, 0.00, 'Added from bulk transaction form', 1, ?, ?)
+                    """, (category, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
+
+            # Insert each transaction
+            success_count = 0
+            error_count = 0
+
+            for item in items:
+                try:
+                    item_date = item.get('date', '').strip()
+                    item_description = item.get('description', '').strip()
+                    item_amount = float(item.get('amount', 0))
+
+                    # Validate item
+                    if not item_date or not item_description or item_amount == 0:
+                        error_count += 1
+                        continue
+
+                    # Convert date
+                    transaction_date = datetime.strptime(item_date, '%Y-%m-%d').date()
+
+                    # Insert transaction
+                    cursor.execute("""
+                        INSERT INTO transactions
+                        (account_name, date, description, amount, sub_category, category, type, owner, is_business, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+                    """, (
+                        account_name,
+                        transaction_date.strftime('%Y-%m-%d'),
+                        item_description,
+                        item_amount,
+                        sub_category if sub_category else None,
+                        category,
+                        transaction_type,
+                        owner,
+                        datetime.utcnow().isoformat(),
+                        datetime.utcnow().isoformat()
+                    ))
+
+                    success_count += 1
+                    print(f"✅ Added: {item_description} - ${item_amount:.2f}")
+
+                except Exception as item_error:
+                    print(f"❌ Error adding item: {item_error}")
+                    error_count += 1
+
+            conn.commit()
+            conn.close()
+
+            # Flash appropriate message
+            if error_count == 0:
+                flash(f'Successfully added {success_count} transactions!', 'success')
+            else:
+                flash(f'Added {success_count} transactions. {error_count} items had errors.', 'warning')
+
+            return redirect(url_for('transactions.list_transactions'))
+
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON parsing error: {e}")
+            flash('Error parsing transaction items', 'error')
+            return redirect(url_for('transactions.bulk_transaction'))
+        except Exception as e:
+            print(f"❌ Error in bulk transaction: {e}")
+            import traceback
+            traceback.print_exc()
+            flash(f'Error processing bulk transaction: {str(e)}', 'error')
+            return redirect(url_for('transactions.bulk_transaction'))
+
+    # GET request - load form data (same as add_transaction)
+    try:
+        print("📊 Loading bulk form dropdown data...")
+
+        conn = sqlite3.connect('data/personal_finance.db')
+
+        # Get categories from budget templates
+        categories_df = pd.read_sql_query("""
+            SELECT DISTINCT category FROM budget_templates
+            WHERE is_active = 1 AND category IS NOT NULL
+            UNION
+            SELECT DISTINCT category FROM transactions
+            WHERE category IS NOT NULL
+            ORDER BY category
+        """, conn)
+
+        # Get subcategories, accounts, and owners from existing transactions
+        sub_categories_df = pd.read_sql_query("""
+            SELECT DISTINCT sub_category FROM transactions
+            WHERE sub_category IS NOT NULL AND sub_category != ''
+            ORDER BY sub_category
+        """, conn)
+
+        accounts_df = pd.read_sql_query("""
+            SELECT DISTINCT account_name FROM transactions
+            WHERE account_name IS NOT NULL
+            ORDER BY account_name
+        """, conn)
+
+        owners_df = pd.read_sql_query("""
+            SELECT DISTINCT owner FROM transactions
+            WHERE owner IS NOT NULL
+            ORDER BY owner
+        """, conn)
+
+        conn.close()
+
+        # Convert to lists for template
+        categories_list = categories_df['category'].tolist()
+        sub_categories_list = sub_categories_df['sub_category'].tolist()
+        accounts_list = accounts_df['account_name'].tolist()
+        owners_list = owners_df['owner'].tolist()
+
+        # Add default options if empty
+        if not accounts_list:
+            accounts_list = ['Venture', 'Cacas', 'Cata']
+
+        if not owners_list:
+            owners_list = ['Cata', 'Suricata', 'Cacas']
+
+        print(f"📊 Bulk form dropdown data loaded successfully")
+
+        return render_template('bulk_transaction.html',
+                             categories=categories_list,
+                             sub_categories=sub_categories_list,
+                             accounts=accounts_list,
+                             owners=owners_list)
+
+    except Exception as e:
+        print(f"❌ Error loading bulk form data: {e}")
+        import traceback
+        traceback.print_exc()
+
+        # Return form with default lists
+        return render_template('bulk_transaction.html',
                              categories=[],
                              sub_categories=[],
                              accounts=['Venture', 'Cacas', 'Cata'],

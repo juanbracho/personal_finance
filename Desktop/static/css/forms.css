@@ -312,3 +312,42 @@
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
+/* Bulk Transaction Styles */
+.bulk-item-row {
+    transition: background-color 0.2s ease;
+}
+
+.bulk-item-row:hover {
+    background-color: rgba(52, 152, 219, 0.05);
+}
+
+.bulk-item-row .form-control.is-invalid {
+    border-color: var(--danger-color);
+    background-image: none;
+}
+
+.bulk-item-row td {
+    vertical-align: middle;
+}
+
+.bulk-summary {
+    border: 1px solid #e9ecef;
+}
+
+#itemsTable th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#itemsTable .input-group-text {
+    padding: 0.25rem 0.5rem;
+}
+
+#emptyMessage {
+    color: #6c757d;
+    font-style: italic;
+}

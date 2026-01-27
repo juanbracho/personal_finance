@@ -252,21 +252,35 @@ def calculate_file_checksum(filepath):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
+def log_update(message):
+    """Log update messages to file for debugging"""
+    log_path = os.path.join('data', 'update_log.txt')
+    with open(log_path, 'a') as f:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f.write(f"[{timestamp}] {message}\n")
+
 @settings_bp.route('/install-update', methods=['POST'])
 def install_update():
     """Handle update package upload and installation"""
 
+    log_update("=" * 50)
+    log_update("UPDATE INSTALLATION STARTED")
+
     try:
         # Check if file was uploaded
         if 'update_file' not in request.files:
+            log_update("ERROR: No file in request.files")
             return jsonify({'success': False, 'message': 'No file uploaded'}), 400
 
         file = request.files['update_file']
+        log_update(f"File received: {file.filename}")
 
         if file.filename == '':
+            log_update("ERROR: Empty filename")
             return jsonify({'success': False, 'message': 'No file selected'}), 400
 
         if not file.filename.endswith('.zip'):
+            log_update(f"ERROR: Invalid file type: {file.filename}")
             return jsonify({'success': False, 'message': 'Invalid file type. Must be a .zip file'}), 400
 
         # Save uploaded file to temporary location
@@ -314,24 +328,29 @@ def install_update():
             new_version_info = json.load(f)
 
         new_version = new_version_info.get('version', 'unknown')
+        log_update(f"Update version: {new_version}")
         print(f"✓ Update version: {new_version}")
 
         # Get current version
         current_version_info = get_app_version()
         current_version = current_version_info.get('version', '1.0.0')
+        log_update(f"Current version: {current_version}")
         print(f"  Current version: {current_version}")
 
         # Compare versions
         version_comparison = compare_versions(current_version, new_version)
+        log_update(f"Version comparison result: {version_comparison}")
 
         if version_comparison == 0:
+            log_update("ERROR: Same version")
             shutil.rmtree(temp_upload_dir)
             return jsonify({
                 'success': False,
                 'message': f'Update package is the same version as current ({current_version})'
             }), 400
 
-        if version_comparison > 0:
+        if version_comparison < 0:
+            log_update("ERROR: Older version")
             shutil.rmtree(temp_upload_dir)
             return jsonify({
                 'success': False,

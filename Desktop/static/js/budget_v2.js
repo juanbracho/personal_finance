@@ -1441,8 +1441,32 @@ async function loadUnexpectedExpenses() {
         renderUnexpectedExpenses(expenses);
         updateSummaryCards();
 
+        // Update the month labels
+        const monthStr = String(budgetState.currentMonth).padStart(2, '0');
+        const monthLabel = document.getElementById('unexpectedMonthLabel');
+        if (monthLabel) {
+            monthLabel.textContent = `${budgetState.currentYear}-${monthStr}`;
+        }
+        const summaryLabel = document.getElementById('unexpectedMonthSummary');
+        if (summaryLabel) {
+            summaryLabel.textContent = `${budgetState.currentYear}-${monthStr}`;
+        }
+
     } catch (error) {
         console.error('Error loading unexpected expenses:', error);
+    }
+}
+
+async function changeUnexpectedMonth() {
+    const monthSelect = document.getElementById('unexpectedMonthSelect');
+    const yearSelect = document.getElementById('unexpectedYearSelect');
+
+    if (monthSelect && yearSelect) {
+        budgetState.currentMonth = parseInt(monthSelect.value);
+        budgetState.currentYear = parseInt(yearSelect.value);
+
+        console.log(`Changing to ${budgetState.currentYear}-${budgetState.currentMonth}`);
+        await loadUnexpectedExpenses();
     }
 }
 
@@ -1560,7 +1584,13 @@ async function editUnexpectedExpense(id) {
 
     document.getElementById('unexpectedExpenseModalLabel').textContent = 'Edit Unexpected Expense';
     document.getElementById('unexpectedExpenseId').value = id;
-    document.getElementById('unexpectedCategory').value = expense.category;
+
+    // Load categories into dropdown
+    const categorySelect = document.getElementById('unexpectedCategory');
+    const categories = [...new Set(budgetState.subcategoryBudgets.map(b => b.category))].sort();
+    categorySelect.innerHTML = '<option value="">Select category...</option>' +
+        categories.map(cat => `<option value="${cat}"${cat === expense.category ? ' selected' : ''}>${cat}</option>`).join('');
+
     document.getElementById('unexpectedDescription').value = expense.description;
     document.getElementById('unexpectedAmount').value = expense.amount;
 
