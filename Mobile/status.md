@@ -3,7 +3,7 @@
 
 ---
 
-## Current Status: Phase 3 — Railway deployed, custom domain pending verification ✅
+## Current Status: Phase 4 — Production hardened, ready for Flutter cloud connection ✅
 
 ---
 
@@ -101,21 +101,33 @@ Files modified in `Mobile/finance_dashboard_mobile/lib/`:
 
 ---
 
+### Phase 4 — Production Hardening ✅ COMPLETE
+
+#### Custom domain
+- `https://finance.juanbracho.com` live and verified (Let's Encrypt cert issued Feb 21 2026)
+- Cloudflare proxy (orange cloud) enabled on `finance` CNAME — handles HTTP → HTTPS redirect
+
+#### CORS locked down
+- `CORS_ORIGINS` env var added on Railway: `https://finance.juanbracho.com`
+- Replaced Flask-CORS library with a manual `after_request` handler in `app.py` for strict origin enforcement
+- Verified: foreign origins receive no `Access-Control-Allow-Origin` header
+
+#### Session expiry
+- Sessions now expire after **1 hour** of inactivity
+- `login_time` timestamp stored on login, checked on every request in `check_web_session()`
+- Implemented in `auth.py` via `SESSION_LIFETIME_SECONDS = 3600`
+
+---
+
 ## Current Known Issues / In Progress
 
-### 1. Custom domain pending verification
-Railway is verifying `finance.juanbracho.com`. DNS records are in place in Cloudflare. Should resolve within minutes to hours of DNS propagation.
-
-### 2. CORS_ORIGINS still set to `*`
-Needs to be locked down to `https://finance.juanbracho.com` once domain is active and Flutter is connected.
+None.
 
 ---
 
 ## What to Do Next Session
 
-### Immediate — finish domain & lock down CORS
-1. Confirm `https://finance.juanbracho.com` is live and login works
-2. Update `CORS_ORIGINS` on Railway to `https://finance.juanbracho.com`
+### Immediate
 
 ### Phase 5 — Flutter to Cloud
 1. Update `config.dart`: `baseUrl = 'https://finance.juanbracho.com'`
