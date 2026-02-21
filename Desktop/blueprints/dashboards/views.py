@@ -317,7 +317,7 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
         WHERE {spending_filter}
         AND sub_category IS NOT NULL
         AND sub_category != ''
-        AND type IN ('Needs', 'Wants', 'Business')
+        AND type IN ('Needs', 'Wants', 'Business', 'Savings')
         AND COALESCE(is_active, 1) = 1
         GROUP BY category, sub_category
         ORDER BY category, sub_category

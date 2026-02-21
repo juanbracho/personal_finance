@@ -211,6 +211,150 @@ def budget_analysis():
         print(f"❌ Error in budget analysis API: {e}")
         return jsonify({'error': str(e)}), 500
 
+@api_bp.route('/budget_subcategories')
+def budget_subcategories():
+    """Get budget analysis with subcategory breakdown for Flutter accordion view.
+
+    Returns a list of categories, each with a nested list of subcategories.
+    Categories that have no subcategory templates are returned with the category
+    itself as a single subcategory row (so the accordion always has content).
+
+    Params: year, month, owner
+    """
+    try:
+        month = request.args.get('month', datetime.now().month, type=int)
+        year  = request.args.get('year',  datetime.now().year,  type=int)
+        owner = request.args.get('owner', 'all')
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        ensure_budget_tables(conn)
+
+        spending_filter = (
+            "strftime('%m', date) = ? AND strftime('%Y', date) = ?"
+            " AND COALESCE(is_active, 1) = 1"
+        )
+        spending_params = [f"{month:02d}", str(year)]
+        if owner != 'all':
+            spending_filter += " AND owner = ?"
+            spending_params.append(owner)
+
+        # Actual spending grouped by category + sub_category
+        spending_df = pd.read_sql_query(f"""
+            SELECT
+                category,
+                COALESCE(NULLIF(TRIM(sub_category), ''), '(other)') AS sub_category,
+                SUM(amount) AS actual
+            FROM transactions
+            WHERE {spending_filter}
+            GROUP BY category, sub_category
+            ORDER BY category, sub_category
+        """, conn, params=spending_params)
+
+        # Category-level initial budgets
+        cat_budgets_df = pd.read_sql_query(
+            "SELECT category, budget_amount FROM budget_templates WHERE is_active = 1",
+            conn
+        )
+
+        # Subcategory budgets
+        subcat_budgets_df = pd.read_sql_query(
+            "SELECT category, sub_category, budget_amount"
+            " FROM budget_subcategory_templates WHERE is_active = 1",
+            conn
+        )
+
+        # Unexpected expenses (category level)
+        unexpected_df = pd.read_sql_query("""
+            SELECT category, SUM(amount) AS total_unexpected
+            FROM unexpected_expenses
+            WHERE month = ? AND year = ? AND is_active = 1
+            GROUP BY category
+        """, conn, params=[month, year])
+
+        conn.close()
+
+        # ── Build lookup dicts ───────────────────────────────────────────────
+        cat_budgets  = {r['category']: float(r['budget_amount'])     for _, r in cat_budgets_df.iterrows()}
+        unexpected   = {r['category']: float(r['total_unexpected'])  for _, r in unexpected_df.iterrows()}
+
+        subcat_budgets: dict = {}   # {category: {sub_category: budget}}
+        for _, r in subcat_budgets_df.iterrows():
+            subcat_budgets.setdefault(r['category'], {})[r['sub_category']] = float(r['budget_amount'])
+
+        spending: dict = {}         # {category: {sub_category: actual}}
+        for _, r in spending_df.iterrows():
+            spending.setdefault(r['category'], {})[r['sub_category']] = float(r['actual'])
+
+        def _status(variance, budget):
+            if budget == 0:      return 'no_budget'
+            if variance >  50:   return 'over'
+            if variance < -50:   return 'under'
+            return 'on_track'
+
+        all_categories = (
+            set(cat_budgets.keys()) |
+            set(subcat_budgets.keys()) |
+            set(spending.keys()) |
+            set(unexpected.keys())
+        )
+
+        result = []
+        for category in sorted(all_categories):
+            cat_initial    = cat_budgets.get(category, 0.0)
+            cat_unexpected = unexpected.get(category, 0.0)
+            cat_subs_b     = subcat_budgets.get(category, {})
+            cat_subs_s     = spending.get(category, {})
+            all_subs       = set(cat_subs_b.keys()) | set(cat_subs_s.keys())
+
+            subcategories = []
+            if all_subs:
+                for sub in sorted(all_subs):
+                    sub_budget = cat_subs_b.get(sub, 0.0)
+                    sub_actual = cat_subs_s.get(sub, 0.0)
+                    sub_var    = sub_actual - sub_budget
+                    subcategories.append({
+                        'sub_category':   sub,
+                        'initial_budget': sub_budget,
+                        'actual_spending': sub_actual,
+                        'variance':       sub_var,
+                        'status':         _status(sub_var, sub_budget),
+                    })
+            else:
+                # No sub-category definitions — category is its own sub
+                cat_actual = sum(cat_subs_s.values()) if cat_subs_s else 0.0
+                cat_var    = cat_actual - cat_initial
+                subcategories.append({
+                    'sub_category':    category,
+                    'initial_budget':  cat_initial,
+                    'actual_spending': cat_actual,
+                    'variance':        cat_var,
+                    'status':          _status(cat_var, cat_initial),
+                })
+
+            cat_actual_total = sum(s['actual_spending'] for s in subcategories)
+            cat_effective    = cat_initial + cat_unexpected
+            cat_var          = cat_actual_total - cat_effective
+
+            result.append({
+                'category':           category,
+                'initial_budget':     cat_initial,
+                'unexpected_expenses': cat_unexpected,
+                'effective_budget':   cat_effective,
+                'actual_spending':    cat_actual_total,
+                'variance':           cat_var,
+                'status':             _status(cat_var, cat_effective),
+                'subcategories':      subcategories,
+            })
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"❌ Error in budget_subcategories: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @api_bp.route('/dashboard_summary')
 def dashboard_summary():
     """Get dashboard summary data for quick overview"""
@@ -1400,7 +1544,7 @@ def api_add_transaction():
     try:
         data = request.get_json(force=True, silent=True) or {}
 
-        required = ['account_name', 'date', 'description', 'amount', 'category', 'type', 'owner']
+        required = ['date', 'description', 'amount', 'category', 'type', 'owner']
         for field in required:
             if not data.get(field) and data.get(field) != 0:
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
