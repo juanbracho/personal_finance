@@ -10,10 +10,13 @@ so local desktop mode stays auth-free.
 """
 
 import hmac
+import time
 from flask import (
     Blueprint, request, jsonify, current_app,
     session, redirect, url_for, render_template
 )
+
+SESSION_LIFETIME_SECONDS = 3600  # 1 hour
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -76,6 +79,11 @@ def check_web_session():
     if not session.get('logged_in'):
         return redirect(url_for('auth.login', next=request.path))
 
+    login_time = session.get('login_time', 0)
+    if time.time() - login_time > SESSION_LIFETIME_SECONDS:
+        session.clear()
+        return redirect(url_for('auth.login', next=request.path))
+
     return None
 
 
@@ -95,7 +103,9 @@ def login():
         pass_ok = hmac.compare_digest(password, expected_pass)
 
         if user_ok and pass_ok:
+            session.clear()
             session['logged_in'] = True
+            session['login_time'] = time.time()
             next_url = request.args.get('next') or url_for('dashboards.dashboard')
             return redirect(next_url)
 

@@ -18,7 +18,10 @@ def create_app(config_class=None):
     # Origins are restricted via CORS_ORIGINS in ProductionConfig.
     try:
         from flask_cors import CORS
-        CORS(app, resources={r'/api/*': {'origins': app.config.get('CORS_ORIGINS', '*')}})
+        cors_origins = app.config.get('CORS_ORIGINS', '*')
+        if cors_origins != '*':
+            cors_origins = [o.strip() for o in cors_origins.split(',')]
+        CORS(app, resources={r'/api/*': {'origins': cors_origins}})
     except ImportError:
         pass  # flask-cors not installed; CORS headers omitted (fine for local use)
 
