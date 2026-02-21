@@ -1,9 +1,9 @@
 # Finance Dashboard — Mobile Expansion Status
-*Last updated: February 20, 2026*
+*Last updated: February 21, 2026*
 
 ---
 
-## Current Status: Phase 2 — Flutter connected to local Flask ✅ (mostly working)
+## Current Status: Phase 3 — Railway deployed, custom domain pending verification ✅
 
 ---
 
@@ -46,85 +46,100 @@ Files modified in `Mobile/finance_dashboard_mobile/lib/`:
 | `ios/Runner/Info.plist` | Added `NSAllowsArbitraryLoads: true` for local HTTP (remove before App Store) |
 | `ios/Podfile` | Uncommented `platform :ios, '13.0'` — fixes CocoaPods warning |
 
-### Phase 3 — Railway Deployment Files ✅ CREATED (not deployed yet)
-- `Desktop/Procfile` — `web: python desktop_app_launcher.py`
-- `Desktop/railway.json` — build/deploy config with healthcheck
-- `Desktop/requirements.txt` — Flask, SQLAlchemy, pandas, numpy, gunicorn, flask-cors
+### Phase 3 — Railway Deployment ✅ COMPLETE & LIVE
 
-### Phase 4 — Desktop Launcher Updated ✅ COMPLETE
-`Desktop/desktop_app_launcher.py` now supports 3 modes:
-1. **Local** (default) — starts Flask on 127.0.0.1:5000, opens PyWebView
-2. **Cloud desktop** (`FINANCE_API_URL` set) — skips local Flask, opens PyWebView at cloud URL, reads API key from `~/.financed/config.json`
-3. **Railway server** (`RAILWAY_ENVIRONMENT` set) — runs Flask on `0.0.0.0:$PORT`, no PyWebView
+#### Infrastructure
+- Railway project created, connected to GitHub repo
+- Root directory set to `Desktop` in Railway service settings
+- Persistent volume mounted at `/app/data` — all relative `data/` paths in the app land here
+- Railway auto-detects `RAILWAY_ENVIRONMENT` and runs Flask in server mode (no PyWebView)
+
+#### Environment Variables set on Railway
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | `sqlite:////app/data/personal_finance.db` |
+| `SECRET_KEY` | Flask session signing key |
+| `API_SECRET_KEY` | Bearer token for Flutter API auth |
+| `CORS_ORIGINS` | `*` (to be locked down after Flutter connected) |
+| `DASHBOARD_USERNAME` | Web dashboard login username |
+| `DASHBOARD_PASSWORD` | Web dashboard login password |
+
+#### Code changes for Railway
+| File | What Changed |
+|---|---|
+| `requirements.txt` | Added `python-dateutil` (used by `budget_recommender.py`) |
+| `auth.py` | Full rewrite — added session login Blueprint (`auth_bp`), login/logout routes, `check_web_session()` app-level hook |
+| `app.py` | Registered `auth_bp`, wired `check_web_session` as `app.before_request` |
+| `config.py` | Added `DASHBOARD_USERNAME` and `DASHBOARD_PASSWORD` config vars |
+| `templates/login.html` | **New** — dark-themed login page matching app style |
+| `templates/base.html` | Added Sign Out button to navbar (only shown when session active) |
+
+#### Database
+- Live backup from `~/Library/Application Support/FinanceDashboard/data/backups/backup_20260221_083626.db` uploaded via `/settings` page
+- Dashboard confirmed showing real data: $10,323.57 monthly spending, $93,898.37 active debts
+
+#### Auth summary (two layers)
+| Layer | Mechanism | Covers |
+|---|---|---|
+| Web UI | Session login (`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`) | All non-API, non-static routes |
+| Flutter API | Bearer token (`API_SECRET_KEY`) | All `/api/*` routes |
+| Local desktop | No auth (env vars not set locally) | All routes — unchanged behavior |
+
+#### URLs
+- Railway URL: `https://personalfinance-production-0e5b.up.railway.app`
+- Custom domain: `https://finance.juanbracho.com` ← **pending DNS verification**
+
+#### DNS records added in Cloudflare (juanbracho.com)
+| Type | Name | Value |
+|---|---|---|
+| `CNAME` | `finance` | `4vdt6k0y.up.railway.app` (DNS only, no proxy) |
+| `TXT` | `_railway-verify.finance` | `railway-verify=88a651f5158d008ecfd39a88abd9ede01719f17511f135a140f80a1b1648ca91` |
+
+#### Credential files (gitignored, at project root)
+- `railway-dns.txt` — DNS record values
+- `railway-credentials.txt` — `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`
 
 ---
 
 ## Current Known Issues / In Progress
 
-### 1. Flask must be started manually for Phase 2 testing
-The desktop `.app` bundle writes live data to:
-```
-~/Library/Application Support/FinanceDashboard/data/personal_finance.db
-```
-But running `python app.py` from `Desktop/` reads `Desktop/data/personal_finance.db` (old/test data, stuck at Jan 2026).
+### 1. Custom domain pending verification
+Railway is verifying `finance.juanbracho.com`. DNS records are in place in Cloudflare. Should resolve within minutes to hours of DNS propagation.
 
-**Correct start command for Phase 2:**
-```bash
-cd ~/Library/Application\ Support/FinanceDashboard && \
-FLASK_HOST=0.0.0.0 FLASK_PORT=5001 \
-python "/Users/elcacas/Desktop/Finance Dashboard/Desktop/app.py"
-```
-
-At the end of the session, the user was about to test this. It had not been confirmed working yet.
-
-### 2. Budgets showing $0 spent — suspected cause: wrong database
-Budget analysis filters by current month (February 2026). The `Desktop/data/` DB is old (Jan 2026 data). Once Flask is started from the correct directory (above), budgets should show real spending.
-
-### 3. Transactions stopping at Jan 17 — same cause as #2
-Transactions endpoint is working and returns data, but from the old database. Fix is same as above.
-
-### 4. Add Transaction not yet tested with real API
-The `POST /api/transactions` endpoint exists and is wired up in Flutter. Has not been tested end-to-end yet.
+### 2. CORS_ORIGINS still set to `*`
+Needs to be locked down to `https://finance.juanbracho.com` once domain is active and Flutter is connected.
 
 ---
 
 ## What to Do Next Session
 
-### Immediate (still Phase 2)
-1. Confirm Flask starts correctly from `~/Library/Application Support/FinanceDashboard` — verify budgets and transactions show Feb 2026 data
-2. Test Add Transaction: fill in the form, hit save, verify it appears in the transactions list and in the desktop app
-3. Test filter by owner on transactions screen
-4. Check the Home screen numbers match what the desktop app shows (sanity check)
-5. Test on physical iPhone if possible (needs to be on same WiFi as Mac)
-
-### Phase 3 — Railway Cloud (when Phase 2 fully validated)
-1. Create Railway account → new project → connect GitHub repo
-2. Set env vars on Railway:
-   - `API_SECRET_KEY` = `openssl rand -hex 32` (generate one)
-   - `DATABASE_URL` = `sqlite:////data/personal_finance.db`
-   - `SECRET_KEY` = another random string
-   - `CORS_ORIGINS` = `https://finance.juanbracho.com`
-3. Add Railway persistent volume mounted at `/data`
-4. Configure custom domain `finance.juanbracho.com`
-5. Add DNS A record at registrar: `finance` → Railway IP
-6. Upload live database to Railway via settings endpoint
+### Immediate — finish domain & lock down CORS
+1. Confirm `https://finance.juanbracho.com` is live and login works
+2. Update `CORS_ORIGINS` on Railway to `https://finance.juanbracho.com`
 
 ### Phase 5 — Flutter to Cloud
 1. Update `config.dart`: `baseUrl = 'https://finance.juanbracho.com'`
-2. Store production API key via `flutter_secure_storage`
-3. Remove `NSAllowsArbitraryLoads` from `ios/Runner/Info.plist` (replace with specific domain exception)
-4. Build release APK (Android sideload)
-5. Build iOS IPA (Xcode → Product → Archive → direct install)
+2. Store production `API_SECRET_KEY` via `flutter_secure_storage`
+3. Remove `NSAllowsArbitraryLoads` from `ios/Runner/Info.plist` (replace with specific domain exception for `finance.juanbracho.com`)
+4. Test all 5 screens against production API
+5. Build release APK (Android sideload)
+6. Build iOS IPA (Xcode → Product → Archive → direct install)
+
+### Phase 6 — Web Dashboard login UX (optional)
+- Add "Remember me" / persistent session (currently expires on browser close)
+- Add password change route in settings
 
 ---
 
 ## Architecture Reference
 
 ```
-Mac LAN IP:     192.168.1.164
-Flask port:     5001 (5000 blocked by macOS AirPlay Receiver)
-Flutter baseUrl: http://192.168.1.164:5001   ← Phase 2
-                 https://finance.juanbracho.com  ← Phase 5
+Railway URL:    https://personalfinance-production-0e5b.up.railway.app
+Custom domain:  https://finance.juanbracho.com  ← pending verification
+Flask port:     8080 (Railway $PORT)
+
+Live DB location (Railway):
+  /app/data/personal_finance.db  (persistent volume)
 
 Live DB location (desktop app):
   ~/Library/Application Support/FinanceDashboard/data/personal_finance.db
@@ -133,8 +148,16 @@ API auth:
   Header: Authorization: Bearer <API_SECRET_KEY>
   Env var empty = no auth (local dev bypass)
 
-All Flutter API endpoints are under /api/* and auth-protected.
-Non-API HTML routes are unprotected (desktop web frontend).
+Web auth:
+  Session cookie, credentials in DASHBOARD_USERNAME / DASHBOARD_PASSWORD env vars
+  Env var empty = no auth (local desktop bypass)
+
+Flutter baseUrl:
+  http://192.168.1.164:5001   ← Phase 2 (LAN, still current)
+  https://finance.juanbracho.com  ← Phase 5 (next)
+
+All Flutter API endpoints are under /api/* — Bearer token protected.
+Non-API HTML routes are session-login protected (on Railway).
 ```
 
 ## Flask Response Shape Reference (for parsing)
@@ -155,15 +178,16 @@ Non-API HTML routes are unprotected (desktop web frontend).
 
 ```
 Desktop/
-  app.py                          — Flask factory, FLASK_HOST/PORT env var support
-  auth.py                         — Bearer token check_api_key()
+  app.py                          — Flask factory, registers auth_bp + check_web_session
+  auth.py                         — Bearer token check_api_key() + session login auth_bp
   config.py                       — Config, DesktopConfig, ProductionConfig
   desktop_app_launcher.py         — 3-mode launcher (local/cloud-desktop/railway)
-  Procfile                        — Railway start command
-  railway.json                    — Railway build config
-  requirements.txt                — Python deps
-  blueprints/api/routes.py        — All API endpoints incl. new /api/transactions, /api/debts
-  templates/base.html             — Injects window.FINANCE_API_KEY
+  Procfile                        — web: python desktop_app_launcher.py
+  railway.json                    — Railway build config (NIXPACKS, healthcheck /)
+  requirements.txt                — Flask, SQLAlchemy, pandas, numpy, gunicorn, flask-cors, python-dateutil
+  blueprints/api/routes.py        — All API endpoints incl. /api/transactions, /api/debts
+  templates/login.html            — Web dashboard login page
+  templates/base.html             — Injects window.FINANCE_API_KEY, Sign Out button
   static/js/main.js               — apiCall() with auth header
 
 Mobile/
@@ -172,13 +196,17 @@ Mobile/
   finance_dashboard_mobile/
     lib/
       main.dart                   — App root, router, themes
-      config.dart                 — baseUrl (change per phase)
+      config.dart                 — baseUrl (change to finance.juanbracho.com for Phase 5)
       models/                     — Transaction, BudgetCategory, DashboardSummary, DebtAccount
       services/api_service.dart   — HTTP client + MockData
       providers/app_providers.dart — Riverpod FutureProviders (real API)
       screens/                    — home, add_transaction, transactions, budgets, debts
       widgets/                    — stat_card, budget_progress_tile
     ios/
-      Runner/Info.plist           — NSAllowsArbitraryLoads (remove before production)
+      Runner/Info.plist           — NSAllowsArbitraryLoads (replace with domain exception before production)
       Podfile                     — platform :ios, '13.0'
+
+Project root (gitignored):
+  railway-dns.txt                 — Cloudflare DNS record values
+  railway-credentials.txt         — Dashboard login credentials
 ```
