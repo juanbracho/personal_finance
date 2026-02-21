@@ -133,11 +133,19 @@ function createLineChart(elementId, traces, title, xAxisTitle, yAxisTitle) {
 }
 
 // API call wrapper with error handling
+// Automatically attaches the Bearer token when window.FINANCE_API_KEY is set
+// (injected by base.html from Flask config — used in both local and cloud modes).
 async function apiCall(url, options = {}) {
     try {
+        const authHeaders = {};
+        if (window.FINANCE_API_KEY) {
+            authHeaders['Authorization'] = 'Bearer ' + window.FINANCE_API_KEY;
+        }
+
         const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json',
+                ...authHeaders,
                 ...options.headers
             },
             ...options

@@ -1306,3 +1306,202 @@ def get_transactions_by_subcategory():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Flutter-facing endpoints (JSON only)
+# All routes below are protected by the api_bp.before_request auth hook.
+# ---------------------------------------------------------------------------
+
+@api_bp.route('/transactions', methods=['GET'])
+def api_transactions_list():
+    """Paginated transaction list for the Flutter mobile app.
+
+    Query params:
+      page       (int, default 1)
+      per_page   (int, default 50, max 200)
+      owner      (str, default 'all')
+      year       (int)
+      month      (int)
+      category   (str)
+    """
+    try:
+        page = max(1, request.args.get('page', 1, type=int))
+        per_page = min(200, max(1, request.args.get('per_page', 50, type=int)))
+        offset = (page - 1) * per_page
+        owner = request.args.get('owner', 'all')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+        category = request.args.get('category', '')
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        filters = ["COALESCE(is_active, 1) = 1"]
+        params = []
+
+        if owner and owner != 'all':
+            filters.append("owner = ?")
+            params.append(owner)
+        if year:
+            filters.append("strftime('%Y', date) = ?")
+            params.append(str(year))
+        if month:
+            filters.append("strftime('%m', date) = ?")
+            params.append(f"{month:02d}")
+        if category:
+            filters.append("category = ?")
+            params.append(category)
+
+        where = "WHERE " + " AND ".join(filters)
+
+        cursor.execute(f"SELECT COUNT(*) FROM transactions {where}", params)
+        total = cursor.fetchone()[0]
+
+        cursor.execute(
+            f"""SELECT id, account_name, date, description, amount,
+                       sub_category, category, type, owner, is_business
+                FROM transactions {where}
+                ORDER BY date DESC, id DESC
+                LIMIT ? OFFSET ?""",
+            params + [per_page, offset]
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        transactions = [
+            {
+                'id': r[0], 'account_name': r[1], 'date': r[2],
+                'description': r[3], 'amount': float(r[4]) if r[4] is not None else 0.0,
+                'sub_category': r[5], 'category': r[6],
+                'type': r[7], 'owner': r[8], 'is_business': bool(r[9])
+            }
+            for r in rows
+        ]
+
+        return jsonify({
+            'transactions': transactions,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': (total + per_page - 1) // per_page,
+            'has_next': offset + per_page < total,
+            'has_prev': page > 1
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/transactions', methods=['POST'])
+def api_add_transaction():
+    """Add a transaction from the Flutter mobile app (JSON body).
+
+    Required fields: account_name, date (YYYY-MM-DD), description,
+                     amount, category, type, owner
+    Optional fields: sub_category, is_business (bool, default false)
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        required = ['account_name', 'date', 'description', 'amount', 'category', 'type', 'owner']
+        for field in required:
+            if not data.get(field) and data.get(field) != 0:
+                return jsonify({'success': False, 'error': f'{field} is required'}), 400
+
+        try:
+            amount = float(data['amount'])
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Invalid amount'}), 400
+
+        if amount == 0:
+            return jsonify({'success': False, 'error': 'Amount cannot be zero'}), 400
+
+        from datetime import datetime as dt
+        try:
+            dt.strptime(data['date'], '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO transactions
+               (account_name, date, description, amount, sub_category, category, type, owner, is_business, is_active)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+            (
+                data['account_name'],
+                data['date'],
+                data['description'],
+                amount,
+                data.get('sub_category', ''),
+                data['category'],
+                data['type'],
+                data['owner'],
+                1 if data.get('is_business', False) else 0,
+            )
+        )
+        transaction_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return jsonify({'success': True, 'id': transaction_id}), 201
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/debts', methods=['GET'])
+def api_debts_list():
+    """Debt accounts list for the Flutter mobile app.
+
+    Query params:
+      show_paid_off  (bool string, default 'false')
+    """
+    try:
+        show_paid_off = request.args.get('show_paid_off', 'false').lower() == 'true'
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        if show_paid_off:
+            cursor.execute(
+                "SELECT * FROM debt_accounts ORDER BY is_active DESC, current_balance DESC"
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM debt_accounts WHERE is_active = 1 ORDER BY current_balance DESC"
+            )
+
+        rows = cursor.fetchall()
+        columns = [d[0] for d in cursor.description]
+        conn.close()
+
+        debts = []
+        for row in rows:
+            debt = dict(zip(columns, row))
+            for key in ('current_balance', 'original_balance', 'interest_rate', 'minimum_payment'):
+                if debt.get(key) is not None:
+                    debt[key] = float(debt[key])
+            debt['is_active'] = bool(debt.get('is_active', 1))
+            debts.append(debt)
+
+        active_debts = [d for d in debts if d['is_active']]
+        total_debt = sum(d['current_balance'] for d in active_debts)
+        total_minimum = sum(d.get('minimum_payment') or 0.0 for d in active_debts)
+
+        return jsonify({
+            'debts': debts,
+            'total_debt': total_debt,
+            'total_minimum_payments': total_minimum,
+            'active_count': len(active_debts)
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

@@ -19,6 +19,11 @@
     
     <!-- Plotly.js for charts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+
+    <!-- API key injected server-side for authenticated fetch() calls -->
+    <script>
+        window.FINANCE_API_KEY = "{{ config.get('API_SECRET_KEY', '') }}";
+    </script>
 </head>
 <body>
     <!-- Navigation -->

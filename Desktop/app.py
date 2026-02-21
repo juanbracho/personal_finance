@@ -3,14 +3,25 @@ from config import Config
 from models import db
 import os
 
-def create_app():
+def create_app(config_class=None):
     """Application factory pattern"""
     app = Flask(__name__)
-    app.config.from_object(Config)
-    
+
+    if config_class is None:
+        config_class = Config
+    app.config.from_object(config_class)
+
     # Initialize database with app
     db.init_app(app)
-    
+
+    # Enable CORS so the desktop web frontend and Flutter can reach the API.
+    # Origins are restricted via CORS_ORIGINS in ProductionConfig.
+    try:
+        from flask_cors import CORS
+        CORS(app, resources={r'/api/*': {'origins': app.config.get('CORS_ORIGINS', '*')}})
+    except ImportError:
+        pass  # flask-cors not installed; CORS headers omitted (fine for local use)
+
     # Import and register blueprints (personal finance only)
     from blueprints.dashboards.routes import dashboards_bp
     from blueprints.debts.routes import debts_bp
@@ -19,6 +30,11 @@ def create_app():
     from blueprints.api.routes import api_bp
     from blueprints.analytics.routes import analytics_bp
     from blueprints.settings.routes import settings_bp
+
+    # Protect all /api/* routes with Bearer token auth.
+    # check_api_key() is a no-op when API_SECRET_KEY is empty (local dev).
+    from auth import check_api_key
+    api_bp.before_request(check_api_key)
 
     # Register blueprints
     app.register_blueprint(dashboards_bp)
@@ -148,4 +164,6 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🌟 Ready to start! Database is initialized and connected...")
     
-    app.run(debug=False, host='127.0.0.1', port=5000, use_reloader=False)
+    host = os.environ.get('FLASK_HOST', '127.0.0.1')
+    port = int(os.environ.get('FLASK_PORT', '5000'))
+    app.run(debug=False, host=host, port=port, use_reloader=False)

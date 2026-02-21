@@ -1,7 +1,29 @@
 #!/usr/bin/env python3
 """
 Finance Dashboard Desktop Application Launcher
-Handles Flask server startup and PyWebView window management
+
+Modes of operation
+------------------
+1. Local desktop (default):
+   Starts a local Flask server on 127.0.0.1:5000, then opens a PyWebView
+   window pointing at http://127.0.0.1:5000/.
+
+2. Cloud desktop (FINANCE_API_URL is set):
+   Skips the local Flask server entirely and opens a PyWebView window
+   pointing at the cloud URL (e.g. https://finance.juanbracho.com).
+   The local API key is read from ~/.financed/config.json and injected
+   into the PyWebView window via JavaScript so all fetch() calls are
+   authenticated against the remote API.
+
+3. Railway cloud server (RAILWAY_ENVIRONMENT is set):
+   Runs Flask as a plain HTTP server on 0.0.0.0:$PORT with no PyWebView.
+   This is the mode used when the app is deployed to Railway.
+
+Environment variables
+---------------------
+FINANCE_API_URL       URL of the cloud backend (enables mode 2)
+RAILWAY_ENVIRONMENT   Set automatically by Railway (enables mode 3)
+PORT                  Port for Railway server (default 8080)
 """
 
 import os
@@ -12,6 +34,13 @@ import atexit
 import signal
 import shutil
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Detect run mode early — before any heavy imports
+# ---------------------------------------------------------------------------
+RAILWAY_MODE = os.environ.get('RAILWAY_ENVIRONMENT') is not None
+FINANCE_API_URL = os.environ.get('FINANCE_API_URL', '').rstrip('/')
 
 def get_bundle_path():
     """Get the path where bundled resources are located"""
@@ -105,8 +134,44 @@ from app import create_app, initialize_personal_finance_database, test_database_
 app = None
 server_thread = None
 
+
+# ---------------------------------------------------------------------------
+# Local config helper (~/.financed/config.json) — used in cloud desktop mode
+# ---------------------------------------------------------------------------
+
+def get_local_api_key():
+    """Read API key from ~/.financed/config.json (cloud desktop mode)."""
+    config_path = Path.home() / '.financed' / 'config.json'
+    try:
+        import json
+        with open(config_path) as f:
+            data = json.load(f)
+        return data.get('api_key', '')
+    except Exception:
+        return ''
+
+
+def ensure_local_config_dir():
+    """Create ~/.financed/ directory if it doesn't exist."""
+    config_dir = Path.home() / '.financed'
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / 'config.json'
+    if not config_path.exists():
+        import json
+        config_path.write_text(json.dumps({
+            'api_key': '',
+            'api_url': ''
+        }, indent=2))
+        print(f"[CONFIG] Created config template at {config_path}")
+        print(f"[CONFIG] Fill in api_key and api_url to enable cloud desktop mode")
+
+
+# ---------------------------------------------------------------------------
+# App initialisation (local mode only)
+# ---------------------------------------------------------------------------
+
 def initialize_app():
-    """Initialize database and Flask app"""
+    """Initialize database and Flask app (local / Railway mode)."""
     global app
 
     print("Finance Dashboard - Desktop Application")
@@ -122,16 +187,27 @@ def initialize_app():
         print("ERROR: Database connection test failed")
         return False
 
-    # Create Flask app
-    app = create_app()
-    print("\nFlask application created successfully")
+    # Pick config class
+    if RAILWAY_MODE:
+        from config import ProductionConfig
+        app = create_app(ProductionConfig)
+        print("\nFlask application created (Railway/production mode)")
+    else:
+        from config import DesktopConfig
+        app = create_app(DesktopConfig)
+        print("\nFlask application created (local desktop mode)")
+
     return True
 
+
+# ---------------------------------------------------------------------------
+# Flask server helpers
+# ---------------------------------------------------------------------------
+
 def run_flask_server():
-    """Run Flask server in background thread"""
+    """Run Flask server in background thread (local desktop mode)."""
     global app
     if app:
-        # Suppress Flask startup banner
         import logging
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
@@ -144,15 +220,30 @@ def run_flask_server():
             threaded=True
         )
 
+
+def run_flask_server_railway():
+    """Run Flask server for Railway (foreground, 0.0.0.0, dynamic port)."""
+    global app
+    if app:
+        port = int(os.environ.get('PORT', 8080))
+        print(f"\nStarting Flask server on 0.0.0.0:{port} (Railway mode)...")
+        app.run(
+            debug=False,
+            host='0.0.0.0',
+            port=port,
+            use_reloader=False,
+            threaded=True
+        )
+
+
 def start_server():
-    """Start Flask server in background"""
+    """Start local Flask server in background thread, wait until ready."""
     global server_thread
     server_thread = threading.Thread(target=run_flask_server, daemon=True)
     server_thread.start()
 
     print("\nStarting Flask server on port 5000...")
 
-    # Wait for server to be ready (check port availability)
     for attempt in range(30):
         try:
             import socket
@@ -169,23 +260,36 @@ def start_server():
     print("ERROR: Flask server failed to start")
     return False
 
-def open_window():
-    """Open PyWebView window"""
+
+# ---------------------------------------------------------------------------
+# PyWebView window helpers
+# ---------------------------------------------------------------------------
+
+def _on_webview_loaded(window, api_key):
+    """Inject FINANCE_API_KEY into the window after the page loads."""
+    if api_key:
+        window.evaluate_js(f'window.FINANCE_API_KEY = "{api_key}";')
+
+
+def open_window(url='http://127.0.0.1:5000/', api_key=''):
+    """Open PyWebView window pointing at url."""
     try:
         import webview
 
-        print("Opening application window...")
+        print(f"Opening application window → {url}")
 
-        # Create window
         window = webview.create_window(
             'Finance Dashboard',
-            'http://127.0.0.1:5000/',
+            url,
             width=1200,
             height=800,
             min_size=(800, 600)
         )
 
-        # Show window (blocks until closed)
+        if api_key:
+            # Inject key after every page load so it survives navigation
+            window.events.loaded += lambda: _on_webview_loaded(window, api_key)
+
         webview.start()
 
     except Exception as e:
@@ -194,38 +298,74 @@ def open_window():
         traceback.print_exc()
         shutdown_app()
 
+
+# ---------------------------------------------------------------------------
+# Shutdown
+# ---------------------------------------------------------------------------
+
 def shutdown_app():
-    """Gracefully shutdown Flask server and exit"""
+    """Gracefully shutdown Flask server and exit."""
     print("\nShutting down...")
-    # Server thread is daemon, so it will be killed when main thread exits
     sys.exit(0)
 
+
 def signal_handler(sig, frame):
-    """Handle Ctrl+C"""
+    """Handle Ctrl+C / SIGTERM."""
     shutdown_app()
 
+
+# ---------------------------------------------------------------------------
+# Entry point — three modes
+# ---------------------------------------------------------------------------
+
 def main():
-    """Main application entry point"""
+    """Main application entry point."""
     try:
-        # Initialize database and app
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        # ------------------------------------------------------------------
+        # MODE 3: Railway cloud server
+        # ------------------------------------------------------------------
+        if RAILWAY_MODE:
+            print("[MODE] Railway cloud server")
+            if not initialize_app():
+                print("ERROR: Application initialization failed")
+                sys.exit(1)
+            atexit.register(shutdown_app)
+            run_flask_server_railway()  # blocks until process is killed
+            return
+
+        # ------------------------------------------------------------------
+        # MODE 2: Cloud desktop (FINANCE_API_URL is set)
+        # ------------------------------------------------------------------
+        if FINANCE_API_URL:
+            print(f"[MODE] Cloud desktop → {FINANCE_API_URL}")
+            ensure_local_config_dir()
+            api_key = get_local_api_key()
+            if not api_key:
+                print("[WARN] No api_key found in ~/.financed/config.json")
+                print("[WARN] API calls will be unauthenticated")
+            atexit.register(shutdown_app)
+            open_window(url=FINANCE_API_URL, api_key=api_key)  # blocks
+            return
+
+        # ------------------------------------------------------------------
+        # MODE 1: Local desktop (default)
+        # ------------------------------------------------------------------
+        print("[MODE] Local desktop")
         if not initialize_app():
             print("\nFailed to initialize application!")
             input("Press Enter to exit...")
             sys.exit(1)
 
-        # Start Flask server
         if not start_server():
             print("\nERROR: Failed to start Flask server")
             input("Press Enter to exit...")
             sys.exit(1)
 
-        # Register shutdown handlers
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
         atexit.register(shutdown_app)
-
-        # Open window (blocks until closed)
-        open_window()
+        open_window()  # blocks until window is closed
 
     except Exception as e:
         print(f"\nFATAL ERROR: {e}")
@@ -233,6 +373,7 @@ def main():
         traceback.print_exc()
         input("Press Enter to exit...")
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
