@@ -40,18 +40,24 @@ def monthly_trends():
         trends_df = pd.read_sql_query(trends_query, conn, params=params)
         conn.close()
         
-        # Process data for response
+        # Process data — normalize type to lowercase so Flutter always gets
+        # consistent 'expense' / 'income' keys regardless of DB casing.
         result = {}
+        raw_types = set()
         for _, row in trends_df.iterrows():
             month = row['month']
+            raw_type = str(row['type']) if row['type'] is not None else ''
+            raw_types.add(raw_type)
             if month not in result:
                 result[month] = {'month': month}
-            result[month][row['type']] = float(row['total'])
-        
+            result[month][raw_type.lower()] = float(row['total'])
+
+        print(f"📊 monthly_trends — distinct type values in DB: {raw_types}")
+
         # Convert to list and sort by month
         result_list = list(result.values())
         result_list.sort(key=lambda x: x['month'])
-        
+
         return jsonify(result_list)
         
     except Exception as e:
