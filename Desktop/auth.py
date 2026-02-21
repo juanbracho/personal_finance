@@ -24,12 +24,18 @@ auth_bp = Blueprint('auth', __name__)
 # Bearer token auth (API routes)
 # ---------------------------------------------------------------------------
 
+_API_PUBLIC_ENDPOINTS = {'api.api_login'}
+
+
 def check_api_key():
     """
     Validate Bearer token on incoming requests.
     Register this with api_bp.before_request(check_api_key).
     Returns None on success (Flask continues), or a 401 response tuple.
     """
+    if request.endpoint in _API_PUBLIC_ENDPOINTS:
+        return None  # Login endpoint is public — no token required yet
+
     expected_key = current_app.config.get('API_SECRET_KEY', '')
 
     # No key configured → running in local dev mode, allow all requests

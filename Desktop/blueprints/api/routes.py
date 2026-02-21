@@ -1455,6 +1455,40 @@ def api_add_transaction():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@api_bp.route('/login', methods=['POST'])
+def api_login():
+    """Authenticate with dashboard credentials and receive the Bearer token.
+
+    Body: {"username": "...", "password": "..."}
+    Returns: {"success": true, "token": "<API_SECRET_KEY>"}
+
+    This endpoint is intentionally exempt from Bearer token auth
+    (see auth.py _API_PUBLIC_ENDPOINTS) so the mobile app can call it
+    before it has a token.
+    """
+    import hmac as _hmac
+    data = request.get_json(force=True, silent=True) or {}
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    expected_user = current_app.config.get('DASHBOARD_USERNAME', '')
+    expected_pass = current_app.config.get('DASHBOARD_PASSWORD', '')
+
+    # Local dev mode — credentials not configured, allow through
+    if not expected_user:
+        token = current_app.config.get('API_SECRET_KEY', '')
+        return jsonify({'success': True, 'token': token})
+
+    user_ok = _hmac.compare_digest(username, expected_user)
+    pass_ok = _hmac.compare_digest(password, expected_pass)
+
+    if user_ok and pass_ok:
+        token = current_app.config.get('API_SECRET_KEY', '')
+        return jsonify({'success': True, 'token': token})
+
+    return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+
+
 @api_bp.route('/debts', methods=['GET'])
 def api_debts_list():
     """Debt accounts list for the Flutter mobile app.
