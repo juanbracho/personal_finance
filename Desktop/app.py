@@ -15,15 +15,31 @@ def create_app(config_class=None):
     db.init_app(app)
 
     # Enable CORS so the desktop web frontend and Flutter can reach the API.
-    # Origins are restricted via CORS_ORIGINS in ProductionConfig.
-    try:
-        from flask_cors import CORS
-        cors_origins = app.config.get('CORS_ORIGINS', '*')
-        if cors_origins != '*':
-            cors_origins = [o.strip() for o in cors_origins.split(',')]
-        CORS(app, resources={r'/api/*': {'origins': cors_origins}})
-    except ImportError:
-        pass  # flask-cors not installed; CORS headers omitted (fine for local use)
+    # Manually applied to /api/* only, restricted to CORS_ORIGINS in production.
+    from flask import request as _request
+
+    @app.after_request
+    def handle_cors(response):
+        if not _request.path.startswith('/api/'):
+            return response
+
+        origin = _request.headers.get('Origin', '')
+        allowed = app.config.get('CORS_ORIGINS', '*')
+
+        if allowed == '*':
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        else:
+            allowed_list = [o.strip() for o in allowed.split(',')]
+            if origin in allowed_list:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Vary'] = 'Origin'
+
+        if _request.method == 'OPTIONS':
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Max-Age'] = '86400'
+
+        return response
 
     # Import and register blueprints (personal finance only)
     from blueprints.dashboards.routes import dashboards_bp
