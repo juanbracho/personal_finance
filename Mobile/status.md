@@ -3,7 +3,30 @@
 
 ---
 
-## Current Status: Phase 5 — Flutter connected to production, data loading ✅ charts & polish pending
+## Current Status: Phase 5 — Flutter connected to production, charts working ✅ design & feature polish next
+
+---
+
+## 🗒️ Next Session — Define App Philosophy First
+
+Before touching any screen, align on what each platform is FOR:
+
+### Mobile (Flutter) — Quick Glance & Quick Add
+- "How's my budget doing this month?"
+- "How are we tracking on debts?"
+- Add a transaction on the spot (receipt in hand)
+- Lightweight, fast, thumb-friendly
+- NO deep editing, NO complex analytics — just the essentials at a glance
+
+### Web / Cloud Dashboard — Power User Hub
+- Edit & correct transactions
+- Deep analytics (trends, category drilldown, year-over-year)
+- Budget management (set budgets, add unexpected expenses)
+- Debt tracking & payoff planning
+- Settings, backups, data management
+
+> This distinction should drive every design decision on both platforms.
+> Expand on this at the start of next session before writing any code.
 
 ---
 
@@ -128,10 +151,11 @@ Files modified in `Mobile/finance_dashboard_mobile/lib/`:
 ## What to Do Next Session
 
 ### Phase 5 — Finish & Polish
-1. **Fix charts** — Debug fl_chart bar chart on Home screen (data shape from `GET /api/monthly_trends`)
-2. **Design pass** — Go screen by screen and fix layout/spacing issues against real data
-3. **Test Add Transaction** — Submit a test transaction, confirm it appears in Transactions screen and web dashboard
-4. **Test filters** — Owner filter, category filter on Transactions screen
+1. ~~**Fix charts**~~ ✅ — bars + trend line working. Root cause: DB uses Needs/Wants/Business/Savings types, not Expense/Income
+2. **Define app philosophy** — Mobile = quick glance/add. Web = power hub. Align before any design work (see note above)
+3. **Design pass** — Go screen by screen with real data, guided by the mobile philosophy
+4. **Test Add Transaction** — Submit a test transaction, confirm it appears in Transactions screen and web dashboard
+5. **Test filters** — Owner filter, category filter on Transactions screen
 
 ### Phase 5 — Build & Install
 5. **Android APK** — `flutter build apk --release` → sideload
