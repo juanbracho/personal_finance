@@ -101,3 +101,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Railway DNS credentials
+railway-dns.txt
+
+# Railway app credentials
+railway-credentials.txt

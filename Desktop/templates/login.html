@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — Personal Finance</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f1724;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background-color: #1a2535;
+            border: 1px solid #2a3a50;
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-card h1 {
+            color: #e2e8f0;
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .login-card .subtitle {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .form-label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+        .form-control {
+            background-color: #0f1724;
+            border: 1px solid #2a3a50;
+            color: #e2e8f0;
+        }
+        .form-control:focus {
+            background-color: #0f1724;
+            border-color: #3b82f6;
+            color: #e2e8f0;
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+        }
+        .btn-login {
+            background-color: #3b82f6;
+            border: none;
+            width: 100%;
+            padding: 0.65rem;
+            font-weight: 500;
+        }
+        .btn-login:hover {
+            background-color: #2563eb;
+        }
+        .error-msg {
+            background-color: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>💰 Personal Finance</h1>
+        <p class="subtitle">Sign in to access your dashboard</p>
+
+        {% if error %}
+            <div class="error-msg">
+                <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username"
+                       autocomplete="username" autofocus required>
+            </div>
+            <div class="mb-4">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password"
+                       autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-login">
+                Sign In
+            </button>
+        </form>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

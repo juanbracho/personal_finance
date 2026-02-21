@@ -33,8 +33,10 @@ def create_app(config_class=None):
 
     # Protect all /api/* routes with Bearer token auth.
     # check_api_key() is a no-op when API_SECRET_KEY is empty (local dev).
-    from auth import check_api_key
+    from auth import check_api_key, check_web_session, auth_bp
     api_bp.before_request(check_api_key)
+    app.before_request(check_web_session)
+    app.register_blueprint(auth_bp)
 
     # Register blueprints
     app.register_blueprint(dashboards_bp)

@@ -38,6 +38,11 @@ class Config:
     # Restrict to your domain in production.
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS') or '*'
 
+    # Web dashboard login credentials.
+    # When empty, session auth is skipped (local desktop mode).
+    DASHBOARD_USERNAME = os.environ.get('DASHBOARD_USERNAME') or ''
+    DASHBOARD_PASSWORD = os.environ.get('DASHBOARD_PASSWORD') or ''
+
 
 class DesktopConfig(Config):
     """Configuration for the macOS desktop application (PyWebView)."""
