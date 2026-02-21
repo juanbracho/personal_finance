@@ -1,22 +1,39 @@
-# Finance Dashboard — Mobile Expansion Status
+# Finance Dashboard — Full Project Status
 *Last updated: February 21, 2026*
 
 ---
 
-## Current Status: Phase 5 — Flutter connected to production, charts working ✅ design & feature polish next
+## What Is This Project?
+
+A personal finance dashboard built for one user (Juan Bracho) to track spending,
+budgets, and debts across a household with multiple owners (Cacas, Cata, Suricata).
+
+**Three surfaces, one SQLite database:**
+
+| Surface | What It Is | Status |
+|---|---|---|
+| macOS Desktop App | PyWebView wrapper around Flask — local, no auth | ✅ Live |
+| Web / Cloud Dashboard | Same Flask app deployed on Railway, browser login | ✅ Live |
+| Mobile App (Flutter/iOS) | Flutter app hitting the Railway API via Bearer token | ✅ Connected, polish pending |
+
+**Database facts:**
+- Transaction types in DB: `Needs`, `Wants`, `Business`, `Savings` (NOT Expense/Income)
+- Owners: `Cacas`, `Cata`, `Suricata`
+- Live data as of Feb 21 2026: $10,323.57 monthly spending, $93,898.37 active debts
+- Local DB: `~/Library/Application Support/FinanceDashboard/data/personal_finance.db`
+- Railway DB: `/app/data/personal_finance.db` (persistent volume)
+- Local backup copy: `Desktop/Finance Dashboard/Data backup/backup_20260221_084303.db`
 
 ---
 
-## 🗒️ Next Session — Define App Philosophy First
-
-Before touching any screen, align on what each platform is FOR:
+## App Philosophy (defined Feb 21 2026 — expand next session)
 
 ### Mobile (Flutter) — Quick Glance & Quick Add
 - "How's my budget doing this month?"
 - "How are we tracking on debts?"
 - Add a transaction on the spot (receipt in hand)
 - Lightweight, fast, thumb-friendly
-- NO deep editing, NO complex analytics — just the essentials at a glance
+- NO deep editing, NO complex analytics
 
 ### Web / Cloud Dashboard — Power User Hub
 - Edit & correct transactions
@@ -25,226 +42,232 @@ Before touching any screen, align on what each platform is FOR:
 - Debt tracking & payoff planning
 - Settings, backups, data management
 
-> This distinction should drive every design decision on both platforms.
-> Expand on this at the start of next session before writing any code.
+> **Next session:** flesh this philosophy out fully before any design work begins.
+> It should drive every screen-level decision on both platforms.
 
 ---
 
-## What Has Been Done
+## URLs & Access
 
-### Phase 1 — Flutter App with Mock Data ✅ COMPLETE & APPROVED
-- Flutter project created at `Mobile/finance_dashboard_mobile/`
-- All 5 screens built and UI approved by user:
-  - **Home** — budget health banner, 4 stat cards (spent, remaining, total debt, min payments), 6-month bar chart (fl_chart)
-  - **Add Transaction** — full form with expense/income toggle, date picker, category/owner/account dropdowns, business flag
-  - **Transactions** — scrollable list, filter sheet (owner, category)
-  - **Budgets** — progress bars per category, over-budget warning, totals summary
-  - **Debts** — per-debt cards with paid-off progress bar, APR, min payment, due date
-- State management: Riverpod (`FutureProvider` per screen)
-- Navigation: go_router with `StatefulShellRoute` (persistent bottom nav)
-- Theme: dark navy finance theme (Material 3)
-- Dependencies: flutter_riverpod, go_router, http, flutter_secure_storage, intl, fl_chart
-
-### Phase 2 — Flask Backend Auth & API ✅ COMPLETE
-Files modified in `Desktop/`:
-
-| File | What Changed |
+| | URL |
 |---|---|
-| `auth.py` | **New** — `check_api_key()` Bearer token validator. No-op when `API_SECRET_KEY` env var is empty (safe for local dev) |
-| `config.py` | Added `API_SECRET_KEY`, `CORS_ORIGINS`, new `ProductionConfig` class for Railway |
-| `app.py` | CORS registered, auth hook wired to api blueprint via `before_request`. Added `FLASK_HOST`/`FLASK_PORT` env var support for running on network |
-| `blueprints/api/routes.py` | Added 3 Flutter-facing endpoints: `GET /api/transactions` (paginated JSON), `POST /api/transactions` (add from JSON), `GET /api/debts` (debt list JSON) |
-| `templates/base.html` | Injects `window.FINANCE_API_KEY` from Flask config for web frontend auth |
-| `static/js/main.js` | `apiCall()` now sends `Authorization: Bearer` header automatically |
+| Railway (direct) | `https://personalfinance-production-0e5b.up.railway.app` |
+| Custom domain | `https://finance.juanbracho.com` |
+| Flutter baseUrl | `https://finance.juanbracho.com` |
+| Flask port on Railway | `8080` (Railway `$PORT`) |
 
-### Phase 2 — Flutter Wired to Real API ✅ COMPLETE
-Files modified in `Mobile/finance_dashboard_mobile/lib/`:
+**DNS (Cloudflare — juanbracho.com):**
+| Type | Name | Value |
+|---|---|---|
+| `CNAME` | `finance` | `4vdt6k0y.up.railway.app` — Proxied (orange cloud ON) |
+| `TXT` | `_railway-verify.finance` | `railway-verify=88a651f5158d008ecfd39a88abd9ede01719f17511f135a140f80a1b1648ca91` |
 
-| File | What Changed |
-|---|---|
-| `config.dart` | `baseUrl = 'http://192.168.1.164:5001'` (Mac's LAN IP, port 5001) |
-| `services/api_service.dart` | Rewrote to match actual Flask response shapes |
-| `providers/app_providers.dart` | All providers switched from mock data to real API calls |
-| `models/debt.dart` | `due_date` parsed with `.toString()` — stored as int in DB, not string |
-| `ios/Runner/Info.plist` | Added `NSAllowsArbitraryLoads: true` for local HTTP (removed in Phase 5) |
-| `ios/Podfile` | Uncommented `platform :ios, '13.0'` — fixes CocoaPods warning |
+Cloudflare proxy handles HTTP → HTTPS redirect automatically.
 
-### Phase 3 — Railway Deployment ✅ COMPLETE & LIVE
+---
 
-#### Infrastructure
-- Railway project created, connected to GitHub repo
-- Root directory set to `Desktop` in Railway service settings
-- Persistent volume mounted at `/app/data` — all relative `data/` paths in the app land here
-- Railway auto-detects `RAILWAY_ENVIRONMENT` and runs Flask in server mode (no PyWebView)
+## Auth Architecture
 
-#### Environment Variables set on Railway
+| Layer | Mechanism | When Active |
+|---|---|---|
+| Web UI | Session cookie — `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD` env vars | Railway only |
+| Web session expiry | 1 hour — `login_time` stored in session, checked on every request | Railway only |
+| Flutter API | Bearer token — `API_SECRET_KEY` env var | Railway only |
+| Flutter login | `POST /api/login` with dashboard credentials → returns Bearer token | Railway only |
+| Flutter token storage | `flutter_secure_storage` (iOS Keychain) — persists across app switches | Always |
+| Local desktop | No auth — all env vars empty = bypass | Local only |
+
+**Flutter login flow:**
+1. App starts → checks Keychain for stored token
+2. No token → shows Login screen (username + password)
+3. POST `/api/login` → Flask validates against `DASHBOARD_USERNAME`/`DASHBOARD_PASSWORD`
+4. Returns `API_SECRET_KEY` as Bearer token → stored in Keychain
+5. All subsequent `/api/*` calls send `Authorization: Bearer <token>`
+6. Login NOT required on app switch — only on first install or after logout
+
+---
+
+## Railway Environment Variables
+
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | `sqlite:////app/data/personal_finance.db` |
 | `SECRET_KEY` | Flask session signing key |
 | `API_SECRET_KEY` | Bearer token for Flutter API auth |
 | `CORS_ORIGINS` | `https://finance.juanbracho.com` |
-| `DASHBOARD_USERNAME` | Web dashboard login username |
-| `DASHBOARD_PASSWORD` | Web dashboard login password |
-
-#### Database
-- Live backup uploaded via `/settings` page
-- Dashboard confirmed showing real data: $10,323.57 monthly spending, $93,898.37 active debts
-
-#### Auth summary (two layers)
-| Layer | Mechanism | Covers |
-|---|---|---|
-| Web UI | Session login (`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`) | All non-API, non-static routes |
-| Flutter API | Bearer token (`API_SECRET_KEY`) | All `/api/*` routes |
-| Local desktop | No auth (env vars not set locally) | All routes — unchanged behavior |
+| `DASHBOARD_USERNAME` | Web + Flutter login username |
+| `DASHBOARD_PASSWORD` | Web + Flutter login password |
 
 ---
 
-### Phase 4 — Production Hardening ✅ COMPLETE
+## CORS
 
-#### Custom domain
-- `https://finance.juanbracho.com` live and verified (Let's Encrypt cert issued Feb 21 2026)
-- Cloudflare proxy (orange cloud) enabled on `finance` CNAME — handles HTTP → HTTPS redirect
-
-#### CORS locked down
-- `CORS_ORIGINS` env var added on Railway: `https://finance.juanbracho.com`
-- Replaced Flask-CORS library with a manual `after_request` handler in `app.py` for strict origin enforcement
-- Verified: foreign origins receive no `Access-Control-Allow-Origin` header
-
-#### Session expiry
-- Web sessions expire after **1 hour**
-- `login_time` timestamp stored on login, checked on every request in `check_web_session()`
-- Mobile app token persists in secure storage indefinitely — only cleared on logout
+Manual `after_request` handler in `app.py` (replaced Flask-CORS which leaked non-matching origins).
+Only adds `Access-Control-Allow-Origin` header when requesting origin exactly matches `CORS_ORIGINS`.
+Verified: foreign origins receive no ACAO header.
 
 ---
 
-### Phase 5 — Flutter to Cloud ✅ CONNECTED (polish pending)
+## Flask API Endpoints
 
-#### What's working
-- Flutter login screen — validates with Railway credentials via `POST /api/login`
-- Token stored in `flutter_secure_storage` (iOS Keychain) — survives app switches and restarts
-- Login only required when token is missing (first install or logout) — not on every app switch
-- Home screen stat cards loading real data from production API
-- Transactions screen loading real data
-- Budgets screen loading real data
-- Debts screen loading real data
+All `/api/*` routes require `Authorization: Bearer <token>` **except** `/api/login`.
 
-#### Known issues to fix next session
-1. **Charts not rendering** — Home screen bar chart (fl_chart) not displaying, likely a data shape or parsing issue
-2. **Design tweaks needed** — UI polish pass across all 5 screens against real data
-3. **Full feature test** — Add Transaction form needs end-to-end test (submit → appears in list)
+| Method | Endpoint | Auth | Response Shape |
+|---|---|---|---|
+| `POST` | `/api/login` | None | `{success, token}` |
+| `GET` | `/api/dashboard_summary` | Bearer | `{summary: {total_monthly_spending, total_debt, total_minimum_payments, period}, monthly_spending: {Needs: {total,count}, Wants:..., ...}}` |
+| `GET` | `/api/monthly_trends` | Bearer | `[{month: "YYYY-MM", expense: float}, ...]` — expense = sum of ALL types |
+| `GET` | `/api/budget_analysis` | Bearer | `[{category, effective_budget, actual_spending, variance, status}, ...]` |
+| `GET` | `/api/transactions` | Bearer | `{transactions: [...], total, page, pages}` |
+| `POST` | `/api/transactions` | Bearer | `{success, id}` |
+| `GET` | `/api/debts` | Bearer | `{debts: [...], total_debt, total_minimum_payments}` |
+| `GET` | `/api/categories/categories` | Bearer | `[{name, type, transaction_count, ...}]` — flat list |
+| `GET` | `/api/categories/owners` | Bearer | `[{name, transaction_count, ...}]` — flat list |
+| `GET` | `/api/accounts/list` | Bearer | `[{name, account_type, is_debt, ...}]` — flat list |
 
-#### Code changes made
-| File | What Changed |
-|---|---|
-| `config.dart` | `baseUrl = 'https://finance.juanbracho.com'` |
-| `ios/Runner/Info.plist` | Removed `NSAllowsArbitraryLoads` — not needed on HTTPS |
-| `services/api_service.dart` | Added `login()` and `logout()` methods |
-| `auth_notifier.dart` | **New** — `ChangeNotifier` tracking token presence, drives GoRouter redirect |
-| `screens/login_screen.dart` | **New** — Dark-themed login UI matching app style |
-| `main.dart` | Added `/login` route + `refreshListenable` + `redirect` logic |
-| `Desktop/auth.py` | Exempt `api.api_login` from Bearer token check |
-| `Desktop/blueprints/api/routes.py` | Added `POST /api/login` endpoint + `current_app` import fix |
+**Important:** `monthly_trends` normalizes type keys to lowercase and sums all types
+into a single `expense` field per month. The DB does NOT use `Expense`/`Income` —
+it uses `Needs`, `Wants`, `Business`, `Savings`.
 
 ---
-
-## What to Do Next Session
-
-### Phase 5 — Finish & Polish
-1. ~~**Fix charts**~~ ✅ — bars + trend line working. Root cause: DB uses Needs/Wants/Business/Savings types, not Expense/Income
-2. **Define app philosophy** — Mobile = quick glance/add. Web = power hub. Align before any design work (see note above)
-3. **Design pass** — Go screen by screen with real data, guided by the mobile philosophy
-4. **Test Add Transaction** — Submit a test transaction, confirm it appears in Transactions screen and web dashboard
-5. **Test filters** — Owner filter, category filter on Transactions screen
-
-### Phase 5 — Build & Install
-5. **Android APK** — `flutter build apk --release` → sideload
-6. **iOS IPA** — Xcode → Product → Archive → install via Xcode / AltStore
-
-### Phase 6 — Web Dashboard UX (optional)
-- Add "Remember me" / persistent session (currently expires on browser close)
-- Add password change route in settings
-
----
-
-## Architecture Reference
-
-```
-Railway URL:    https://personalfinance-production-0e5b.up.railway.app
-Custom domain:  https://finance.juanbracho.com
-Flask port:     8080 (Railway $PORT)
-
-Live DB location (Railway):
-  /app/data/personal_finance.db  (persistent volume)
-
-Live DB location (desktop app):
-  ~/Library/Application Support/FinanceDashboard/data/personal_finance.db
-
-API auth:
-  POST /api/login  → {username, password} → {token}   ← Flutter login
-  Header: Authorization: Bearer <token>                ← all /api/* calls
-  Env var empty = no auth (local dev bypass)
-
-Web auth:
-  Session cookie, credentials in DASHBOARD_USERNAME / DASHBOARD_PASSWORD env vars
-  Session expires after 1 hour
-  Env var empty = no auth (local desktop bypass)
-
-Flutter baseUrl:
-  https://finance.juanbracho.com  ← Phase 5 (current)
-
-All Flutter API endpoints are under /api/* — Bearer token protected.
-Non-API HTML routes are session-login protected (on Railway).
-```
-
-## Flask Response Shape Reference (for parsing)
-
-| Endpoint | Response Shape |
-|---|---|
-| `GET /api/dashboard_summary` | `{summary: {total_monthly_spending, total_debt, total_minimum_payments, period: "YYYY-MM"}, monthly_spending: {Expense: {total, count}}}` |
-| `GET /api/monthly_trends` | `[{month: "YYYY-MM", Expense: float, Income: float}, ...]` |
-| `GET /api/budget_analysis` | `[{category, effective_budget, actual_spending, variance, status: "over"/"under"/"on_track"}, ...]` |
-| `GET /api/transactions` | `{transactions: [...], total: int, page: int, pages: int}` |
-| `POST /api/transactions` | `{success: bool, id: int}` |
-| `GET /api/debts` | `{debts: [...], total_debt: float, total_minimum_payments: float}` |
-| `GET /api/categories/categories` | `[{name, type, transaction_count, ...}, ...]` — flat list |
-| `GET /api/categories/owners` | `[{name, transaction_count, ...}, ...]` — flat list |
-| `GET /api/accounts/list` | `[{name, account_type, is_debt, ...}, ...]` — flat list |
-| `POST /api/login` | `{success: bool, token: str}` — public endpoint, no Bearer required |
 
 ## Key Files Index
 
+### Backend — `Desktop/` (deployed to Railway, root dir set to `Desktop/`)
 ```
-Desktop/
-  app.py                          — Flask factory, manual CORS handler, auth hooks
-  auth.py                         — Bearer check_api_key() + session auth_bp + _API_PUBLIC_ENDPOINTS
-  config.py                       — Config, DesktopConfig, ProductionConfig
-  desktop_app_launcher.py         — 3-mode launcher (local/cloud-desktop/railway)
-  Procfile                        — web: python desktop_app_launcher.py
-  railway.json                    — Railway build config
-  requirements.txt                — Flask, SQLAlchemy, pandas, numpy, gunicorn, flask-cors, python-dateutil
-  blueprints/api/routes.py        — All API endpoints incl. /api/login, /api/transactions, /api/debts
-  templates/login.html            — Web dashboard login page
-  templates/base.html             — Injects window.FINANCE_API_KEY, Sign Out button
-  static/js/main.js               — apiCall() with auth header
+app.py                        — Flask factory, manual CORS after_request handler, registers all blueprints + auth hooks
+auth.py                       — check_api_key() Bearer validator, check_web_session() hook, auth_bp login/logout routes
+                                _API_PUBLIC_ENDPOINTS = {'api.api_login'} exempts login from Bearer check
+config.py                     — Config base, DesktopConfig, ProductionConfig (Railway)
+desktop_app_launcher.py       — 3-mode launcher: local PyWebView / cloud desktop / Railway server
+Procfile                      — web: python desktop_app_launcher.py
+railway.json                  — Railway NIXPACKS build config + healthcheck
+requirements.txt              — Flask, SQLAlchemy, pandas, numpy, gunicorn, flask-cors, python-dateutil
 
-Mobile/
-  status.md                       — This file
-  finance_dashboard_mobile/
-    lib/
-      main.dart                   — App root, GoRouter with auth redirect
-      config.dart                 — baseUrl = https://finance.juanbracho.com
-      auth_notifier.dart          — ChangeNotifier for login state
-      models/                     — Transaction, BudgetCategory, DashboardSummary, DebtAccount
-      services/api_service.dart   — HTTP client, login(), logout()
-      providers/app_providers.dart — Riverpod FutureProviders (real API)
-      screens/                    — home, add_transaction, transactions, budgets, debts, login
-      widgets/                    — stat_card, budget_progress_tile
-    ios/
-      Runner/Info.plist           — Clean (NSAllowsArbitraryLoads removed)
-      Podfile                     — platform :ios, '13.0'
+blueprints/api/routes.py      — ALL API endpoints (monthly_trends, dashboard_summary, budget_analysis,
+                                transactions CRUD, debts, categories, accounts, /api/login)
+blueprints/dashboards/        — Web dashboard HTML views
+blueprints/transactions/      — Web transaction management
+blueprints/budgets/           — Web budget management
+blueprints/debts/             — Web debt management
+blueprints/settings/          — Settings page (DB backup upload lives here)
+blueprints/analytics/         — Web analytics views
 
-Project root (gitignored):
-  railway-dns.txt                 — Cloudflare DNS record values
-  railway-credentials.txt         — Dashboard login credentials
+templates/login.html          — Web dashboard login page (dark theme)
+templates/base.html           — Base template, injects window.FINANCE_API_KEY, Sign Out button
+static/js/main.js             — Web frontend JS, apiCall() sends Authorization: Bearer header
 ```
+
+### Mobile — `Mobile/finance_dashboard_mobile/`
+> ⚠️ `lib/` is in Flutter's .gitignore — Dart source files are local only, not in GitHub.
+> They exist on the dev machine and are used to build the app.
+
+```
+lib/main.dart                 — App root, GoRouter with /login route + refreshListenable + redirect logic
+lib/config.dart               — AppConfig: baseUrl = https://finance.juanbracho.com, apiKeyStorageKey
+lib/auth_notifier.dart        — ChangeNotifier: tracks token presence, drives GoRouter auth redirect
+lib/services/api_service.dart — HTTP client: all API calls, login(), logout(), _headers() with Bearer
+lib/providers/app_providers.dart — Riverpod FutureProviders: dashboardSummary, monthlyTrends,
+                                   budgets, transactions, debts, categories, owners, accounts
+lib/models/
+  transaction.dart            — Transaction model + fromJson/toJson
+  budget.dart                 — BudgetCategory model
+  debt.dart                   — DebtAccount model (due_date stored as int in DB)
+  dashboard_summary.dart      — DashboardSummary model (budgetRemaining, budgetPercentUsed computed)
+lib/screens/
+  login_screen.dart           — Username/password login, calls ApiService.login()
+  home_screen.dart            — Dashboard: budget health banner, 4 stat cards, 6-month bar+line chart
+  add_transaction_screen.dart — Add transaction form
+  transactions_screen.dart    — Scrollable transaction list + filter sheet
+  budgets_screen.dart         — Budget progress bars per category
+  debts_screen.dart           — Debt cards with payoff progress
+lib/widgets/
+  stat_card.dart              — Reusable stat card widget
+  budget_progress_tile.dart   — Budget category progress row
+
+ios/Runner/Info.plist         — Clean — NSAllowsArbitraryLoads removed (HTTPS only now)
+ios/Podfile                   — platform :ios, '13.0'
+```
+
+### Project Root (gitignored — on dev machine only)
+```
+railway-dns.txt               — Cloudflare DNS record values
+railway-credentials.txt       — DASHBOARD_USERNAME / DASHBOARD_PASSWORD
+Data backup/                  — Local DB backups
+  backup_20260221_084303.db   — Last uploaded backup (used to seed Railway DB)
+```
+
+---
+
+## Full History — What Was Built & When
+
+### Phase 1 — Flutter App with Mock Data ✅
+- Flutter project scaffolded at `Mobile/finance_dashboard_mobile/`
+- 5 screens built with hardcoded mock data, UI approved
+- Dark navy Material 3 theme established
+- Navigation: go_router `StatefulShellRoute` with persistent bottom nav bar
+- State: Riverpod `FutureProvider` per screen
+- Dependencies: flutter_riverpod, go_router, http, flutter_secure_storage, intl, fl_chart
+
+### Phase 2 — Flask API + Flutter Wired to Local API ✅
+- Added Bearer token auth to Flask (`check_api_key()`)
+- Added 3 Flutter endpoints: `GET /api/transactions`, `POST /api/transactions`, `GET /api/debts`
+- Flutter providers switched from mock data to real API calls against LAN IP `192.168.1.164:5001`
+- CORS configured, web frontend updated to send Bearer header
+- `NSAllowsArbitraryLoads` added to iOS for local HTTP (removed in Phase 5)
+
+### Phase 3 — Railway Deployment ✅
+- Railway project connected to GitHub, root dir set to `Desktop/`
+- Persistent volume at `/app/data/` for SQLite DB
+- Session-based web login added (`auth_bp`, login/logout routes, `check_web_session()`)
+- `ProductionConfig` class added to `config.py`
+- Login page (`templates/login.html`) built
+- Live DB backup uploaded via `/settings`, confirmed real data showing
+
+### Phase 4 — Production Hardening ✅
+- Custom domain `https://finance.juanbracho.com` verified and live
+- Cloudflare proxy enabled — handles HTTP→HTTPS redirect
+- CORS locked down: replaced Flask-CORS with manual `after_request` handler
+  (Flask-CORS 4.x reflected non-matching origins back — manual handler fixed this)
+- `CORS_ORIGINS` Railway env var set to `https://finance.juanbracho.com`
+- Web session expiry: 1 hour enforced via `login_time` timestamp in session
+
+### Phase 5 — Flutter Connected to Production ✅ (polish pending)
+- `POST /api/login` endpoint added — validates dashboard credentials, returns Bearer token
+- Flutter login screen built — dark themed, matches app style
+- `AuthNotifier` (ChangeNotifier) drives GoRouter redirect to /login if no token stored
+- `config.dart` baseUrl updated to `https://finance.juanbracho.com`
+- `NSAllowsArbitraryLoads` removed from `ios/Runner/Info.plist`
+- `flutter_secure_storage` stores token in iOS Keychain — survives app switches
+- **Chart fix:** DB uses `Needs/Wants/Business/Savings` not `Expense/Income`
+  → `monthly_trends` endpoint updated to sum all types into single `expense` field
+  → Home screen chart now shows bars + curved trend line with dots
+  → Tap bar to reveal amount tooltip
+
+---
+
+## Current Known Issues / Pending Work
+
+### Next Session — Start Here
+1. **Flesh out app philosophy** — define exactly what belongs on mobile vs web before any design
+2. **Design pass — Mobile** — screen by screen with real data, guided by "quick glance/quick add" philosophy
+3. **Test Add Transaction** — submit test transaction, confirm it shows in list + web dashboard
+4. **Test filters** — owner filter, category filter on Transactions screen
+5. **Build & install** — `flutter build apk --release` (Android) + Xcode Archive (iOS IPA)
+
+### Phase 6 — Web Dashboard UX (future)
+- "Remember me" / persistent session (currently expires on browser close)
+- Password change route in settings
+
+---
+
+## Gotchas & Things to Know
+
+- **DB transaction types are `Needs`, `Wants`, `Business`, `Savings`** — never `Expense`/`Income`
+- **Flutter `lib/` is gitignored** — Dart files live locally on dev machine only, not in GitHub
+- **Local desktop app has no auth** — env vars are empty locally, all auth is bypassed
+- **Railway auto-detects `RAILWAY_ENVIRONMENT`** — launcher uses this to pick `ProductionConfig` and run as plain HTTP server
+- **CORS manual handler** — Flask-CORS was replaced because v4.x reflected non-matching origins; manual `after_request` in `app.py` is strict
+- **Session expiry is server-enforced** — checks `login_time` on every request, not just cookie expiry
+- **Mobile token is permanent** — no expiry on the Flutter Bearer token, cleared only by explicit logout
+- **`due_date` on debts** — stored as integer in DB (day of month), parsed with `.toString()` in Flutter
