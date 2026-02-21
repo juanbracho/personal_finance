@@ -24,38 +24,26 @@ def monthly_trends():
             owner_filter = "AND owner = ?"
             params.append(owner)
         
-        # Get monthly trends for the last 12 months
+        # Sum all spending per month regardless of type category.
+        # This DB uses Needs/Wants/Business instead of Expense/Income.
         trends_query = f"""
-        SELECT 
+        SELECT
             strftime('%Y-%m', date) as month,
-            type,
             SUM(amount) as total
-        FROM transactions 
+        FROM transactions
         WHERE date >= date('now', '-12 months') AND COALESCE(is_active, 1) = 1
         {owner_filter}
-        GROUP BY strftime('%Y-%m', date), type
+        GROUP BY strftime('%Y-%m', date)
         ORDER BY month DESC
         """
-        
+
         trends_df = pd.read_sql_query(trends_query, conn, params=params)
         conn.close()
-        
-        # Process data — normalize type to lowercase so Flutter always gets
-        # consistent 'expense' / 'income' keys regardless of DB casing.
-        result = {}
-        raw_types = set()
-        for _, row in trends_df.iterrows():
-            month = row['month']
-            raw_type = str(row['type']) if row['type'] is not None else ''
-            raw_types.add(raw_type)
-            if month not in result:
-                result[month] = {'month': month}
-            result[month][raw_type.lower()] = float(row['total'])
 
-        print(f"📊 monthly_trends — distinct type values in DB: {raw_types}")
-
-        # Convert to list and sort by month
-        result_list = list(result.values())
+        result_list = [
+            {'month': row['month'], 'expense': float(row['total'])}
+            for _, row in trends_df.iterrows()
+        ]
         result_list.sort(key=lambda x: x['month'])
 
         return jsonify(result_list)
