@@ -10,29 +10,32 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 @api_bp.route('/monthly_trends')
 def monthly_trends():
     """Get monthly spending trends for charts"""
-    
+
     try:
         owner = request.args.get('owner', 'all')
         date_range = request.args.get('date_range', '365')  # days
-        
+        type_filter = request.args.get('type', None)  # optional Kakeibo type filter
+
         conn = sqlite3.connect('data/personal_finance.db')
-        
+
         # Build filter conditions
-        owner_filter = ""
+        extra_filters = ""
         params = []
         if owner != 'all':
-            owner_filter = "AND owner = ?"
+            extra_filters += " AND owner = ?"
             params.append(owner)
-        
-        # Sum all spending per month regardless of type category.
-        # This DB uses Needs/Wants/Business instead of Expense/Income.
+        if type_filter and type_filter != 'all':
+            extra_filters += " AND type = ?"
+            params.append(type_filter)
+
+        # Sum spending per month. Optionally filtered by Kakeibo type.
         trends_query = f"""
         SELECT
             strftime('%Y-%m', date) as month,
             SUM(amount) as total
         FROM transactions
         WHERE date >= date('now', '-12 months') AND COALESCE(is_active, 1) = 1
-        {owner_filter}
+        {extra_filters}
         GROUP BY strftime('%Y-%m', date)
         ORDER BY month DESC
         """

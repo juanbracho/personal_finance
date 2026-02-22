@@ -33,7 +33,7 @@ Status: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ---
 
-### 1. Branding & Theme System  `[ ]`
+### 1. Branding & Theme System  `[x]`
 
 **What:** Rename app, add Japanese subtitle to login, implement both themes, add theme toggle.
 
@@ -74,7 +74,14 @@ Status: `[ ]` pending · `[~]` in progress · `[x]` done
 | Primary | `#8C6A3F` — dark amber ink |
 | Error | `#C94040` |
 
-**Theme toggle:** small icon button (top-right of home screen or settings). Preference saved locally.
+**Theme toggle:** small FAB (bottom-right, persistent across all tabs). Cycles Warm Ink → Indigo → Light → repeat. Icon changes to reflect current theme. Preference saved to `shared_preferences` (survives app restarts).
+
+**Files changed:**
+- `pubspec.yaml` — added `shared_preferences: ^2.3.0`
+- `lib/theme_notifier.dart` — new file, `KakeiboTheme` enum + `StateNotifier`, self-initializing from disk
+- `lib/main.dart` — renamed `FinanceApp` → `KakeiboApp`, 3 theme functions + shared `_buildTheme()` builder, FAB in `_ScaffoldWithNavBar`
+- `lib/screens/login_screen.dart` — `menu_book_outlined` icon, Kakeibo / 家計簿 / tagline, all hardcoded colors replaced with `Theme.of(context)`
+- AppBar titles: Home → "Kakeibo", Add → "Record", Transactions → "History"
 
 ---
 
@@ -152,45 +159,40 @@ Status: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ---
 
-### 6. Home Screen — Budget Bar Redesign  `[ ]`
+### 6. Home Screen — Budget Bar Redesign  `[x]`
 
-**Depends on:** Item #5 confirmed and API fields verified.
+**Two stacked segmented bars, same scale (max of budget vs. spending):**
+- Row 1 (Budget): `[Initial — primary][Unexpected — orange][Remaining — gray]`
+- Row 2 (Spending): `[Needs — green][Wants — orange][Business — blue][Savings — purple][Unspent — gray]`
 
-**API already exposes** (per `budget_analysis` rows): `initial_budget`, `unexpected_expenses`, `effective_budget`
-So the layered bar is doable with existing data — just sum across rows.
+**Data sources (no backend changes needed):**
+- `budget_analysis` → sums `initial_budget`, `unexpected_expenses`, `effective_budget`
+- `dashboard_summary.monthly_spending` → keyed by Needs/Wants/Business/Savings (already type-grouped)
 
-**Visual approach:**
-- Two rows:
-  - Row 1: Actual spent, stacked by type (Needs/Wants/Business/Savings, 4 colors)
-  - Row 2: Effective budget bar — with a tick/divider showing where Initial ends and Unexpected begins
-- Labels: Initial $X | +Unexpected $Y | = Effective $Z | Spent $W
+**Note — commitment portion:** The web dashboard tracks fixed commitments in a `budget_commitments` table (rent, subscriptions, etc). This is not yet exposed to mobile. When added, the budget bar can add a `[Committed]` first segment before `Initial`. Tracked as future work.
 
 ---
 
-### 7. Home Screen — Remove Stat Cards, Add Insights  `[ ]`
+### 7. Home Screen — Remove Stat Cards, Add Insights  `[x]`
 
-**Depends on:** Item #6.
+**Removed:** All 4 stat cards (Spent, Remaining, Total Debt, Min Payments). The two bars + insights replace them.
 
-**Remove:** Total Debt, Min Payments cards (Debt tab exists for that).
-**Possibly remove:** Spent + Remaining cards too (covered by bar).
-
-**Add:**
-| Insight | Source | Notes |
+**Added:**
+| Section | Source | Notes |
 |---|---|---|
-| Spending by type | `dashboard_summary.monthly_spending` | Already available |
-| Spending by owner | Owner-filtered summary calls | 3 quick API calls (one per owner) |
-| Top 5 sub-categories (excl. Rent) | Client-side from transactions | Hardcode exclusion list in config |
+| Spending by Type | `dashboard_summary.monthly_spending` | 4 colored tiles (Needs/Wants/Business/Savings) |
+| Top 5 Sub-categories | `getBudgetSubcategories()` flattened | Excludes any sub named "rent" (case-insensitive), 0-spend excluded |
+| Spending by Owner | `getDashboardSummary(owner: x)` × n | Parallel calls via `Future.wait`, bar chart per person |
+
+**New providers added:** `ownerSpendingProvider`, `topSubcategoriesProvider`
 
 ---
 
-### 8. Home Screen — Kakeibo Framing + Title  `[ ]`
+### 8. Home Screen — Kakeibo Framing + Title  `[x]`
 
-**What:** Rename "Dashboard" title, add month context, add mindfulness tone.
-
-**Scope:**
-- AppBar title: current month name ("February") instead of "Dashboard"
-- Small subtitle or greeting line beneath the header
-- Keep 6-month trend chart — it works and is useful
+- AppBar title: current month name (dynamic from `summary.month`, fallback "Kakeibo" while loading)
+- Subheader line: `FEBRUARY 2026` in primary color + `How are we doing this month?` italic greeting
+- 6-month trend chart retained
 
 ---
 
@@ -204,7 +206,7 @@ So the layered bar is doable with existing data — just sum across rows.
 
 ---
 
-### 10. Navigation — Icons & Labels  `[ ]`
+### 10. Navigation — Icons & Labels  `[x]`
 
 **Proposed:**
 | Tab | Label | Icon |
@@ -258,15 +260,19 @@ Minor visual polish, no functional changes. Review in session.
 | Feb 21, 2026 | Web dashboard budget fix — added Savings to transaction type filter |
 | Feb 21, 2026 | Budgets screen rebuilt — 2-level accordion (category → sub-category → transactions) |
 | Feb 21, 2026 | Hardcoded February 2026 date replaced with dynamic DateFormat |
+| Feb 21, 2026 | Branding complete — app renamed Kakeibo, 家計簿 subtitle, 3-theme system (Warm Ink / Indigo / Light), theme toggle FAB, all AppBar titles updated |
+| Feb 21, 2026 | Fixed Xcode build error — replaced stale counter test (MyApp ref) with placeholder; cleaned up unnecessary_underscores warnings |
+| Feb 21, 2026 | Home screen rebuilt — dual-bar budget (Initial/Unexpected vs Needs/Wants/Business/Savings), type breakdown tiles, top 5 subs (excl. Rent), spending by owner; all stat cards removed |
+| Feb 21, 2026 | DashboardSummary model extended — initialBudget, unexpectedBudget, spendingByType fields; two new providers: ownerSpendingProvider, topSubcategoriesProvider |
+| Feb 21, 2026 | Type tiles as filters — tap Needs/Wants/Business/Savings to filter top-5 categories, owner breakdown, and 6-month trend; tap again to clear; one type active at a time |
 
 ---
 
 ## Gotchas to Carry Forward
 
 - DB types are exactly: `Needs`, `Wants`, `Business`, `Savings` — never change these
-- `add_transaction_screen.dart` is now wired to real API ✓
-- `budgets_screen.dart` line 57 has hardcoded "February 2026" — fix is item #3
-- Budget total discrepancy ($12,710 mobile vs $11,092 web) — must investigate before redesigning the bar (item #5)
-- Top 5 sub-categories insight needs API decision — either new backend endpoint or client-side grouping
+- Savings inclusion in budget total is temporary — will be revisited later
+- Top 5 sub-categories (home insights) needs client-side grouping from `/api/transactions`
 - Flutter `lib/` is gitignored — Dart files are local only
 - Bearer token has no expiry — persists until explicit logout
+- Backend must be deployed to Railway before testing any new API endpoints on device

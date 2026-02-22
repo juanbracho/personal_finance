@@ -24,6 +24,9 @@ dependencies:
   # Secure API key storage (Phase 2+)
   flutter_secure_storage: ^9.2.2
 
+  # Theme preference persistence
+  shared_preferences: ^2.3.0
+
   # Date & currency formatting
   intl: ^0.19.0
 
