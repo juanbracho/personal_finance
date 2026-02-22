@@ -1,273 +1,291 @@
 {% extends "base.html" %}
-
-{% block title %}Settings - Finance Dashboard{% endblock %}
+{% block title %}Settings — Kanso{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="mb-4">
-                <i class="fas fa-cog"></i> Settings
-            </h1>
+<div class="kanso-page">
+
+    <!-- Page header -->
+    <div class="kanso-page-header">
+        <h1 class="kanso-page-title">Settings</h1>
+        <p class="kanso-page-subtitle">App, data, and database management</p>
+    </div>
+
+    <!-- ── App status strip ── -->
+    <div class="kanso-info-strip">
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Version</div>
+            <div class="kanso-info-value primary">v{{ version }}</div>
+        </div>
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Database</div>
+            <div class="kanso-info-value">
+                {% if db_exists %}
+                    <span class="status-dot green"></span>Active
+                {% else %}
+                    <span class="status-dot amber"></span>Not found
+                {% endif %}
+            </div>
+        </div>
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Size</div>
+            <div class="kanso-info-value {{ 'muted' if not db_exists }}">
+                {% if db_exists %}{{ "%.2f"|format(db_size / 1024 / 1024) }} MB{% else %}—{% endif %}
+            </div>
+        </div>
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Last modified</div>
+            <div class="kanso-info-value muted">
+                {% if db_exists and db_modified %}
+                    {{ db_modified.strftime('%b %-d, %Y') }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- App Version -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Application Version</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Version:</strong> <span class="badge bg-primary">v{{ version }}</span></p>
-                    <p><strong>Build Date:</strong> {{ build_date }}</p>
-                    <p><strong>Build Number:</strong> {{ build_number }}</p>
-                </div>
+    <!-- ── Appearance ── -->
+    <div class="kanso-section">
+        <div class="kanso-section-label">Appearance</div>
+        <div class="kanso-card">
+            <div class="theme-picker">
+                <!-- Warm Ink -->
+                <button class="theme-option" data-theme-pick="warm-ink" onclick="setTheme('warm-ink')">
+                    <div class="theme-swatch">
+                        <span style="background:#141210;"></span>
+                        <span style="background:#C49A5E;"></span>
+                        <span style="background:#7BAF8E;"></span>
+                        <span style="background:#D4956A;"></span>
+                    </div>
+                    <div class="theme-option-name">Warm Ink</div>
+                    <div class="theme-option-desc">Dark · Japanese aesthetic</div>
+                </button>
+                <!-- Indigo -->
+                <button class="theme-option" data-theme-pick="indigo" onclick="setTheme('indigo')">
+                    <div class="theme-swatch">
+                        <span style="background:#0F1117;"></span>
+                        <span style="background:#7B9ED9;"></span>
+                        <span style="background:#7BAF8E;"></span>
+                        <span style="background:#A67FB5;"></span>
+                    </div>
+                    <div class="theme-option-name">Indigo</div>
+                    <div class="theme-option-desc">Dark · Structured, cooler</div>
+                </button>
+                <!-- Washi Paper -->
+                <button class="theme-option" data-theme-pick="washi" onclick="setTheme('washi')">
+                    <div class="theme-swatch">
+                        <span style="background:#F7F4EF;"></span>
+                        <span style="background:#8C6A3F;"></span>
+                        <span style="background:#4A8B60;"></span>
+                        <span style="background:#B86A3A;"></span>
+                    </div>
+                    <div class="theme-option-name">Washi Paper</div>
+                    <div class="theme-option-desc">Light · Warm off-white</div>
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Database Information -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-database"></i> Database Information</h5>
-                </div>
-                <div class="card-body">
-                    {% if db_exists %}
-                        <p><strong>Status:</strong> <span class="badge bg-success">Active</span></p>
-                        <p><strong>Size:</strong> {{ "%.2f"|format(db_size / 1024 / 1024) }} MB</p>
-                        <p><strong>Last Modified:</strong> {{ db_modified.strftime('%Y-%m-%d %H:%M:%S') if db_modified else 'Unknown' }}</p>
-                    {% else %}
-                        <p><strong>Status:</strong> <span class="badge bg-warning">No database found</span></p>
-                        <p class="text-muted small">A new database will be created when you add your first transaction.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+    <!-- ── Data management ── -->
+    <div class="kanso-section">
+        <div class="kanso-section-label">Data Management</div>
+        <div class="kanso-card">
 
-        <!-- Export Database -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="fas fa-file-export"></i> Export Database</h5>
+            <!-- Export -->
+            <div class="kanso-row">
+                <div class="kanso-row-icon success">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 3v9m0 0l-3-3m3 3l3-3"/>
+                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        <strong>Important:</strong> Always export your database before installing updates!
-                    </p>
-                    <button id="downloadBtn" onclick="downloadDatabase()" class="btn btn-success w-100 mb-2" {% if not db_exists %}disabled{% endif %}>
-                        <i class="fas fa-download"></i> Export Database (Download)
+                <div class="kanso-row-body">
+                    <div class="kanso-row-title">Export Database</div>
+                    <div class="kanso-row-desc">Download a timestamped backup to your Downloads folder</div>
+                </div>
+                <div class="kanso-row-action">
+                    <button id="downloadBtn"
+                            onclick="downloadDatabase()"
+                            class="btn-kanso btn-kanso-ghost"
+                            {% if not db_exists %}disabled{% endif %}>
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 3v9m0 0l-3-3m3 3l3-3"/>
+                            <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                        </svg>
+                        Download
                     </button>
-                    <p class="text-muted small mb-0">
-                        Saves your database to your Downloads folder with timestamp
-                    </p>
-                    <div id="downloadFeedback" class="alert alert-success mt-2" style="display: none;">
-                        <i class="fas fa-check-circle"></i> <span id="downloadMessage"></span>
-                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Install Update -->
-        <div class="col-md-12 mb-4">
-            <div class="card border-info">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-sync-alt"></i> Install Update</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        <i class="fas fa-info-circle"></i> Install a new version of the Finance Dashboard app from an update package file.
-                        <br><strong>Important:</strong> Always export your database before installing updates!
-                    </p>
-
-                    <div id="updateNormalState">
-                        <button onclick="selectUpdateFile()" class="btn btn-info btn-lg w-100 mb-2">
-                            <i class="fas fa-file-archive"></i> Select Update Package (.zip)
-                        </button>
-                        <input type="file" id="updateFileInput" accept=".zip" style="display: none;" onchange="handleUpdateFileSelected()">
-                    </div>
-
-                    <div id="updateProgressState" style="display: none;">
-                        <div class="progress mb-3" style="height: 30px;">
-                            <div id="updateProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">
-                                <span id="updateProgressText">0%</span>
-                            </div>
-                        </div>
-                        <div class="alert alert-info mb-0">
-                            <strong id="updateStatusTitle">Processing...</strong>
-                            <p id="updateStatusMessage" class="mb-0 small"></p>
-                        </div>
-                    </div>
-
-                    <div id="updateErrorState" class="alert alert-danger mt-3" style="display: none;">
-                        <h6><i class="fas fa-exclamation-triangle"></i> Update Failed</h6>
-                        <p id="updateErrorMessage" class="mb-0"></p>
-                        <button onclick="resetUpdateUI()" class="btn btn-sm btn-outline-danger mt-2">Try Again</button>
-                    </div>
-
-                    <div id="updateSuccessState" class="alert alert-success mt-3" style="display: none;">
-                        <h6><i class="fas fa-check-circle"></i> Update Successful!</h6>
-                        <p id="updateSuccessMessage" class="mb-0"></p>
-                    </div>
-                </div>
+            <div id="downloadFeedback" class="kanso-feedback success" style="display:none; margin:0 18px 12px;">
+                <i class="fas fa-check-circle"></i>
+                <span id="downloadMessage"></span>
             </div>
-        </div>
-    </div>
 
-    <div class="row">
-        <!-- Import Database -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-file-import"></i> Import Database</h5>
+            <!-- Import -->
+            <div class="kanso-row">
+                <div class="kanso-row-icon">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 14V5m0 0L7 8m3-3l3 3"/>
+                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        Restore your database from a previously exported backup file (.db)
-                    </p>
-                    <form action="{{ url_for('settings.upload_database') }}" method="POST" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label for="database_file" class="form-label">Select Database File:</label>
-                            <input type="file" class="form-control" id="database_file" name="database_file" accept=".db" required>
-                        </div>
-                        <button type="submit" class="btn btn-info w-100" onclick="return confirm('This will replace your current database. Your current data will be backed up first. Continue?')">
-                            <i class="fas fa-upload"></i> Import Database (Upload & Restore)
+                <div class="kanso-row-body">
+                    <div class="kanso-row-title">Import Database</div>
+                    <div class="kanso-row-desc">Restore from a <code>.db</code> backup — current data is backed up first</div>
+                </div>
+                <div class="kanso-row-action">
+                    <form action="{{ url_for('settings.upload_database') }}"
+                          method="POST"
+                          enctype="multipart/form-data"
+                          id="importForm"
+                          style="display:flex; align-items:center; gap:8px;">
+                        <label class="kanso-file-label" for="database_file">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                                <path d="M4 4h7l5 5v9H4z"/><path d="M11 4v5h5"/>
+                            </svg>
+                            Choose file
+                        </label>
+                        <span class="kanso-file-name" id="importFileName">No file chosen</span>
+                        <input type="file"
+                               id="database_file"
+                               name="database_file"
+                               accept=".db"
+                               required
+                               style="display:none;"
+                               onchange="document.getElementById('importFileName').textContent = this.files[0]?.name || 'No file chosen'">
+                        <button type="submit"
+                                class="btn-kanso btn-kanso-primary"
+                                onclick="return confirm('This will replace your current database. A backup will be created first. Continue?')">
+                            Upload
                         </button>
                     </form>
-                    <p class="text-muted small mt-2 mb-0">
-                        <i class="fas fa-shield-alt"></i> Your current database will be backed up before importing
-                    </p>
                 </div>
             </div>
-        </div>
 
-        <!-- Local Backups -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="fas fa-save"></i> Local Backups</h5>
+            <!-- Create local backup -->
+            <div class="kanso-row">
+                <div class="kanso-row-icon warning">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 10a7 7 0 1014 0A7 7 0 003 10z"/>
+                        <path d="M10 7v3l2 2"/>
+                    </svg>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        Create backup copies stored in the app's backup folder
-                    </p>
+                <div class="kanso-row-body">
+                    <div class="kanso-row-title">Create Local Backup</div>
+                    <div class="kanso-row-desc">Saved to <code>data/backups/</code> inside the app</div>
+                </div>
+                <div class="kanso-row-action">
                     <form action="{{ url_for('settings.create_backup') }}" method="POST">
-                        <button type="submit" class="btn btn-warning w-100" {% if not db_exists %}disabled{% endif %}>
-                            <i class="fas fa-save"></i> Create Local Backup
-                        </button>
-                    </form>
-                    <p class="text-muted small mt-2 mb-0">
-                        Location: <code>data/backups/</code>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Backup History -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0"><i class="fas fa-history"></i> Backup History</h5>
-                </div>
-                <div class="card-body">
-                    {% if backups %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Filename</th>
-                                        <th>Size</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for backup in backups %}
-                                        <tr>
-                                            <td><i class="fas fa-file-archive text-muted"></i> {{ backup.filename }}</td>
-                                            <td>{{ "%.2f"|format(backup.size / 1024 / 1024) }} MB</td>
-                                            <td>{{ backup.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                            <td>
-                                                <form action="{{ url_for('settings.restore_backup', filename=backup.filename) }}" method="POST" style="display: inline;">
-                                                    <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('This will replace your current database with this backup. Continue?')">
-                                                        <i class="fas fa-undo"></i> Restore
-                                                    </button>
-                                                </form>
-                                                <form action="{{ url_for('settings.delete_backup', filename=backup.filename) }}" method="POST" style="display: inline;">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this backup?')">
-                                                        <i class="fas fa-trash"></i> Delete
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted text-center mb-0">No local backups found. Create a backup to get started!</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- DANGER ZONE -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h5>
-                </div>
-                <div class="card-body">
-                    <h6 class="text-danger">Delete All Data</h6>
-                    <p class="text-muted">
-                        Permanently delete all your financial data from the database. This action cannot be undone!
-                        A backup will be automatically created before deletion.
-                    </p>
-
-                    <form action="{{ url_for('settings.delete_all_data') }}" method="POST" id="deleteForm" class="mt-3">
-                        <div class="mb-3">
-                            <label for="confirmation" class="form-label fw-bold">
-                                Type <code>DELETE ALL DATA</code> to confirm:
-                            </label>
-                            <input type="text" class="form-control" id="confirmation" name="confirmation" placeholder="DELETE ALL DATA" required>
-                        </div>
-                        <button type="submit" class="btn btn-danger" {% if not db_exists %}disabled{% endif %} onclick="return confirmDelete()">
-                            <i class="fas fa-trash-alt"></i> Delete All Data Permanently
+                        <button type="submit"
+                                class="btn-kanso btn-kanso-ghost"
+                                {% if not db_exists %}disabled{% endif %}>
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 10a7 7 0 1014 0A7 7 0 003 10z"/>
+                                <path d="M10 7v3l2 2"/>
+                            </svg>
+                            Create
                         </button>
                     </form>
                 </div>
             </div>
+
         </div>
     </div>
 
-    <!-- Important Notes -->
-    <div class="row">
-        <div class="col-12">
-            <div class="alert alert-info">
-                <h6><i class="fas fa-info-circle"></i> Important Notes:</h6>
-                <ul class="mb-0">
-                    <li><strong>Before Updates:</strong> Always export your database before updating the app</li>
-                    <li><strong>After Updates:</strong> Import your exported database to restore your data</li>
-                    <li><strong>Backup Location:</strong> Local backups are stored in <code>data/backups/</code> folder inside the app</li>
-                    <li><strong>Export Location:</strong> Exported databases are saved to your Downloads folder</li>
-                    <li><strong>File Format:</strong> Only <code>.db</code> files are accepted for import</li>
-                    <li><strong>Safety:</strong> A backup is automatically created before any restore or delete operation</li>
-                </ul>
+    <!-- ── Backup history ── -->
+    <div class="kanso-section">
+        <div class="kanso-section-label">Backup History</div>
+        <div class="kanso-card">
+            {% if backups %}
+            <ul class="backup-list">
+                {% for backup in backups %}
+                <li class="backup-item">
+                    <div class="backup-item-icon">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h7l5 5v9H4z"/><path d="M11 4v5h5"/>
+                        </svg>
+                    </div>
+                    <div class="backup-item-name" title="{{ backup.filename }}">{{ backup.filename }}</div>
+                    <div class="backup-item-meta">{{ "%.2f"|format(backup.size / 1024 / 1024) }} MB &nbsp;·&nbsp; {{ backup.created.strftime('%b %-d, %Y') }}</div>
+                    <div class="backup-item-actions">
+                        <form action="{{ url_for('settings.restore_backup', filename=backup.filename) }}" method="POST" style="display:inline;">
+                            <button type="submit"
+                                    class="btn-kanso btn-kanso-ghost btn-kanso-sm"
+                                    onclick="return confirm('Replace current database with this backup?')">
+                                Restore
+                            </button>
+                        </form>
+                        <form action="{{ url_for('settings.delete_backup', filename=backup.filename) }}" method="POST" style="display:inline;">
+                            <button type="submit"
+                                    class="btn-kanso btn-kanso-danger btn-kanso-sm"
+                                    onclick="return confirm('Delete this backup?')">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div style="padding:20px 18px; font-size:13.5px; color:var(--text-faint); text-align:center;">
+                No local backups yet — create one above.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── Danger zone ── -->
+    <div class="kanso-section mt-section">
+        <div class="kanso-section-label" style="color:var(--danger); opacity:0.7;">Danger Zone</div>
+        <div class="kanso-danger-card">
+            <div class="kanso-danger-header">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 3L2 17h16L10 3z"/>
+                    <line x1="10" y1="9" x2="10" y2="12"/>
+                    <circle cx="10" cy="14.5" r="0.5" fill="currentColor"/>
+                </svg>
+                Delete All Data
+            </div>
+            <div class="kanso-danger-body">
+                <p style="font-size:13.5px; color:var(--text-muted); margin:0 0 14px;">
+                    Permanently deletes all financial data from the database.
+                    A backup is created automatically before deletion.
+                    <strong style="color:var(--text);">This cannot be easily undone.</strong>
+                </p>
+                <form action="{{ url_for('settings.delete_all_data') }}" method="POST" id="deleteForm">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                        <label style="font-size:13px; color:var(--text-muted); white-space:nowrap;">
+                            Type <code>DELETE ALL DATA</code> to confirm:
+                        </label>
+                        <input type="text"
+                               class="kanso-input"
+                               id="confirmation"
+                               name="confirmation"
+                               placeholder="DELETE ALL DATA"
+                               required
+                               style="max-width:240px;">
+                        <button type="submit"
+                                class="btn-kanso btn-kanso-danger-solid"
+                                {% if not db_exists %}disabled{% endif %}
+                                onclick="return confirmDelete()">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 5h10l-1 12H6L5 5z"/>
+                                <path d="M3 5h14M8 5V3h4v2"/>
+                            </svg>
+                            Delete permanently
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
-</div>
 
+</div><!-- /kanso-page -->
+{% endblock %}
+
+{% block extra_js %}
 <script>
-// ==================== UPDATE SYSTEM ====================
-
+// ── Update system — kept for future use ───────────────────
 function selectUpdateFile() {
     document.getElementById('updateFileInput').click();
 }
@@ -275,103 +293,75 @@ function selectUpdateFile() {
 function handleUpdateFileSelected() {
     const fileInput = document.getElementById('updateFileInput');
     const file = fileInput.files[0];
+    if (!file) return;
 
-    if (!file) {
-        return;
-    }
-
-    // Validate file type
     if (!file.name.endsWith('.zip')) {
         showUpdateError('Invalid file type. Please select a .zip update package.');
         fileInput.value = '';
         return;
     }
 
-    // Confirm before proceeding
-    if (!confirm(`Install update from: ${file.name}\n\nMake sure you've exported your database first!\n\nContinue with update?`)) {
+    if (!confirm(`Install update from: ${file.name}\n\nMake sure you've exported your database first.\n\nContinue?`)) {
         fileInput.value = '';
         return;
     }
 
-    // Start upload
     uploadUpdatePackage(file);
 }
 
 function uploadUpdatePackage(file) {
-    // Hide normal state, show progress
     document.getElementById('updateNormalState').style.display = 'none';
     document.getElementById('updateProgressState').style.display = 'block';
     document.getElementById('updateErrorState').style.display = 'none';
     document.getElementById('updateSuccessState').style.display = 'none';
 
-    setUpdateProgress(10, 'Uploading update package...');
+    setUpdateProgress(10, 'Uploading update package…');
 
-    // Create form data
     const formData = new FormData();
     formData.append('update_file', file);
 
-    // Upload via XHR for progress tracking
     const xhr = new XMLHttpRequest();
 
-    // Upload progress
     xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 50); // 0-50% for upload
-            setUpdateProgress(percentComplete, 'Uploading update package...');
+            setUpdateProgress(Math.round((e.loaded / e.total) * 50), 'Uploading…');
         }
     });
 
-    // Response handler
     xhr.addEventListener('load', () => {
         try {
             const response = JSON.parse(xhr.responseText);
-
             if (xhr.status === 200 && response.success) {
                 setUpdateProgress(100, 'Update installed successfully!');
-
-                // Show success message
                 setTimeout(() => {
                     document.getElementById('updateProgressState').style.display = 'none';
                     document.getElementById('updateSuccessState').style.display = 'block';
-                    document.getElementById('updateSuccessMessage').textContent = response.message || 'Update completed. The app is restarting...';
-
-                    // If auto-restart is happening, show countdown
-                    if (response.restarting) {
-                        showRestartCountdown();
-                    }
+                    document.getElementById('updateSuccessMessage').textContent = response.message || 'Update complete.';
+                    if (response.restarting) showRestartCountdown();
                 }, 500);
             } else {
-                // Show actual error message from server
-                showUpdateError(response.message || `Server error (${xhr.status}). Please try again.`);
+                showUpdateError(response.message || `Server error (${xhr.status}).`);
             }
-        } catch (e) {
-            showUpdateError(`Server error (${xhr.status}). Invalid response from server.`);
+        } catch(e) {
+            showUpdateError(`Server error (${xhr.status}). Invalid response.`);
         }
     });
 
-    // Error handler
     xhr.addEventListener('error', () => {
-        showUpdateError('Network error. Please check your connection and try again.');
+        showUpdateError('Network error. Please check your connection.');
     });
 
-    // Send request
     xhr.open('POST', '{{ url_for("settings.install_update") }}');
     xhr.send(formData);
 
-    // Simulate validation progress
-    setTimeout(() => setUpdateProgress(60, 'Validating update package...'), 1000);
-    setTimeout(() => setUpdateProgress(75, 'Extracting files...'), 2000);
-    setTimeout(() => setUpdateProgress(90, 'Installing update...'), 3000);
+    setTimeout(() => setUpdateProgress(60, 'Validating package…'), 1000);
+    setTimeout(() => setUpdateProgress(75, 'Extracting files…'), 2000);
+    setTimeout(() => setUpdateProgress(90, 'Installing…'), 3000);
 }
 
 function setUpdateProgress(percent, message) {
-    const progressBar = document.getElementById('updateProgressBar');
-    const progressText = document.getElementById('updateProgressText');
-    const statusMessage = document.getElementById('updateStatusMessage');
-
-    progressBar.style.width = percent + '%';
-    progressText.textContent = percent + '%';
-    statusMessage.textContent = message;
+    document.getElementById('updateProgressBar').style.width = percent + '%';
+    document.getElementById('updateStatusMessage').textContent = message;
 }
 
 function showUpdateError(message) {
@@ -379,13 +369,11 @@ function showUpdateError(message) {
     document.getElementById('updateProgressState').style.display = 'none';
     document.getElementById('updateErrorState').style.display = 'block';
     document.getElementById('updateErrorMessage').textContent = message;
-
-    // Reset file input
     document.getElementById('updateFileInput').value = '';
 }
 
 function resetUpdateUI() {
-    document.getElementById('updateNormalState').style.display = 'block';
+    document.getElementById('updateNormalState').style.display = 'flex';
     document.getElementById('updateProgressState').style.display = 'none';
     document.getElementById('updateErrorState').style.display = 'none';
     document.getElementById('updateSuccessState').style.display = 'none';
@@ -393,109 +381,82 @@ function resetUpdateUI() {
 }
 
 function showRestartCountdown() {
-    let countdown = 5;
-    const successMessage = document.getElementById('updateSuccessMessage');
-
-    const interval = setInterval(() => {
-        successMessage.textContent = `Update successful! App will restart in ${countdown} seconds...`;
-        countdown--;
-
-        if (countdown < 0) {
-            clearInterval(interval);
-            successMessage.textContent = 'Restarting now...';
-
-            // Poll for reconnection
+    let n = 5;
+    const el = document.getElementById('updateSuccessMessage');
+    const id = setInterval(() => {
+        el.textContent = `Update successful! Restarting in ${n}s…`;
+        if (--n < 0) {
+            clearInterval(id);
+            el.textContent = 'Restarting…';
             setTimeout(checkAppReconnection, 2000);
         }
     }, 1000);
 }
 
 function checkAppReconnection() {
-    const successMessage = document.getElementById('updateSuccessMessage');
-    successMessage.textContent = 'Waiting for app to restart...';
-
+    const el = document.getElementById('updateSuccessMessage');
+    el.textContent = 'Waiting for app to restart…';
     let attempts = 0;
-    const maxAttempts = 30; // 30 seconds
-
-    const interval = setInterval(() => {
+    const id = setInterval(() => {
         fetch('{{ url_for("settings.index") }}')
-            .then(response => {
-                if (response.ok) {
-                    clearInterval(interval);
-                    successMessage.textContent = 'Update complete! Reloading page...';
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
+            .then(r => {
+                if (r.ok) {
+                    clearInterval(id);
+                    el.textContent = 'Update complete! Reloading…';
+                    setTimeout(() => window.location.reload(), 1000);
                 }
             })
             .catch(() => {
-                // Still waiting...
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    clearInterval(interval);
-                    successMessage.textContent = 'Update complete! Please manually refresh the page.';
+                if (++attempts >= 30) {
+                    clearInterval(id);
+                    el.textContent = 'Update complete! Please refresh the page manually.';
                 }
             });
     }, 1000);
 }
 
-// ==================== DATABASE FUNCTIONS ====================
-
-function confirmDelete() {
-    const confirmation = document.getElementById('confirmation').value;
-    if (confirmation !== 'DELETE ALL DATA') {
-        alert('Please type "DELETE ALL DATA" exactly to confirm deletion.');
-        return false;
-    }
-    return confirm('⚠️ FINAL WARNING ⚠️\n\nThis will DELETE ALL your financial data!\n\nA backup will be created, but this action cannot be easily undone.\n\nAre you absolutely sure?');
-}
-
+// ── Database export ────────────────────────────────────────
 function downloadDatabase() {
     const btn = document.getElementById('downloadBtn');
     const feedback = document.getElementById('downloadFeedback');
     const message = document.getElementById('downloadMessage');
 
-    // Show loading state
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+    btn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15"><path d="M10 3v9m0 0l-3-3m3 3l3-3"/><path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/></svg> Exporting…`;
     btn.disabled = true;
     feedback.style.display = 'none';
 
-    // Generate timestamp for filename
     const now = new Date();
-    const timestamp = now.getFullYear() +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0') + '_' +
-        String(now.getHours()).padStart(2, '0') +
-        String(now.getMinutes()).padStart(2, '0') +
-        String(now.getSeconds()).padStart(2, '0');
-    const filename = `finance_dashboard_backup_${timestamp}.db`;
+    const ts = now.getFullYear()
+        + String(now.getMonth()+1).padStart(2,'0')
+        + String(now.getDate()).padStart(2,'0') + '_'
+        + String(now.getHours()).padStart(2,'0')
+        + String(now.getMinutes()).padStart(2,'0')
+        + String(now.getSeconds()).padStart(2,'0');
+    const filename = `kanso_backup_${ts}.db`;
 
-    // Trigger download using a hidden iframe to avoid page navigation
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = '{{ url_for("settings.download_database") }}';
     document.body.appendChild(iframe);
 
-    // Show success message after a short delay
     setTimeout(() => {
-        btn.innerHTML = '<i class="fas fa-download"></i> Export Database (Download)';
+        btn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15"><path d="M10 3v9m0 0l-3-3m3 3l3-3"/><path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/></svg> Download`;
         btn.disabled = false;
-
-        // Show success feedback
-        message.textContent = `Database exported successfully! Look for ${filename} in your Downloads folder.`;
-        feedback.style.display = 'block';
-        feedback.className = 'alert alert-success mt-2';
-
-        // Remove iframe after download starts
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 2000);
-
-        // Hide feedback after 10 seconds
-        setTimeout(() => {
-            feedback.style.display = 'none';
-        }, 10000);
+        message.textContent = `Exported as ${filename}`;
+        feedback.style.display = 'flex';
+        setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe); }, 2000);
+        setTimeout(() => { feedback.style.display = 'none'; }, 10000);
     }, 1000);
+}
+
+// ── Delete confirmation ────────────────────────────────────
+function confirmDelete() {
+    const val = document.getElementById('confirmation').value;
+    if (val !== 'DELETE ALL DATA') {
+        alert('Please type "DELETE ALL DATA" exactly to confirm.');
+        return false;
+    }
+    return confirm('Final warning: this will delete ALL financial data.\nA backup will be created first, but this is not easily reversible.\n\nContinue?');
 }
 </script>
 {% endblock %}

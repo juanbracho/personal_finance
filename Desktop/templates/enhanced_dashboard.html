@@ -1,14 +1,152 @@
 {% extends "base.html" %}
 {% block extra_css %}
-<link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
+{% block title %}Dashboard — Kanso{% endblock %}
+
+{% block content %}
+<div class="kanso-page-wide">
+
+  <!-- View Tab Nav -->
+  <div class="dsh-tab-nav">
+    <a href="{{ url_for('dashboards.enhanced_dashboard', view='overview', year=current_year, month=current_month, owner=current_owner) }}"
+       class="dsh-tab-btn {{ 'active' if view == 'overview' }}">Overview</a>
+    <a href="{{ url_for('dashboards.enhanced_dashboard', view='budget', year=current_year, month=current_month, owner=current_owner) }}"
+       class="dsh-tab-btn {{ 'active' if view == 'budget' }}">Budget</a>
+    <a href="{{ url_for('dashboards.enhanced_dashboard', view='categories', year=current_year, month=current_month, owner=current_owner) }}"
+       class="dsh-tab-btn {{ 'active' if view == 'categories' }}">Categories</a>
+  </div>
+
+  <!-- Filter Bar -->
+  <form method="GET" class="kanso-info-strip" style="margin-bottom: 24px;">
+    <input type="hidden" name="view" value="{{ view }}">
+    <!-- Year: all views; categories uses JS-only reload (no page submit) -->
+    <div class="kanso-info-item">
+      <div class="kanso-info-label">Year</div>
+      <select name="year" class="kanso-select" {% if view != 'categories' %}onchange="this.form.submit()"{% endif %} style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+        {% for year in available_years %}
+        <option value="{{ year }}" {{ 'selected' if year == current_year }}>{{ year }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <!-- Month: overview and budget only -->
+    {% if view in ['overview', 'budget'] %}
+    <div class="kanso-info-item">
+      <div class="kanso-info-label">Month</div>
+      <select name="month" class="kanso-select" onchange="this.form.submit()" style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+        {% for month_num, month_name in [(1,'Jan'),(2,'Feb'),(3,'Mar'),(4,'Apr'),(5,'May'),(6,'Jun'),(7,'Jul'),(8,'Aug'),(9,'Sep'),(10,'Oct'),(11,'Nov'),(12,'Dec')] %}
+        <option value="{{ month_num }}" {{ 'selected' if month_num == current_month }}>{{ month_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <!-- Owner: not for categories (backend hardcodes 'all' and ignores this param) -->
+    {% if view != 'categories' %}
+    <div class="kanso-info-item">
+      <div class="kanso-info-label">Owner</div>
+      <select name="owner" class="kanso-select" onchange="this.form.submit()" style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+        <option value="all" {{ 'selected' if current_owner == 'all' }}>All Owners</option>
+        {% for owner in available_owners %}
+        <option value="{{ owner }}" {{ 'selected' if owner == current_owner }}>{{ owner }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="kanso-info-item" style="flex:0 0 auto; align-self:center; padding-top:12px; padding-bottom:12px;">
+      <div class="kanso-info-label">Period</div>
+      <div class="kanso-info-value muted">
+        {% if view in ['overview', 'budget'] %}
+          {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][current_month-1] }} {{ current_year }}
+        {% else %}
+          {{ current_year }}
+        {% endif %}
+      </div>
+    </div>
+  </form>
+
+  <!-- Sub-template -->
+  {% if view == 'overview' %}{% include 'dashboard_overview.html' %}
+  {% elif view == 'budget' %}{% include 'dashboard_budget.html' %}
+  {% elif view == 'categories' %}{% include 'dashboard_categories.html' %}{% endif %}
+
+  <!-- Quick Actions -->
+  <div class="kanso-card" style="margin-top: 24px;">
+    <div class="kanso-section-label" style="padding: 14px 18px 0;">Quick Actions</div>
+    <a href="{{ url_for('transactions.add_transaction') }}" class="kanso-row" style="text-decoration:none;">
+      <span class="kanso-row-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+        </svg>
+      </span>
+      <span class="kanso-row-body">
+        <span class="kanso-row-title">Add Transaction</span>
+        <span class="kanso-row-desc">Record a new income or expense</span>
+      </span>
+      <span class="kanso-row-action" style="color:var(--text-faint);">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
+      </span>
+    </a>
+    <a href="{{ url_for('debts.add_debt') }}" class="kanso-row" style="text-decoration:none;">
+      <span class="kanso-row-icon muted">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="1" y="4" width="14" height="10" rx="2"/><line x1="1" y1="8" x2="15" y2="8"/>
+        </svg>
+      </span>
+      <span class="kanso-row-body">
+        <span class="kanso-row-title">Add Debt Account</span>
+        <span class="kanso-row-desc">Track a credit card or loan</span>
+      </span>
+      <span class="kanso-row-action" style="color:var(--text-faint);">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
+      </span>
+    </a>
+    <a href="{{ url_for('budgets.budget_management') }}" class="kanso-row" style="text-decoration:none;">
+      <span class="kanso-row-icon muted">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="2" y="2" width="12" height="12" rx="2"/>
+          <line x1="2" y1="6" x2="14" y2="6"/>
+          <line x1="6" y1="6" x2="6" y2="14"/>
+        </svg>
+      </span>
+      <span class="kanso-row-body">
+        <span class="kanso-row-title">Manage Budget</span>
+        <span class="kanso-row-desc">Set and review category budgets</span>
+      </span>
+      <span class="kanso-row-action" style="color:var(--text-faint);">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
+      </span>
+    </a>
+    <a href="{{ url_for('transactions.list_transactions') }}" class="kanso-row" style="text-decoration:none;">
+      <span class="kanso-row-icon muted">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="2" y1="4" x2="14" y2="4"/>
+          <line x1="2" y1="8" x2="14" y2="8"/>
+          <line x1="2" y1="12" x2="10" y2="12"/>
+        </svg>
+      </span>
+      <span class="kanso-row-body">
+        <span class="kanso-row-title">View All Transactions</span>
+        <span class="kanso-row-desc">Browse and filter your history</span>
+      </span>
+      <span class="kanso-row-action" style="color:var(--text-faint);">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
+      </span>
+    </a>
+  </div>
+
+</div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-{% if view == 'budget' %}
-<script src="{{ url_for('static', filename='js/budget.js') }}"></script>
-{% endif %}
-<!-- Keep any template-specific data passing scripts here -->
 <script>
 // Pass template data to JavaScript
 window.templateData = {
@@ -36,9 +174,9 @@ window.templateData = {
     ownerComparison: [
         {% if owner_comparison %}
             {% for owner_data in owner_comparison %}
-            { 
-                owner: '{{ owner_data.owner }}', 
-                current_month: {{ owner_data.current_month }}, 
+            {
+                owner: '{{ owner_data.owner }}',
+                current_month: {{ owner_data.current_month }},
                 previous_month: {{ owner_data.previous_month }},
                 change_percent: {{ owner_data.change_percent }}
             }{{ ',' if not loop.last else '' }}
@@ -77,130 +215,15 @@ window.budgetAnalysisData = [
 ];
 {% endif %}
 </script>
-{% endblock %}
-
-
-{% block title %}Enhanced Dashboard - Personal Finance{% endblock %}
-
-{% block content %}
-<!-- Navigation Header -->
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="display-6 fw-bold text-primary">💰 Financial Dashboard</h1>
-    </div>
-</div>
-
-<!-- View Navigation -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <!-- View Selector -->
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <div class="btn-group" role="group" aria-label="Dashboard Views">
-                            <a href="{{ url_for('dashboards.enhanced_dashboard', view='overview', year=current_year, month=current_month, owner=current_owner) }}" 
-                               class="btn {{ 'btn-primary' if view == 'overview' else 'btn-outline-primary' }}">
-                                📊 Overview
-                            </a>
-                            <a href="{{ url_for('dashboards.enhanced_dashboard', view='budget', year=current_year, month=current_month, owner=current_owner) }}" 
-                               class="btn {{ 'btn-primary' if view == 'budget' else 'btn-outline-primary' }}">
-                                💰 Budget
-                            </a>
-                            <a href="{{ url_for('dashboards.enhanced_dashboard', view='categories') }}" 
-                               class="btn {{ 'btn-primary' if view == 'categories' else 'btn-outline-primary' }}">
-                                ⚙️ Categories
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <!-- Time Controls -->
-                    <div class="col-md-6">
-                        <form method="GET" class="d-flex gap-2" id="timeFilterForm">
-                            <input type="hidden" name="view" value="{{ view }}">
-                            
-                            {% if view in ['overview', 'budget'] %}
-                            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
-                                {% for year in available_years %}
-                                <option value="{{ year }}" {{ 'selected' if year == current_year else '' }}>{{ year }}</option>
-                                {% endfor %}
-                            </select>
-                            
-                            <select name="month" class="form-select form-select-sm" onchange="this.form.submit()">
-                                {% for month_num, month_name in [(1, 'Jan'), (2, 'Feb'), (3, 'Mar'), (4, 'Apr'), (5, 'May'), (6, 'Jun'), (7, 'Jul'), (8, 'Aug'), (9, 'Sep'), (10, 'Oct'), (11, 'Nov'), (12, 'Dec')] %}
-                                <option value="{{ month_num }}" {{ 'selected' if month_num == current_month else '' }}>{{ month_name }}</option>
-                                {% endfor %}
-                            </select>
-                            {% endif %}
-                            
-                            <select name="owner" class="form-select form-select-sm" onchange="this.form.submit()">
-                                <option value="all" {{ 'selected' if current_owner == 'all' else '' }}>All Owners</option>
-                                {% for owner in available_owners %}
-                                <option value="{{ owner }}" {{ 'selected' if owner == current_owner else '' }}>{{ owner }}</option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- View Content -->
-{% if view == 'overview' %}
-    {% include 'dashboard_overview.html' %}
-{% elif view == 'budget' %}
-    {% include 'dashboard_budget.html' %}
-{% elif view == 'categories' %}
-    {% include 'dashboard_categories.html' %}
-{% endif %}
-
-<!-- Quick Actions -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">⚡ Quick Actions</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-success w-100 mb-2">
-                            💰 Add Transaction
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="{{ url_for('debts.add_debt') }}" class="btn btn-primary w-100 mb-2">
-                            💳 Add Debt Account
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="{{ url_for('budgets.budget_management') }}" class="btn btn-warning w-100 mb-2">
-                            📋 Manage Budget
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary w-100 mb-2">
-                            📝 View All Transactions
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% if view == 'budget' and budget_analysis %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% if view == 'budget' %}
+<script src="{{ url_for('static', filename='js/budget.js') }}"></script>
 <script>
-// Load budget charts when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof loadBudgetCharts === 'function') {
         loadBudgetCharts();
     } else if (window.BudgetManager && typeof window.BudgetManager.loadBudgetCharts === 'function') {
         window.BudgetManager.loadBudgetCharts();
-    } else {
-        console.warn('loadBudgetCharts function not found');
     }
 });
 </script>

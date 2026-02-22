@@ -1,304 +1,294 @@
 {% extends "base.html" %}
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/debts.js') }}"></script>
-{% endblock %}
-
-{% block title %}Debt Management - Personal Finance{% endblock %}
+{% block title %}Debts — Kanso{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1 class="display-6 fw-bold text-primary">💳 Debt Management</h1>
-        <p class="lead text-muted">Track and manage all your debts in one place</p>
-    </div>
-    <div class="col-md-4 text-end">
-        <a href="{{ url_for('debts.add_debt') }}" class="btn btn-primary btn-lg">
-            ➕ Add Debt Account
+<div class="kanso-page-wide">
+
+    <!-- Page Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <div>
+            <div class="kanso-section-label" style="margin-bottom:4px;">Finance</div>
+            <h1 style="font-size:22px; font-weight:700; color:var(--text); margin:0;">Debts</h1>
+        </div>
+        <a href="{{ url_for('debts.add_debt') }}" class="btn-kanso btn-kanso-primary">
+            Add Debt Account
         </a>
     </div>
-</div>
 
-<!-- Debt Overview Cards -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card metric-card debt-card">
-            <div class="metric-label">Total Debt</div>
-            <div class="metric-value negative">${{ "%.2f"|format(total_debt) }}</div>
-            <small class="text-muted">All Active Debts</small>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card metric-card">
-            <div class="metric-label">Monthly Minimums</div>
-            <div class="metric-value neutral">${{ "%.2f"|format(total_minimum_payments) }}</div>
-            <small class="text-muted">Required Payments</small>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card metric-card">
-            <div class="metric-label">Active Accounts</div>
-            <div class="metric-value neutral">{{ active_count }}</div>
-            <small class="text-muted">Debt Accounts</small>
-        </div>
-    </div>
-</div>
-
-<!-- Debt Accounts List -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">💳 Your Debt Accounts</h5>
-                <div class="form-check form-switch">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           id="showPaidOffToggle"
-                           {{ 'checked' if show_paid_off else '' }}
-                           onchange="togglePaidOffDebts(this.checked)">
-                    <label class="form-check-label" for="showPaidOffToggle">
-                        Show Paid-Off Debts
-                    </label>
-                </div>
+    <!-- Info Strip -->
+    <div class="kanso-info-strip" style="margin-bottom:20px;">
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Total Debt</div>
+            <div class="kanso-info-value" id="totalDebtValue" style="color:var(--danger);">
+                ${{ "%.2f"|format(total_debt) }}
             </div>
-            <div class="card-body">
-                {% if debts %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Account</th>
-                                    <th>Type</th>
-                                    <th>Owner</th>
-                                    <th>Current Balance</th>
-                                    <th>Minimum Payment</th>
-                                    <th>Interest Rate</th>
-                                    <th>Due Date</th>
-                                    <th>Progress</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for debt in debts %}
-                                <tr class="{{ 'table-success' if debt.is_active == 0 else '' }}">
-                                    <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div>
-                                                <div class="fw-bold">{{ debt.name }}</div>
-                                                {% if debt.account_number_last4 %}
-                                                    <small class="text-muted">****{{ debt.account_number_last4 }}</small>
-                                                {% endif %}
-                                            </div>
-                                            {% if debt.is_active == 0 %}
-                                                <span class="badge bg-success">Paid Off</span>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ debt.debt_type }}</span>
-                                    </td>
-                                    <td>{{ debt.owner }}</td>
-                                    <td>
-                                        {% if debt.is_active == 0 %}
-                                            <span class="fw-bold text-success">
-                                                ${{ "%.2f"|format(debt.current_balance) }}
-                                            </span>
-                                        {% else %}
-                                            <span class="fw-bold text-danger">
-                                                ${{ "%.2f"|format(debt.current_balance) }}
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if debt.minimum_payment %}
-                                            ${{ "%.2f"|format(debt.minimum_payment) }}
-                                        {% else %}
-                                            <span class="text-muted">Not set</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if debt.interest_rate %}
-                                            {{ "%.2f"|format(debt.interest_rate * 100) }}%
-                                        {% else %}
-                                            <span class="text-muted">Not set</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if debt.due_date %}
-                                            {{ debt.due_date }}{{ 
-                                                'st' if debt.due_date == 1 or debt.due_date == 21 or debt.due_date == 31
-                                                else 'nd' if debt.due_date == 2 or debt.due_date == 22
-                                                else 'rd' if debt.due_date == 3 or debt.due_date == 23
-                                                else 'th'
-                                            }}
-                                        {% else %}
-                                            <span class="text-muted">Not set</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% set progress = ((debt.original_balance - debt.current_balance) / debt.original_balance * 100) if debt.original_balance > 0 else 0 %}
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar bg-success" 
-                                                 role="progressbar" 
-                                                 style="width: {{ progress }}%"
-                                                 aria-valuenow="{{ progress }}" 
-                                                 aria-valuemin="0" 
-                                                 aria-valuemax="100">
-                                                {{ "%.1f"|format(progress) }}%
-                                            </div>
-                                        </div>
-                                        <small class="text-muted">
-                                            ${{ "%.2f"|format(debt.original_balance - debt.current_balance) }} paid off
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-success btn-sm"
-                                                    onclick="showPaymentModal({{ debt.id }}, '{{ debt.name }}', {{ debt.current_balance }}, {{ debt.minimum_payment if debt.minimum_payment else 'null' }})"
-                                                    title="Make Payment">
-                                                💰
-                                            </button>
-                                            <button class="btn btn-info btn-sm"
-                                                    onclick="editDebt({{ debt.id }})"
-                                                    title="Edit Account">
-                                                ✏️
-                                            </button>
-                                            <button class="btn btn-outline-secondary btn-sm"
-                                                    onclick="showPaymentHistory({{ debt.id }}, '{{ debt.name }}')"
-                                                    title="Payment History">
-                                                📊
-                                            </button>
-                                            <button class="btn btn-danger btn-sm"
-                                                    onclick="deleteDebt({{ debt.id }}, '{{ debt.name }}')"
-                                                    title="Delete Account">
-                                                🗑️
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center py-5">
-                        <div class="mb-4">
-                            <i class="fas fa-credit-card fa-4x text-muted"></i>
+        </div>
+        <div class="kanso-info-item">
+            <div class="kanso-info-label">Monthly Minimums</div>
+            <div class="kanso-info-value" id="totalMinimumsValue">
+                ${{ "%.2f"|format(total_minimum_payments) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Debt List Section -->
+    <div class="kanso-section-label">Accounts</div>
+    <div class="kanso-card" style="margin-bottom:20px; padding:0; overflow:hidden;">
+
+        <!-- Card Header -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border-subtle);">
+            <span style="font-size:14px; font-weight:600; color:var(--text);">Your Debts</span>
+            <label class="debt-header-toggle" for="showPaidOffToggle">
+                <input
+                    type="checkbox"
+                    id="showPaidOffToggle"
+                    {{ 'checked' if show_paid_off else '' }}
+                    onchange="togglePaidOffDebts(this.checked)">
+                Show Paid-Off Debts
+            </label>
+        </div>
+
+        {% if debts %}
+        <ul class="debt-list">
+            {% for debt in debts %}
+            {% set progress = ((debt.original_balance - debt.current_balance) / debt.original_balance * 100) if debt.original_balance > 0 else 0 %}
+            {% set progress = [0, [100, progress] | min] | max %}
+            <li class="debt-item {{ 'debt-paid-off' if debt.is_active == 0 }}"
+                data-debt-id="{{ debt.id }}"
+                data-debt-type="{{ debt.debt_type }}"
+                data-debt-owner="{{ debt.owner }}"
+                data-debt-balance="{{ debt.current_balance }}"
+                data-original-balance="{{ debt.original_balance }}"
+                data-min-payment="{{ debt.minimum_payment or 0 }}"
+                data-is-active="{{ debt.is_active }}">
+
+                <!-- Main Row -->
+                <div class="debt-item-main">
+
+                    <!-- Identity -->
+                    <div class="debt-item-identity">
+                        <div>
+                            <span class="debt-item-name-text">{{ debt.name }}</span>
+                            {% if debt.is_active == 0 %}
+                            <span class="debt-paid-badge">Paid Off</span>
+                            {% endif %}
                         </div>
-                        <h4 class="text-muted">No Debt Accounts Yet</h4>
-                        <p class="text-muted mb-4">Start tracking your debts by adding your first account</p>
-                        <a href="{{ url_for('debts.add_debt') }}" class="btn btn-primary">
-                            ➕ Add Your First Debt Account
-                        </a>
+                        {% if debt.account_number_last4 %}
+                        <div class="debt-item-last4">****{{ debt.account_number_last4 }}</div>
+                        {% endif %}
+                        <div class="debt-type-badge">{{ debt.debt_type }}</div>
                     </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Debt Statistics -->
-{% if debts %}
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📊 Debt by Type</h5>
-            </div>
-            <div class="card-body">
-                <div id="debtByTypeChart" class="chart-container" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">👥 Debt by Owner</h5>
-            </div>
-            <div class="card-body">
-                <div id="debtByOwnerChart" class="chart-container" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-</div>
+                    <!-- Owner -->
+                    <div class="debt-item-owner">{{ debt.owner }}</div>
 
-<!-- Debt Insights -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">💡 Debt Insights</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% set highest_debt = debts | max(attribute='current_balance') if debts else None %}
-                    {% set lowest_rate = debts | selectattr('interest_rate') | min(attribute='interest_rate') if debts else None %}
-                    {% set highest_rate = debts | selectattr('interest_rate') | max(attribute='interest_rate') if debts else None %}
-                    
-                    <div class="col-md-4">
-                        <div class="alert alert-info">
-                            <h6>📈 Highest Balance</h6>
-                            {% if highest_debt %}
-                                <strong>{{ highest_debt.name }}</strong><br>
-                                ${{ "%.2f"|format(highest_debt.current_balance) }}
+                    <!-- Balance -->
+                    <div class="debt-item-balance">
+                        <div class="debt-balance-value {{ 'paid-off' if debt.is_active == 0 }}">
+                            ${{ "%.2f"|format(debt.current_balance) }}
+                        </div>
+                        <div class="debt-balance-label">balance</div>
+                    </div>
+
+                    <!-- Mini Progress -->
+                    <div class="debt-item-progress">
+                        <div class="debt-progress-mini-track">
+                            <div class="debt-progress-mini-fill" style="width:{{ "%.1f"|format(progress) }}%;"></div>
+                        </div>
+                        <div class="debt-progress-mini-label">{{ "%.0f"|format(progress) }}% paid</div>
+                    </div>
+
+                    <!-- Min Payment -->
+                    <div class="debt-item-payment">
+                        <div class="debt-min-payment">
+                            {% if debt.minimum_payment %}
+                                ${{ "%.2f"|format(debt.minimum_payment) }}
                             {% else %}
-                                No debts found
+                                &mdash;
                             {% endif %}
                         </div>
+                        <div class="debt-min-label">min{% if debt.due_date %} &middot; due {{ debt.due_date }}{{
+                            'st' if debt.due_date == 1 or debt.due_date == 21 or debt.due_date == 31
+                            else 'nd' if debt.due_date == 2 or debt.due_date == 22
+                            else 'rd' if debt.due_date == 3 or debt.due_date == 23
+                            else 'th'
+                        }}{% endif %}</div>
                     </div>
-                    
-                    <div class="col-md-4">
-                        <div class="alert alert-success">
-                            <h6>✅ Lowest Interest Rate</h6>
-                            {% if lowest_rate %}
-                                <strong>{{ lowest_rate.name }}</strong><br>
-                                {{ "%.2f"|format(lowest_rate.interest_rate * 100) }}% APR
-                            {% else %}
-                                No rates set
-                            {% endif %}
+
+                    <!-- Actions -->
+                    <div class="debt-item-actions">
+                        <button class="debt-action-btn payment"
+                                onclick="showPaymentModal({{ debt.id }}, '{{ debt.name }}', {{ debt.current_balance }}, {{ debt.minimum_payment if debt.minimum_payment else 'null' }})"
+                                title="Make Payment">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </button>
+                        <button class="debt-action-btn edit"
+                                onclick="editDebt({{ debt.id }})"
+                                title="Edit Account">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="debt-action-btn history"
+                                onclick="showPaymentHistory({{ debt.id }}, '{{ debt.name }}')"
+                                title="Payment History">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                        </button>
+                        <button class="debt-action-btn delete"
+                                onclick="deleteDebt({{ debt.id }}, '{{ debt.name }}')"
+                                title="Delete Account">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                <path d="M10 11v6"></path>
+                                <path d="M14 11v6"></path>
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                            </svg>
+                        </button>
+                        <button class="debt-expand-btn"
+                                onclick="toggleDebtDetails({{ debt.id }})"
+                                title="Show Details">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+
+                </div><!-- /.debt-item-main -->
+
+                <!-- Expandable Details Row -->
+                <div class="debt-item-details" id="debt-details-{{ debt.id }}" style="display:none;">
+                    <div class="debt-details-grid">
+                        <div>
+                            <div class="debt-detail-label">Original Balance</div>
+                            <div class="debt-detail-value">${{ "%.2f"|format(debt.original_balance) }}</div>
+                        </div>
+                        <div>
+                            <div class="debt-detail-label">Interest Rate</div>
+                            <div class="debt-detail-value">
+                                {% if debt.interest_rate %}
+                                    {{ "%.2f"|format(debt.interest_rate * 100) }}% APR
+                                {% else %}
+                                    &mdash;
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="debt-detail-label">Amount Paid</div>
+                            <div class="debt-detail-value positive debt-detail-paid">
+                                ${{ "%.2f"|format(debt.original_balance - debt.current_balance) }}
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-4">
-                        <div class="alert alert-warning">
-                            <h6>⚠️ Highest Interest Rate</h6>
-                            {% if highest_rate %}
-                                <strong>{{ highest_rate.name }}</strong><br>
-                                {{ "%.2f"|format(highest_rate.interest_rate * 100) }}% APR
-                            {% else %}
-                                No rates set
-                            {% endif %}
+
+                    <!-- Full Progress Bar -->
+                    <div class="debt-progress-full-track">
+                        <div class="debt-progress-full-fill {{ 'high' if progress >= 70 else ('mid' if progress >= 30 else '') }}"
+                             style="width:{{ "%.1f"|format(progress) }}%;">
+                            {{ "%.1f"|format(progress) }}%
                         </div>
                     </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-12">
-                        <h6>📋 Recommendations:</h6>
-                        <ul class="mb-0">
-                            {% if highest_rate and lowest_rate and highest_rate.interest_rate > lowest_rate.interest_rate * 1.5 %}
-                                <li>Consider focusing extra payments on <strong>{{ highest_rate.name }}</strong> (highest interest rate)</li>
-                            {% endif %}
-                            {% if total_minimum_payments > 0 %}
-                                <li>Your minimum payments total ${{ "%.2f"|format(total_minimum_payments) }} per month</li>
-                            {% endif %}
-                            {% if debts | selectattr('due_date', 'none') | list | length > 0 %}
-                                <li>Consider setting due dates for accounts without them to avoid late fees</li>
-                            {% endif %}
-                        </ul>
+                    <div class="debt-progress-end-labels">
+                        <span>$0</span>
+                        <span>${{ "%.2f"|format(debt.original_balance) }}</span>
                     </div>
-                </div>
+                </div><!-- /.debt-item-details -->
+
+            </li>
+            {% endfor %}
+        </ul>
+
+        {% else %}
+        <!-- Empty State -->
+        <div style="text-align:center; padding:48px 24px;">
+            <div style="margin-bottom:16px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
             </div>
+            <div style="font-size:15px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">No Debt Accounts Yet</div>
+            <div style="font-size:13px; color:var(--text-faint); margin-bottom:20px;">Start tracking your debts by adding your first account.</div>
+            <a href="{{ url_for('debts.add_debt') }}" class="btn-kanso btn-kanso-primary">
+                Add Your First Debt Account
+            </a>
+        </div>
+        {% endif %}
+
+    </div><!-- /.kanso-card -->
+
+    {% if debts %}
+
+    <!-- Charts Section -->
+    <div class="kanso-section-label">Overview</div>
+    <div class="debt-charts-grid" style="margin-bottom:20px;">
+        <div class="kanso-card">
+            <div style="font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:12px;">Debt by Type</div>
+            <div id="debtByTypeChart" style="height:280px;"></div>
+        </div>
+        <div class="kanso-card">
+            <div style="font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:12px;">Debt by Owner</div>
+            <div id="debtByOwnerChart" style="height:280px;"></div>
         </div>
     </div>
-</div>
-{% endif %}
 
-<!-- Payment Modal -->
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <!-- Insights Section -->
+    {% set highest_debt = debts | max(attribute='current_balance') if debts else None %}
+    {% set lowest_rate = debts | selectattr('interest_rate') | min(attribute='interest_rate') if debts else None %}
+    {% set highest_rate = debts | selectattr('interest_rate') | max(attribute='interest_rate') if debts else None %}
+
+    <div class="kanso-section-label">Insights</div>
+    <div class="debt-insights-grid" style="margin-bottom:24px;">
+
+        <div class="debt-insight-card">
+            <div class="debt-insight-label">Highest Balance</div>
+            {% if highest_debt %}
+            <div class="debt-insight-name">{{ highest_debt.name }}</div>
+            <div class="debt-insight-value" style="color:var(--danger);">${{ "%.2f"|format(highest_debt.current_balance) }}</div>
+            {% else %}
+            <div class="debt-insight-value">No debts found</div>
+            {% endif %}
+        </div>
+
+        <div class="debt-insight-card">
+            <div class="debt-insight-label">Lowest Rate</div>
+            {% if lowest_rate %}
+            <div class="debt-insight-name">{{ lowest_rate.name }}</div>
+            <div class="debt-insight-value" style="color:var(--success);">{{ "%.2f"|format(lowest_rate.interest_rate * 100) }}% APR</div>
+            {% else %}
+            <div class="debt-insight-value">No rates set</div>
+            {% endif %}
+        </div>
+
+        <div class="debt-insight-card">
+            <div class="debt-insight-label">Highest Rate</div>
+            {% if highest_rate %}
+            <div class="debt-insight-name">{{ highest_rate.name }}</div>
+            <div class="debt-insight-value" style="color:var(--wants);">{{ "%.2f"|format(highest_rate.interest_rate * 100) }}% APR</div>
+            {% else %}
+            <div class="debt-insight-value">No rates set</div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div><!-- /.kanso-page-wide -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL 1: Payment Modal
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal fade kanso-modal" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -306,27 +296,24 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- Current Balance Display -->
-                <div class="alert alert-info mb-3">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>Current Balance:</strong> <span id="currentBalanceDisplay">$0.00</span>
-                        </div>
-                        <div class="col-md-6">
-                            <small class="text-muted" id="minimumPaymentDisplay"></small>
-                        </div>
+
+                <!-- Balance Strip -->
+                <div class="modal-balance-strip">
+                    <div class="modal-balance-main">
+                        Current Balance: <span id="currentBalanceDisplay">$0.00</span>
                     </div>
+                    <div class="modal-balance-min" id="minimumPaymentDisplay"></div>
                 </div>
-                
+
                 <form id="paymentForm">
-                    <!-- Payment Details -->
+
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="paymentDate" class="form-label">Payment Date *</label>
+                            <label for="paymentDate">Payment Date *</label>
                             <input type="date" class="form-control" id="paymentDate" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="paymentAmount" class="form-label">Payment Amount *</label>
+                            <label for="paymentAmount">Payment Amount *</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" required>
@@ -334,41 +321,36 @@
                             <div class="form-text">Enter the amount you paid</div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label for="paymentDescription" class="form-label">Description *</label>
+                        <label for="paymentDescription">Description *</label>
                         <input type="text" class="form-control" id="paymentDescription" required>
                     </div>
-                    
-                    <!-- Transaction Details -->
+
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="paymentAccount" class="form-label">From Account *</label>
+                            <label for="paymentAccount">From Account *</label>
                             <select class="form-select" id="paymentAccount" required>
                                 <option value="">Select account...</option>
                             </select>
                             <div class="form-text">
-                                <button type="button" class="btn btn-link btn-sm p-0" onclick="addNewPaymentAccount()">
-                                    + Add new account
-                                </button>
+                                <button type="button" class="btn-link" onclick="addNewPaymentAccount()">+ Add new account</button>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label for="paymentOwner" class="form-label">Owner *</label>
+                            <label for="paymentOwner">Owner *</label>
                             <select class="form-select" id="paymentOwner" required>
                                 <option value="">Select owner...</option>
                             </select>
                             <div class="form-text">
-                                <button type="button" class="btn btn-link btn-sm p-0" onclick="addNewPaymentOwner()">
-                                    + Add new owner
-                                </button>
+                                <button type="button" class="btn-link" onclick="addNewPaymentOwner()">+ Add new owner</button>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="paymentType" class="form-label">Type *</label>
+                            <label for="paymentType">Type *</label>
                             <select class="form-select" id="paymentType" required>
                                 <option value="Needs" selected>Needs</option>
                                 <option value="Wants">Wants</option>
@@ -377,29 +359,33 @@
                             </select>
                         </div>
                     </div>
-                    
-                    <div class="alert alert-warning small">
+
+                    <div class="modal-note">
                         <strong>Note:</strong> This payment will be recorded as:
-                        <ul class="mb-0">
+                        <ul>
                             <li>Category: <strong>Debt</strong></li>
                             <li>Sub-Category: <strong><span id="debtNameDisplay"></span></strong> (matches debt account)</li>
                             <li>Transaction Type: <strong>Expense</strong></li>
                         </ul>
                     </div>
+
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="clearPaymentValidation()">Cancel</button>
-                <button type="button" class="btn btn-primary" id="submitPaymentBtn" onclick="submitPayment()">
-                    💰 Submit Payment
+                <button type="button" class="btn-kanso btn-kanso-ghost" data-bs-dismiss="modal" onclick="clearPaymentValidation()">Cancel</button>
+                <button type="button" class="btn-kanso btn-kanso-primary" id="submitPaymentBtn" onclick="submitPayment()">
+                    Submit Payment
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Edit Debt Modal -->
-<div class="modal fade" id="editDebtModal" tabindex="-1" aria-labelledby="editDebtModalLabel" aria-hidden="true">
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL 2: Edit Debt Modal
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal fade kanso-modal" id="editDebtModal" tabindex="-1" aria-labelledby="editDebtModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -409,24 +395,18 @@
             <div class="modal-body">
                 <form id="editDebtForm">
                     <input type="hidden" id="editDebtId" value="">
-                    
-                    <!-- Basic Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Basic Information</h6>
-                        </div>
-                        
+
+                    <!-- Section: Basic Information -->
+                    <div class="modal-section-label">Basic Information</div>
+
+                    <div class="row mb-3">
                         <div class="col-md-6 mb-3">
-                            <label for="editName" class="form-label">Account Name *</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="editName" 
-                                   required
+                            <label for="editName">Account Name *</label>
+                            <input type="text" class="form-control" id="editName" required
                                    placeholder="e.g., Chase Freedom, Car Loan, etc.">
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editDebtType" class="form-label">Debt Type *</label>
+                            <label for="editDebtType">Debt Type *</label>
                             <select class="form-select" id="editDebtType" required>
                                 <option value="">Select debt type...</option>
                                 <option value="Credit Card">Credit Card</option>
@@ -437,9 +417,8 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editOwner" class="form-label">Owner *</label>
+                            <label for="editOwner">Owner *</label>
                             <select class="form-select" id="editOwner" required>
                                 <option value="">Select owner...</option>
                                 <option value="Cata">Cata</option>
@@ -447,92 +426,61 @@
                                 <option value="Cacas">Cacas</option>
                             </select>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editAccountNumberLast4" class="form-label">Last 4 Digits</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="editAccountNumberLast4"
-                                   maxlength="4"
-                                   pattern="[0-9]{4}"
-                                   placeholder="1234">
+                            <label for="editAccountNumberLast4">Last 4 Digits</label>
+                            <input type="text" class="form-control" id="editAccountNumberLast4"
+                                   maxlength="4" pattern="[0-9]{4}" placeholder="1234">
                         </div>
                     </div>
-                    
-                    <!-- Financial Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Financial Details</h6>
-                        </div>
-                        
+
+                    <!-- Section: Financial Details -->
+                    <div class="modal-section-label">Financial Details</div>
+
+                    <div class="row mb-3">
                         <div class="col-md-6 mb-3">
-                            <label for="editOriginalBalance" class="form-label">Original Balance *</label>
+                            <label for="editOriginalBalance">Original Balance *</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="editOriginalBalance"
-                                       step="0.01"
-                                       min="0"
-                                       required
-                                       placeholder="0.00">
+                                <input type="number" class="form-control" id="editOriginalBalance"
+                                       step="0.01" min="0" required placeholder="0.00">
                             </div>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editCurrentBalance" class="form-label">Current Balance *</label>
+                            <label for="editCurrentBalance">Current Balance *</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="editCurrentBalance"
-                                       step="0.01"
-                                       min="0"
-                                       required
-                                       placeholder="0.00">
+                                <input type="number" class="form-control" id="editCurrentBalance"
+                                       step="0.01" min="0" required placeholder="0.00">
                             </div>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editInterestRate" class="form-label">Interest Rate (APR)</label>
+                            <label for="editInterestRate">Interest Rate (APR)</label>
                             <div class="input-group">
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="editInterestRate"
-                                       step="0.01"
-                                       min="0"
-                                       max="100"
-                                       placeholder="0.00">
+                                <input type="number" class="form-control" id="editInterestRate"
+                                       step="0.01" min="0" max="100" placeholder="0.00">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editMinimumPayment" class="form-label">Minimum Payment</label>
+                            <label for="editMinimumPayment">Minimum Payment</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="editMinimumPayment"
-                                       step="0.01"
-                                       min="0"
-                                       placeholder="0.00">
+                                <input type="number" class="form-control" id="editMinimumPayment"
+                                       step="0.01" min="0" placeholder="0.00">
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Payment Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Payment & Category</h6>
-                        </div>
-                        
+
+                    <!-- Section: Payment & Category -->
+                    <div class="modal-section-label">Payment &amp; Category</div>
+
+                    <div class="row mb-3">
                         <div class="col-md-6 mb-3">
-                            <label for="editDueDate" class="form-label">Due Date</label>
+                            <label for="editDueDate">Due Date</label>
                             <select class="form-select" id="editDueDate">
                                 <option value="">Select day of month...</option>
                                 {% for day in range(1, 32) %}
-                                <option value="{{ day }}">{{ day }}{{ 
+                                <option value="{{ day }}">{{ day }}{{
                                     'st' if day == 1 or day == 21 or day == 31
                                     else 'nd' if day == 2 or day == 22
                                     else 'rd' if day == 3 or day == 23
@@ -541,9 +489,8 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        
                         <div class="col-md-6 mb-3">
-                            <label for="editCategory" class="form-label">Expense Category *</label>
+                            <label for="editCategory">Expense Category *</label>
                             <select class="form-select" id="editCategory" required>
                                 <option value="">Select category...</option>
                                 <option value="Debt">Debt</option>
@@ -554,20 +501,24 @@
                             </select>
                         </div>
                     </div>
+
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveDebtEditBtn" onclick="saveDebtEdit()">
-                    💾 Save Changes
+                <button type="button" class="btn-kanso btn-kanso-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-kanso btn-kanso-primary" id="saveDebtEditBtn" onclick="saveDebtEdit()">
+                    Save Changes
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Payment History Modal -->
-<div class="modal fade" id="paymentHistoryModal" tabindex="-1" aria-labelledby="paymentHistoryModalLabel" aria-hidden="true">
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL 3: Payment History Modal
+     ═══════════════════════════════════════════════════════════ -->
+<div class="modal fade kanso-modal" id="paymentHistoryModal" tabindex="-1" aria-labelledby="paymentHistoryModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
@@ -575,76 +526,46 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- Summary Section -->
-                <div class="row mb-4">
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small">Original Balance</h6>
-                                <h5 class="text-primary mb-0" id="historyOriginalBalance">$0.00</h5>
-                            </div>
-                        </div>
+
+                <!-- History Summary Strip -->
+                <div class="history-summary-strip">
+                    <div class="history-summary-item">
+                        <div class="history-summary-label">Original Balance</div>
+                        <div class="history-summary-value" id="historyOriginalBalance">$0.00</div>
                     </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small">Current Balance</h6>
-                                <h5 class="text-danger mb-0" id="historyCurrentBalance">$0.00</h5>
-                            </div>
-                        </div>
+                    <div class="history-summary-item">
+                        <div class="history-summary-label">Current Balance</div>
+                        <div class="history-summary-value" style="color:var(--danger);" id="historyCurrentBalance">$0.00</div>
                     </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small">Total Charges</h6>
-                                <h5 class="text-warning mb-0" id="historyTotalCharges">$0.00</h5>
-                            </div>
-                        </div>
+                    <div class="history-summary-item">
+                        <div class="history-summary-label">Total Charges</div>
+                        <div class="history-summary-value" style="color:var(--wants);" id="historyTotalCharges">$0.00</div>
                     </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small">Total Paid</h6>
-                                <h5 class="text-success mb-0" id="historyTotalPaid">$0.00</h5>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small"># Payments</h6>
-                                <h5 class="text-info mb-0" id="historyPaymentCount">0</h5>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        <div class="card text-center">
-                            <div class="card-body p-2">
-                                <h6 class="text-muted mb-2 small">Avg Payment</h6>
-                                <h5 class="text-secondary mb-0" id="historyAvgPayment">$0.00</h5>
-                            </div>
-                        </div>
+                    <div class="history-summary-item">
+                        <div class="history-summary-label">Total Paid</div>
+                        <div class="history-summary-value" style="color:var(--success);" id="historyTotalPaid">$0.00</div>
                     </div>
                 </div>
 
+                <!-- History View Toggle (populated by JS) -->
+                <!-- JS inserts historyViewToggle div here before the table -->
+
                 <!-- Payment History Table -->
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Amount</th>
-                                <th>Principal</th>
-                                <th>Interest</th>
-                                <th>Balance After</th>
                                 <th>Type</th>
-                                <th>Notes</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Balance</th>
                             </tr>
                         </thead>
                         <tbody id="paymentHistoryTableBody">
                             <tr>
-                                <td colspan="7" class="text-center">
-                                    <div class="spinner-border text-primary" role="status">
+                                <td colspan="5" class="text-center" style="padding:24px;">
+                                    <div class="spinner-border" role="status" style="width:20px;height:20px;">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
                                 </td>
@@ -654,18 +575,26 @@
                 </div>
 
                 <!-- Empty State -->
-                <div id="paymentHistoryEmpty" class="text-center py-5" style="display: none;">
-                    <div class="mb-3">
-                        <i class="fas fa-history fa-3x text-muted"></i>
+                <div id="paymentHistoryEmpty" class="modal-empty-state" style="display:none;">
+                    <div style="margin-bottom:10px;">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
                     </div>
-                    <h5 class="text-muted">No Payment History</h5>
-                    <p class="text-muted">No payments have been made to this debt account yet.</p>
+                    <div>No payment history for this account yet.</div>
                 </div>
+
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn-kanso btn-kanso-ghost" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/debts.js') }}"></script>
 {% endblock %}

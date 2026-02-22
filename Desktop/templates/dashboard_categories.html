@@ -1,298 +1,293 @@
-<!-- dashboard_categories.html - Fixed Categories Management Content -->
-<!-- Categories Management Content -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-info">
-            <h5 class="mb-2">⚙️ Categories Management
-                {% if current_month != 'all' %} | {{ current_year }}-{{ "%02d"|format(current_month) }}{% else %} | {{ current_year }}{% endif %}
-            </h5>
-            <p class="mb-0">Manage all your transaction labels: categories, subcategories, owners, accounts, and types</p>
-        </div>
-    </div>
+<!-- dashboard_categories.html — Kanso redesign -->
+
+<!-- Info strip (values populated by JS) -->
+<div class="kanso-info-strip" style="margin-bottom:20px;">
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">Categories</div>
+    <div class="kanso-info-value" id="totalCategories">—</div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">Sub-Categories</div>
+    <div class="kanso-info-value" id="totalSubCategories">—</div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">Owners</div>
+    <div class="kanso-info-value" id="totalOwners">—</div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">Accounts</div>
+    <div class="kanso-info-value" id="totalAccounts">—</div>
+  </div>
 </div>
 
-<!-- Management Tabs -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <ul class="nav nav-tabs card-header-tabs" id="managementTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">
-                            📊 Categories
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="subcategories-tab" data-bs-toggle="tab" data-bs-target="#subcategories" type="button" role="tab">
-                            🏷️ Sub-Categories
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="owners-tab" data-bs-toggle="tab" data-bs-target="#owners" type="button" role="tab">
-                            👥 Owners
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="accounts-tab" data-bs-toggle="tab" data-bs-target="#accounts" type="button" role="tab">
-                            💳 Accounts
-                        </button>
-                    </li>
-                </ul>
-            </div>
-            <div class="card-body">
-                <div class="tab-content" id="managementTabsContent">
-                    <!-- Categories Tab -->
-                    <div class="tab-pane fade show active" id="categories" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>📊 Categories Management</h5>
-                            <button class="btn btn-primary btn-sm" onclick="showAddModal('category')">
-                                ➕ Add Category
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="categoriesTable">
-                                <thead>
-                                    <tr>
-                                        <th>Category</th>
-                                        <th>Type</th>
-                                        <th>Transactions</th>
-                                        <th>Total Amount</th>
-                                        <th>Average</th>
-                                        <th>Budget</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="categoriesTableBody">
-                                    <tr>
-                                        <td colspan="7" class="text-center py-4">
-                                            <div class="spinner-border text-primary" role="status">
-                                                <span class="visually-hidden">Loading...</span>
-                                            </div>
-                                            <p class="mt-2 text-muted">Loading categories...</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+<!-- Inner tab nav + panes -->
+<div class="kanso-card" style="margin-bottom:20px;">
 
-                    <!-- Sub-Categories Tab -->
-                    <div class="tab-pane fade" id="subcategories" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>🏷️ Sub-Categories Management</h5>
-                            <button class="btn btn-primary btn-sm" onclick="showAddModal('subcategory')">
-                                ➕ Add Sub-Category
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="subcategoriesTable">
-                                <thead>
-                                    <tr>
-                                        <th>Sub-Category</th>
-                                        <th>Parent Category</th>
-                                        <th>Transactions</th>
-                                        <th>Total Amount</th>
-                                        <th>Average</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="subcategoriesTableBody">
-                                    <tr>
-                                        <td colspan="6" class="text-center py-4">
-                                            <p class="text-muted">Click the Sub-Categories tab to load data</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+  <!-- Tab buttons -->
+  <div class="dsh-tab-nav" style="margin:14px 18px 0; border-radius:8px;" id="managementTabs" role="tablist">
+    <button class="dsh-tab-btn active" id="categories-tab"
+            data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab"
+            aria-controls="categories" aria-selected="true">
+      Categories
+    </button>
+    <button class="dsh-tab-btn" id="subcategories-tab"
+            data-bs-toggle="tab" data-bs-target="#subcategories" type="button" role="tab"
+            aria-controls="subcategories" aria-selected="false">
+      Sub-Categories
+    </button>
+    <button class="dsh-tab-btn" id="owners-tab"
+            data-bs-toggle="tab" data-bs-target="#owners" type="button" role="tab"
+            aria-controls="owners" aria-selected="false">
+      Owners
+    </button>
+    <button class="dsh-tab-btn" id="accounts-tab"
+            data-bs-toggle="tab" data-bs-target="#accounts" type="button" role="tab"
+            aria-controls="accounts" aria-selected="false">
+      Accounts
+    </button>
+  </div>
 
-                    <!-- Owners Tab -->
-                    <div class="tab-pane fade" id="owners" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>👥 Owners Management</h5>
-                            <button class="btn btn-primary btn-sm" onclick="showAddModal('owner')">
-                                ➕ Add Owner
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="ownersTable">
-                                <thead>
-                                    <tr>
-                                        <th>Owner</th>
-                                        <th>Transactions</th>
-                                        <th>Total Amount</th>
-                                        <th>Average</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ownersTableBody">
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4">
-                                            <p class="text-muted">Click the Owners tab to load data</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+  <!-- Tab pane content -->
+  <div class="tab-content" style="padding:16px 18px;" id="managementTabsContent">
 
-                    <!-- Accounts Tab -->
-                    <div class="tab-pane fade" id="accounts" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5>💳 Accounts Management</h5>
-                            <button class="btn btn-primary btn-sm" onclick="showAddModal('account')">
-                                ➕ Add Account
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="accountsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Account</th>
-                                        <th>Transactions</th>
-                                        <th>Total Amount</th>
-                                        <th>Average</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="accountsTableBody">
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4">
-                                            <p class="text-muted">Click the Accounts tab to load data</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+    <!-- Categories pane -->
+    <div class="tab-pane fade show active" id="categories" role="tabpanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="kanso-section-label" style="margin-bottom:0;">Categories</div>
+        <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('category')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          Add Category
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="anl-table" id="categoriesTable">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Type</th>
+              <th style="text-align:right;">Transactions</th>
+              <th style="text-align:right;">Total Amount</th>
+              <th style="text-align:right;">Average</th>
+              <th style="text-align:right;">Budget</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="categoriesTableBody">
+            <tr>
+              <td colspan="7" style="text-align:center; padding:32px;">
+                <div style="display:inline-block; width:20px; height:20px; border:2px solid var(--primary); border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+                <div style="color:var(--text-muted); margin-top:8px; font-size:13px;">Loading categories…</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sub-Categories pane -->
+    <div class="tab-pane fade" id="subcategories" role="tabpanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="kanso-section-label" style="margin-bottom:0;">Sub-Categories</div>
+        <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('subcategory')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          Add Sub-Category
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="anl-table" id="subcategoriesTable">
+          <thead>
+            <tr>
+              <th>Sub-Category</th>
+              <th>Parent Category</th>
+              <th style="text-align:right;">Transactions</th>
+              <th style="text-align:right;">Total Amount</th>
+              <th style="text-align:right;">Average</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="subcategoriesTableBody">
+            <tr>
+              <td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">
+                Click the Sub-Categories tab to load data
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Owners pane -->
+    <div class="tab-pane fade" id="owners" role="tabpanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="kanso-section-label" style="margin-bottom:0;">Owners</div>
+        <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('owner')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          Add Owner
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="anl-table" id="ownersTable">
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th style="text-align:right;">Transactions</th>
+              <th style="text-align:right;">Total Amount</th>
+              <th style="text-align:right;">Average</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ownersTableBody">
+            <tr>
+              <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">
+                Click the Owners tab to load data
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Accounts pane -->
+    <div class="tab-pane fade" id="accounts" role="tabpanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="kanso-section-label" style="margin-bottom:0;">Accounts</div>
+        <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('account')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          Add Account
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="anl-table" id="accountsTable">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th style="text-align:right;">Transactions</th>
+              <th style="text-align:right;">Total Amount</th>
+              <th style="text-align:right;">Average</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="accountsTableBody">
+            <tr>
+              <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">
+                Click the Accounts tab to load data
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+</div><!-- /kanso-card -->
 
 <!-- Add/Edit Modal -->
 <div class="modal fade" id="addEditModal" tabindex="-1" aria-labelledby="addEditModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addEditModalLabel">Add Category</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addEditForm">
-                    <input type="hidden" id="editItemType" value="">
-                    <input type="hidden" id="editItemId" value="">
-                    
-                    <div class="mb-3" id="nameField">
-                        <label for="itemName" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="itemName" required>
-                    </div>
-                    
-                    <div class="mb-3 d-none" id="parentCategoryField">
-                        <label for="parentCategory" class="form-label">Parent Category *</label>
-                        <select class="form-select" id="parentCategory">
-                            <option value="">Select category...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3 d-none" id="typeField">
-                        <label for="itemType" class="form-label">Type *</label>
-                        <select class="form-select" id="itemType">
-                            <option value="">Select type...</option>
-                            <option value="Needs">Needs</option>
-                            <option value="Wants">Wants</option>
-                            <option value="Savings">Savings</option>
-                            <option value="Business">Business</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveItem()">
-                    <span id="saveButtonText">Save</span>
-                </button>
-            </div>
-        </div>
+  <div class="modal-dialog kanso-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addEditModalLabel">Add Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addEditForm">
+          <input type="hidden" id="editItemType" value="">
+          <input type="hidden" id="editItemId" value="">
+
+          <div class="mb-3" id="nameField">
+            <label for="itemName" class="kanso-form-label">Name *</label>
+            <input type="text" class="kanso-input" id="itemName" required>
+          </div>
+
+          <div class="mb-3 d-none" id="parentCategoryField">
+            <label for="parentCategory" class="kanso-form-label">Parent Category *</label>
+            <select class="kanso-select" id="parentCategory">
+              <option value="">Select category…</option>
+            </select>
+          </div>
+
+          <div class="mb-3 d-none" id="typeField">
+            <label for="itemType" class="kanso-form-label">Type *</label>
+            <select class="kanso-select" id="itemType">
+              <option value="">Select type…</option>
+              <option value="Needs">Needs</option>
+              <option value="Wants">Wants</option>
+              <option value="Savings">Savings</option>
+              <option value="Business">Business</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-kanso btn-kanso-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-kanso btn-kanso-primary" onclick="saveItem()">
+          <span id="saveButtonText">Save</span>
+        </button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- Migration Modal -->
 <div class="modal fade" id="migrationModal" tabindex="-1" aria-labelledby="migrationModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="migrationModalLabel">Migrate Transactions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning">
-                    <h6>⚠️ Data Migration Required</h6>
-                    <p class="mb-2">This item has <strong id="migrationTransactionCount">0</strong> transactions that need to be migrated before deletion.</p>
-                    <p class="mb-0">Select where to move these transactions:</p>
-                </div>
-                
-                <form id="migrationForm">
-                    <input type="hidden" id="migrationItemType" value="">
-                    <input type="hidden" id="migrationItemName" value="">
-                    
-                    <div class="mb-3" id="migrationTargetField">
-                        <label for="migrationTarget" class="form-label">Migrate to *</label>
-                        <select class="form-select" id="migrationTarget" required>
-                            <option value="">Select target...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Transaction Preview</label>
-                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;" id="migrationPreview">
-                            Loading affected transactions...
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="executeMigration()">
-                    Migrate & Delete
-                </button>
-            </div>
+  <div class="modal-dialog modal-lg kanso-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="migrationModalLabel">Migrate Transactions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="kanso-tip-box" style="background:var(--danger-dim); border-left-color:var(--danger); margin-bottom:16px;">
+          <div style="font-weight:600; color:var(--danger); margin-bottom:4px;">Data Migration Required</div>
+          <div style="font-size:12.5px; color:var(--text-muted);">
+            This item has <strong id="migrationTransactionCount">0</strong> transactions that need to be migrated before deletion.
+            Select where to move these transactions:
+          </div>
         </div>
+
+        <form id="migrationForm">
+          <input type="hidden" id="migrationItemType" value="">
+          <input type="hidden" id="migrationItemName" value="">
+
+          <div class="mb-3" id="migrationTargetField">
+            <label for="migrationTarget" class="kanso-form-label">Migrate to *</label>
+            <select class="kanso-select" id="migrationTarget" required>
+              <option value="">Select target…</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="kanso-form-label">Transaction Preview</label>
+            <div style="background:var(--surface-raised); border:1px solid var(--border); border-radius:8px; padding:12px; max-height:200px; overflow-y:auto; font-size:12.5px; color:var(--text-muted);" id="migrationPreview">
+              Loading affected transactions…
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-kanso btn-kanso-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-kanso btn-kanso-danger-solid" onclick="executeMigration()">
+          Migrate &amp; Delete
+        </button>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Statistics Cards -->
-<div class="row">
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Total Categories</div>
-            <div class="metric-value neutral" id="totalCategories">0</div>
-            <small class="text-muted">Active Categories</small>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Total Sub-Categories</div>
-            <div class="metric-value neutral" id="totalSubCategories">0</div>
-            <small class="text-muted">Active Sub-Categories</small>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Total Owners</div>
-            <div class="metric-value neutral" id="totalOwners">0</div>
-            <small class="text-muted">Active Owners</small>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Total Accounts</div>
-            <div class="metric-value neutral" id="totalAccounts">0</div>
-            <small class="text-muted">Active Accounts</small>
-        </div>
-    </div>
-</div>
+<!-- Spinner keyframes -->
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+// Bootstrap tab change: sync .active class on dsh-tab-btn
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBtns = document.querySelectorAll('#managementTabs .dsh-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('shown.bs.tab', function() {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+});
+</script>

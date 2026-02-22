@@ -25,17 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Budget V2 initialized');
     loadAllData();
 
-    // Setup tab change listeners
-    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
-        tab.addEventListener('shown.bs.tab', function(event) {
-            const target = event.target.getAttribute('data-bs-target');
-            if (target === '#commitments') {
-                loadCommitments();
-            } else if (target === '#unexpected') {
-                loadUnexpectedExpenses();
-            }
-        });
-    });
+    // Tab switching handled by switchBudgetTab() in inline script
 });
 
 // ============================================================================
@@ -97,9 +87,9 @@ async function quickSetupBudgets() {
         // Show loading indicator
         const loadingMsg = document.createElement('div');
         loadingMsg.innerHTML = `
-            <div class="alert alert-info position-fixed top-50 start-50 translate-middle" style="z-index: 9999;">
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 28px;text-align:center;color:var(--text-muted);">
                 <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                Setting up budgets... This may take a moment.
+                Setting up budgets… This may take a moment.
             </div>
         `;
         document.body.appendChild(loadingMsg);
@@ -216,10 +206,10 @@ function renderSubcategoryBudgets(budgets) {
         const isCollapsed = budgetState.collapsedCategories.has(category) || budgetByCategory;
 
         html += `
-            <div class="subcategory-group border rounded mb-3 p-3" data-category-name="${category}">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="d-flex align-items-center">
-                        <button class="btn btn-sm btn-link text-decoration-none p-0 me-2"
+            <div class="bgt-subcategory-group" data-category-name="${category}">
+                <div class="bgt-subcategory-group-header">
+                    <div class="bgt-subcategory-group-title">
+                        <button class="btn btn-sm btn-link text-decoration-none p-0"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#${collapseId}"
@@ -229,14 +219,14 @@ function renderSubcategoryBudgets(budgets) {
                                 title="Expand/Collapse category">
                             <span class="collapse-icon">▼</span>
                         </button>
-                        <h6 class="mb-0 d-inline">${category}</h6>
-                        <small class="text-muted ms-2 category-total">Total: $${categoryTotal.toFixed(2)}</small>
+                        ${category}
+                        <span class="bgt-subcategory-group-total category-total">Total: $${categoryTotal.toFixed(2)}</span>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-sm btn-outline-danger"
+                    <div class="bgt-subcategory-group-actions">
+                        <button class="debt-action-btn delete"
                                 onclick="hideBudgetCategory('${category}')"
                                 title="Hide this category from budget view">
-                            Hide
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
                         </button>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="${toggleId}"
@@ -249,83 +239,63 @@ function renderSubcategoryBudgets(budgets) {
                     </div>
                 </div>
                 ${budgetByCategory ? `
-                    <div class="alert alert-info py-2 mb-2">
-                        <small>
-                            <strong>Category-level budgeting:</strong> Set one budget for all "${category}" expenses.
-                            Subcategories are tracked for analysis only.
-                        </small>
-                    </div>
-                    <div class="subcategory-row">
-                        <div class="row align-items-center">
-                            <div class="col-md-4">
-                                <strong>Category Budget</strong>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" step="0.01" min="0"
-                                           value="${categoryTotal}"
-                                           data-category="${category}"
-                                           data-is-category-level="true"
-                                           onchange="updateCategoryLevelBudget(this)">
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Applied to all subcategories below</small>
-                            </div>
-                            <div class="col-md-1">
-                                <button class="btn btn-sm btn-outline-success"
-                                        onclick="saveCategoryLevelBudget('${category}')">
-                                    💾
-                                </button>
-                            </div>
+                    <div class="bgt-subcategory-row">
+                        <span class="bgt-sub-name">Category Budget</span>
+                        <div class="kanso-input-group" style="width:130px;">
+                            <span class="kanso-input-prefix">$</span>
+                            <input type="number" class="kanso-input has-prefix" step="0.01" min="0"
+                                   value="${categoryTotal}"
+                                   data-category="${category}"
+                                   data-is-category-level="true"
+                                   onchange="updateCategoryLevelBudget(this)">
+                        </div>
+                        <small style="color:var(--text-faint); font-size:11px;">Applied to all subcategories below</small>
+                        <div class="bgt-sub-actions">
+                            <button class="debt-action-btn edit"
+                                    onclick="saveCategoryLevelBudget('${category}')">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 9l4 4 8-8"/></svg>
+                            </button>
                         </div>
                     </div>
                 ` : ''}
                 <div class="collapse ${!isCollapsed ? 'show' : ''}" id="${collapseId}">
-                    ${budgetByCategory ? '<hr><div class="mb-2"><small class="text-muted"><strong>Subcategories (for tracking only):</strong></small></div>' : ''}
+                    ${budgetByCategory ? '<div style="padding:6px 14px;"><small style="color:var(--text-faint);font-size:11px;"><strong>Subcategories (for tracking only):</strong></small></div>' : ''}
                     ${categoryBudgets.map((budget, idx) => `
-                        <div class="subcategory-row ${budgetByCategory ? 'opacity-75' : ''}">
-                            <div class="row align-items-center">
-                                <div class="col-md-3">
-                                    <strong>${budget.sub_category}</strong>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text">$</span>
-                                        <input type="number" class="form-control" step="0.01"
-                                               min="${budget.commitment_minimum || 0}"
-                                               value="${budget.budget_amount}"
-                                               data-category="${budget.category}"
-                                               data-subcategory="${budget.sub_category}"
-                                               data-commitment-minimum="${budget.commitment_minimum || 0}"
-                                               ${budgetByCategory ? 'readonly' : ''}
-                                               onchange="updateSubcategoryBudgetInState(this)"
-                                               title="${budget.commitment_minimum > 0 ? 'Minimum: $' + budget.commitment_minimum.toFixed(2) + ' (based on commitments)' : 'No minimum'}">
-                                    </div>
-                                    ${budget.commitment_minimum > 0 ? `<small class="text-muted">Min: $${budget.commitment_minimum.toFixed(2)}</small>` : ''}
-                                </div>
-                                <div class="col-md-4">
-                                    <input type="text" class="form-control form-control-sm"
-                                           placeholder="Notes..."
-                                           value="${budget.notes || ''}"
-                                           data-category="${budget.category}"
-                                           data-subcategory="${budget.sub_category}"
-                                           onchange="updateSubcategoryNoteInState(this)">
-                                </div>
-                                <div class="col-md-3 d-flex gap-1">
-                                    ${!budgetByCategory ? `
-                                        <button class="btn btn-sm btn-outline-success"
-                                                onclick="saveSubcategoryBudget('${budget.category}', '${budget.sub_category}')">
-                                            💾
-                                        </button>
-                                    ` : ''}
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            onclick="hideBudgetSubcategory('${budget.category}', '${budget.sub_category}')"
-                                            title="Hide this subcategory">
-                                        Hide
+                        <div class="bgt-subcategory-row ${budgetByCategory ? 'opacity-75' : ''}">
+                            <span class="bgt-sub-name" title="${budget.sub_category}">
+                                ${budget.sub_category}
+                                ${budget.commitment_minimum > 0 ? `<small class="bgt-sub-min">Min: $${budget.commitment_minimum.toFixed(2)}</small>` : ''}
+                            </span>
+                            <div class="kanso-input-group" style="width:130px;">
+                                <span class="kanso-input-prefix">$</span>
+                                <input type="number" class="kanso-input has-prefix" step="0.01"
+                                       min="${budget.commitment_minimum || 0}"
+                                       value="${budget.budget_amount}"
+                                       data-category="${budget.category}"
+                                       data-subcategory="${budget.sub_category}"
+                                       data-commitment-minimum="${budget.commitment_minimum || 0}"
+                                       ${budgetByCategory ? 'readonly' : ''}
+                                       onchange="updateSubcategoryBudgetInState(this)"
+                                       title="${budget.commitment_minimum > 0 ? 'Minimum: $' + budget.commitment_minimum.toFixed(2) + ' (based on commitments)' : 'No minimum'}">
+                            </div>
+                            <input type="text" class="kanso-input bgt-notes-input"
+                                   placeholder="Notes…"
+                                   value="${budget.notes || ''}"
+                                   data-category="${budget.category}"
+                                   data-subcategory="${budget.sub_category}"
+                                   onchange="updateSubcategoryNoteInState(this)">
+                            <div class="bgt-sub-actions">
+                                ${!budgetByCategory ? `
+                                    <button class="debt-action-btn edit"
+                                            onclick="saveSubcategoryBudget('${budget.category}', '${budget.sub_category}')">
+                                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 9l4 4 8-8"/></svg>
                                     </button>
-                                </div>
+                                ` : ''}
+                                <button class="debt-action-btn delete"
+                                        onclick="hideBudgetSubcategory('${budget.category}', '${budget.sub_category}')"
+                                        title="Hide this subcategory">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+                                </button>
                             </div>
                         </div>
                     `).join('')}
@@ -585,13 +555,13 @@ function toggleShowHiddenBudgets() {
 function createHiddenBudgetsModal() {
     const modalHtml = `
         <div class="modal fade" id="hiddenBudgetsModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg kanso-modal">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Hidden Budget Items</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body" id="hiddenBudgetsContent">
+                    <div class="modal-body" id="hiddenBudgetsContent" style="padding:0;">
                         <!-- Content will be rendered here -->
                     </div>
                 </div>
@@ -608,7 +578,7 @@ function renderHiddenBudgets() {
     const hiddenBudgets = budgetState.subcategoryBudgets.filter(b => b.is_active === false);
 
     if (hiddenBudgets.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center py-4">No hidden budget items</p>';
+        container.innerHTML = '<div class="bgt-empty-state">No hidden budget items</div>';
         return;
     }
 
@@ -621,28 +591,29 @@ function renderHiddenBudgets() {
         return acc;
     }, {});
 
-    let html = '<div class="list-group">';
+    let html = '';
     for (const [category, items] of Object.entries(grouped)) {
-        html += `<div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>${category}</strong>
-                <button class="btn btn-sm btn-success" onclick="restoreBudgetCategory('${category}')">
-                    Restore All
-                </button>
-            </div>
-            <ul class="list-unstyled ms-3">
+        html += `
+            <div style="border-bottom:1px solid var(--border-subtle);">
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 18px; background:var(--surface-raised);">
+                    <span style="font-size:13.5px; font-weight:600; color:var(--text);">${category}</span>
+                    <button class="btn-kanso btn-kanso-ghost btn-kanso-sm" onclick="restoreBudgetCategory('${category}')">
+                        Restore All
+                    </button>
+                </div>
                 ${items.map(item => `
-                    <li class="d-flex justify-content-between align-items-center py-1">
-                        <span>${item.sub_category}</span>
-                        <button class="btn btn-sm btn-outline-success" onclick="restoreBudgetSubcategory('${item.category}', '${item.sub_category}')">
-                            Restore
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 18px 8px 28px; border-top:1px solid var(--border-subtle);">
+                        <span style="font-size:13px; color:var(--text-muted);">${item.sub_category}</span>
+                        <button class="debt-action-btn edit" onclick="restoreBudgetSubcategory('${item.category}', '${item.sub_category}')" title="Restore">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M2 8a6 6 0 1 0 1.5-4M2 4v4h4"/>
+                            </svg>
                         </button>
-                    </li>
+                    </div>
                 `).join('')}
-            </ul>
-        </div>`;
+            </div>
+        `;
     }
-    html += '</div>';
 
     container.innerHTML = html;
 }
@@ -909,10 +880,10 @@ function renderRecommendations(recommendations) {
         );
         const currentAmount = current ? current.budget_amount : 0;
         const difference = rec.recommended_budget - currentAmount;
-        const diffClass = difference > 0 ? 'text-danger' : difference < 0 ? 'text-success' : '';
+        const diffClass = difference > 0 ? 'anl-negative' : difference < 0 ? 'anl-positive' : 'anl-neutral';
         const diffSign = difference > 0 ? '+' : '';
 
-        const confidenceClass = `confidence-${rec.confidence}`;
+        const confidenceClass = `bgt-confidence-${rec.confidence}`;
 
         html += `
             <tr>
@@ -1060,32 +1031,24 @@ function renderCommitments(commitments) {
         const typeLabel = commitment.is_fixed ? 'Fixed' : 'Variable';
 
         html += `
-            <div class="card commitment-card ${fixedClass}">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-3">
-                            <h6 class="mb-0">${commitment.name}</h6>
-                            <small class="text-muted">${commitment.category} > ${commitment.sub_category}</small>
-                        </div>
-                        <div class="col-md-2">
-                            <strong class="text-primary">$${commitment.estimated_amount.toFixed(2)}</strong>
-                            <br><small class="badge bg-secondary">${typeLabel}</small>
-                        </div>
-                        <div class="col-md-2">
-                            <span class="badge bg-info">Due: Day ${commitment.due_day_of_month}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <small class="text-muted">Added ${new Date(commitment.created_at).toLocaleDateString()}</small>
-                        </div>
-                        <div class="col-md-2 text-end">
-                            <button class="btn btn-sm btn-outline-primary" onclick="editCommitment(${commitment.id})">
-                                ✏️ Edit
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCommitment(${commitment.id})">
-                                🗑️
-                            </button>
-                        </div>
-                    </div>
+            <div class="bgt-commitment-item ${commitment.is_fixed ? '' : 'variable'}">
+                <div class="bgt-commitment-main">
+                    <span class="bgt-commitment-name">${commitment.name}</span>
+                    <span class="bgt-commitment-meta">${commitment.category} › ${commitment.sub_category}</span>
+                </div>
+                <div class="bgt-commitment-amount">$${commitment.estimated_amount.toFixed(2)}</div>
+                <div class="bgt-badge-group">
+                    <span class="bgt-badge ${commitment.is_fixed ? 'bgt-badge-fixed' : 'bgt-badge-variable'}">${typeLabel}</span>
+                    <span class="bgt-badge bgt-badge-due">Day ${commitment.due_day_of_month}</span>
+                </div>
+                <div class="bgt-commitment-date">Added ${new Date(commitment.created_at).toLocaleDateString()}</div>
+                <div class="bgt-commitment-actions">
+                    <button class="debt-action-btn edit" onclick="editCommitment(${commitment.id})" title="Edit">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-9 9H2v-3L11 2z"/></svg>
+                    </button>
+                    <button class="debt-action-btn delete" onclick="deleteCommitment(${commitment.id})" title="Delete">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+                    </button>
                 </div>
             </div>
         `;
@@ -1167,6 +1130,11 @@ function renderCommitmentTimelineChart(commitments) {
 
     const ctx = canvas.getContext('2d');
 
+    // Read theme at render time
+    const isDark = document.documentElement.dataset.theme !== 'washi';
+    const barColor = isDark ? 'rgba(130,110,90,0.7)' : 'rgba(100,90,210,0.6)';
+    const barBorder = isDark ? 'rgba(130,110,90,1)' : 'rgba(100,90,210,1)';
+
     // Destroy existing chart if it exists
     if (commitmentTimelineChart) {
         commitmentTimelineChart.destroy();
@@ -1200,10 +1168,10 @@ function renderCommitmentTimelineChart(commitments) {
                 label: 'Total Commitments Due',
                 data: dailyAmounts,
                 backgroundColor: dailyAmounts.map(amount =>
-                    amount > 0 ? 'rgba(54, 162, 235, 0.7)' : 'rgba(201, 203, 207, 0.2)'
+                    amount > 0 ? barColor : 'rgba(201, 203, 207, 0.2)'
                 ),
                 borderColor: dailyAmounts.map(amount =>
-                    amount > 0 ? 'rgba(54, 162, 235, 1)' : 'rgba(201, 203, 207, 0.5)'
+                    amount > 0 ? barBorder : 'rgba(201, 203, 207, 0.5)'
                 ),
                 borderWidth: 1
             }]
@@ -1494,12 +1462,14 @@ function renderUnexpectedExpenses(expenses) {
                 <td>$${expense.amount.toFixed(2)}</td>
                 <td>${new Date(expense.created_at).toLocaleDateString()}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="editUnexpectedExpense(${expense.id})">
-                        ✏️ Edit
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUnexpectedExpense(${expense.id})">
-                        🗑️
-                    </button>
+                    <div style="display:flex; gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editUnexpectedExpense(${expense.id})" title="Edit">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-9 9H2v-3L11 2z"/></svg>
+                        </button>
+                        <button class="debt-action-btn delete" onclick="deleteUnexpectedExpense(${expense.id})" title="Delete">
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -1653,12 +1623,8 @@ async function loadAllData() {
 }
 
 function showToast(message, type = 'success') {
-    // Simple toast notification - you can enhance this with Bootstrap toasts
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-
     const toast = document.createElement('div');
-    toast.className = `alert ${alertClass} position-fixed top-0 end-0 m-3`;
-    toast.style.zIndex = '9999';
+    toast.className = `bgt-toast ${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
 
@@ -1763,8 +1729,8 @@ function sortAndRenderCategoryTable() {
         categoryHtml += `
             <tr>
                 <td><strong>${item.category}</strong></td>
-                <td class="text-end">${item.count}</td>
-                <td class="text-end text-primary"><strong>$${item.total.toFixed(2)}</strong></td>
+                <td style="text-align:right;">${item.count}</td>
+                <td style="text-align:right; color:var(--primary);"><strong>$${item.total.toFixed(2)}</strong></td>
             </tr>
         `;
         grandTotal += item.total;
@@ -1772,10 +1738,10 @@ function sortAndRenderCategoryTable() {
     });
 
     categoryHtml += `
-        <tr class="table-primary">
+        <tr class="bgt-table-total">
             <td><strong>Total</strong></td>
-            <td class="text-end"><strong>${grandCount}</strong></td>
-            <td class="text-end"><strong>$${grandTotal.toFixed(2)}</strong></td>
+            <td style="text-align:right;"><strong>${grandCount}</strong></td>
+            <td style="text-align:right;"><strong>$${grandTotal.toFixed(2)}</strong></td>
         </tr>
     `;
     categoryBody.innerHTML = categoryHtml;
@@ -1821,10 +1787,10 @@ function sortAndRenderSubcategoryTable() {
     data.forEach(item => {
         subcategoryHtml += `
             <tr>
-                <td><small>${item.category}</small></td>
+                <td style="color:var(--text-faint); font-size:12px; white-space:nowrap;">${item.category}</td>
                 <td>${item.subcategory}</td>
-                <td class="text-end">${item.count}</td>
-                <td class="text-end text-primary">$${item.total.toFixed(2)}</td>
+                <td style="text-align:right;">${item.count}</td>
+                <td style="text-align:right; color:var(--primary);">$${item.total.toFixed(2)}</td>
             </tr>
         `;
     });

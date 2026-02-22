@@ -1,49 +1,47 @@
 {% extends "base.html" %}
 
-{% block title %}Add Debt Account - Personal Finance{% endblock %}
+{% block title %}Add Debt Account — Kanso{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1 class="display-6 fw-bold text-primary">➕ Add Debt Account</h1>
-        <p class="lead text-muted">Add a new credit card, loan, or other debt to track</p>
-    </div>
-    <div class="col-md-4 text-end">
-        <a href="{{ url_for('debts.list_debts') }}" class="btn btn-outline-secondary">
+<div class="kanso-page-wide">
+
+    <!-- Page Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+        <div>
+            <div class="kanso-section-label" style="margin-bottom:4px;">Debts</div>
+            <h1 style="font-size:22px; font-weight:700; color:var(--text); margin:0;">Add Debt Account</h1>
+        </div>
+        <a href="{{ url_for('debts.list_debts') }}" class="btn-kanso btn-kanso-ghost">
             ← Back to Debts
         </a>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">💳 Debt Account Information</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST">
-                    <!-- Basic Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Basic Information</h6>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="name" class="form-label">Account Name *</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="name" 
-                                   name="name" 
+    <!-- 2-col layout -->
+    <div class="row g-4">
+
+        <!-- ── Form column ── -->
+        <div class="col-md-8">
+            <form method="POST">
+                <!-- Basic Information -->
+                <div class="kanso-card" style="margin-bottom:16px; padding:20px 22px;">
+                    <div class="kanso-form-section">Basic Information</div>
+                    <div class="kanso-form-grid">
+
+                        <div>
+                            <label class="kanso-form-label" for="name">Account Name <span style="color:var(--danger)">*</span></label>
+                            <input type="text"
+                                   class="kanso-input"
+                                   id="name"
+                                   name="name"
                                    required
-                                   placeholder="e.g., Chase Freedom, Car Loan, etc.">
-                            <div class="form-text">Give this debt a recognizable name</div>
+                                   placeholder="e.g., Chase Freedom, Car Loan…">
+                            <div class="kanso-form-hint">Give this debt a recognizable name</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="debt_type" class="form-label">Debt Type *</label>
-                            <select class="form-select" id="debt_type" name="debt_type" required>
-                                <option value="">Select debt type...</option>
+
+                        <div>
+                            <label class="kanso-form-label" for="debt_type">Debt Type <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="debt_type" name="debt_type" required>
+                                <option value="">Select debt type…</option>
                                 <option value="Credit Card">Credit Card</option>
                                 <option value="Car Loan">Car Loan</option>
                                 <option value="Student Loan">Student Loan</option>
@@ -52,112 +50,107 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="owner" class="form-label">Owner *</label>
-                            <select class="form-select" id="owner" name="owner" required>
-                                <option value="">Select owner...</option>
+
+                        <div>
+                            <label class="kanso-form-label" for="owner">Owner <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="owner" name="owner" required>
+                                <option value="">Select owner…</option>
                                 <option value="Cata">Cata</option>
                                 <option value="Suricata">Suricata</option>
                                 <option value="Cacas">Cacas</option>
                             </select>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="account_number_last4" class="form-label">Last 4 Digits</label>
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="account_number_last4" 
+
+                        <div>
+                            <label class="kanso-form-label" for="account_number_last4">Last 4 Digits</label>
+                            <input type="text"
+                                   class="kanso-input"
+                                   id="account_number_last4"
                                    name="account_number_last4"
                                    maxlength="4"
                                    pattern="[0-9]{4}"
                                    placeholder="1234">
-                            <div class="form-text">Optional: For account identification</div>
+                            <div class="kanso-form-hint">Optional — for account identification</div>
                         </div>
+
                     </div>
-                    
-                    <!-- Financial Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Financial Details</h6>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="original_balance" class="form-label">Original Balance *</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="original_balance" 
+                </div>
+
+                <!-- Financial Details -->
+                <div class="kanso-card" style="margin-bottom:16px; padding:20px 22px;">
+                    <div class="kanso-form-section">Financial Details</div>
+                    <div class="kanso-form-grid">
+
+                        <div>
+                            <label class="kanso-form-label" for="original_balance">Original Balance <span style="color:var(--danger)">*</span></label>
+                            <div class="kanso-input-group">
+                                <span class="kanso-input-affix prefix">$</span>
+                                <input type="number"
+                                       class="kanso-input has-prefix"
+                                       id="original_balance"
                                        name="original_balance"
-                                       step="0.01"
-                                       min="0"
-                                       required
+                                       step="0.01" min="0" required
                                        placeholder="0.00">
                             </div>
-                            <div class="form-text">The total amount originally borrowed</div>
+                            <div class="kanso-form-hint">The total amount originally borrowed</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="current_balance" class="form-label">Current Balance *</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="current_balance" 
+
+                        <div>
+                            <label class="kanso-form-label" for="current_balance">Current Balance <span style="color:var(--danger)">*</span></label>
+                            <div class="kanso-input-group">
+                                <span class="kanso-input-affix prefix">$</span>
+                                <input type="number"
+                                       class="kanso-input has-prefix"
+                                       id="current_balance"
                                        name="current_balance"
-                                       step="0.01"
-                                       min="0"
-                                       required
+                                       step="0.01" min="0" required
                                        placeholder="0.00">
                             </div>
-                            <div class="form-text">How much you currently owe</div>
+                            <div class="kanso-form-hint">How much you currently owe</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="interest_rate" class="form-label">Interest Rate (APR)</label>
-                            <div class="input-group">
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="interest_rate" 
+
+                        <div>
+                            <label class="kanso-form-label" for="interest_rate">Interest Rate (APR)</label>
+                            <div class="kanso-input-group">
+                                <input type="number"
+                                       class="kanso-input has-suffix"
+                                       id="interest_rate"
                                        name="interest_rate"
-                                       step="0.01"
-                                       min="0"
-                                       max="100"
+                                       step="0.01" min="0" max="100"
                                        placeholder="0.00">
-                                <span class="input-group-text">%</span>
+                                <span class="kanso-input-affix suffix">%</span>
                             </div>
-                            <div class="form-text">Annual percentage rate (optional)</div>
+                            <div class="kanso-form-hint">Annual percentage rate (optional)</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="minimum_payment" class="form-label">Minimum Payment</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="minimum_payment" 
+
+                        <div>
+                            <label class="kanso-form-label" for="minimum_payment">Minimum Payment</label>
+                            <div class="kanso-input-group">
+                                <span class="kanso-input-affix prefix">$</span>
+                                <input type="number"
+                                       class="kanso-input has-prefix"
+                                       id="minimum_payment"
                                        name="minimum_payment"
-                                       step="0.01"
-                                       min="0"
+                                       step="0.01" min="0"
                                        placeholder="0.00">
                             </div>
-                            <div class="form-text">Monthly minimum payment required</div>
+                            <div class="kanso-form-hint">Monthly minimum payment required</div>
                         </div>
+
                     </div>
-                    
-                    <!-- Payment Information -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="text-primary mb-3">Payment & Category</h6>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="due_date" class="form-label">Due Date</label>
-                            <select class="form-select" id="due_date" name="due_date">
-                                <option value="">Select day of month...</option>
+                </div>
+
+                <!-- Payment & Category -->
+                <div class="kanso-card" style="margin-bottom:24px; padding:20px 22px;">
+                    <div class="kanso-form-section">Payment &amp; Category</div>
+                    <div class="kanso-form-grid">
+
+                        <div>
+                            <label class="kanso-form-label" for="due_date">Due Date</label>
+                            <select class="kanso-select" id="due_date" name="due_date">
+                                <option value="">Select day of month…</option>
                                 {% for day in range(1, 32) %}
-                                <option value="{{ day }}">{{ day }}{{ 
+                                <option value="{{ day }}">{{ day }}{{
                                     'st' if day == 1 or day == 21 or day == 31
                                     else 'nd' if day == 2 or day == 22
                                     else 'rd' if day == 3 or day == 23
@@ -165,172 +158,145 @@
                                 }}</option>
                                 {% endfor %}
                             </select>
-                            <div class="form-text">Day of the month payment is due</div>
+                            <div class="kanso-form-hint">Day of the month payment is due</div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="category" class="form-label">Expense Category *</label>
-                            <select class="form-select" id="category" name="category" required>
-                                <option value="">Select category...</option>
+
+                        <div>
+                            <label class="kanso-form-label" for="category">Expense Category <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="category" name="category" required>
+                                <option value="">Select category…</option>
                                 <option value="Debt">Debt</option>
-                                <option value="Transport">Transport (for car loans)</option>
+                                <option value="Transport">Transport (car loans)</option>
                                 <option value="Living Expenses">Living Expenses</option>
-                                <option value="Learning">Learning (for student loans)</option>
-                                <option value="Home">Home (for mortgages)</option>
+                                <option value="Learning">Learning (student loans)</option>
+                                <option value="Home">Home (mortgages)</option>
                             </select>
-                            <div class="form-text">Category for payments in expense tracking</div>
+                            <div class="kanso-form-hint">Category for payments in expense tracking</div>
                         </div>
+
                     </div>
-                    
-                    <!-- Form Actions -->
-                    <div class="row">
-                        <div class="col-12">
-                            <hr class="mb-4">
-                            <div class="d-flex justify-content-between">
-                                <a href="{{ url_for('debts.list_debts') }}" class="btn btn-outline-secondary">
-                                    Cancel
-                                </a>
-                                <div>
-                                    <button type="reset" class="btn btn-outline-warning me-2">
-                                        Reset Form
-                                    </button>
-                                    <button type="submit" class="btn btn-primary">
-                                        💾 Save Debt Account
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Help Section -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">💡 Help & Tips</h5>
-            </div>
-            <div class="card-body">
-                <h6>Debt Types:</h6>
-                <ul class="small mb-3">
-                    <li><strong>Credit Card:</strong> Revolving credit accounts</li>
-                    <li><strong>Car Loan:</strong> Vehicle financing</li>
-                    <li><strong>Student Loan:</strong> Education loans</li>
-                    <li><strong>Personal Loan:</strong> Unsecured loans</li>
-                    <li><strong>Mortgage:</strong> Home loans</li>
-                    <li><strong>Other:</strong> Any other debt type</li>
-                </ul>
-                
-                <h6>Categories:</h6>
-                <ul class="small mb-3">
-                    <li><strong>Debt:</strong> General debt payments</li>
-                    <li><strong>Transport:</strong> Car loan payments</li>
-                    <li><strong>Learning:</strong> Student loan payments</li>
-                    <li><strong>Home:</strong> Mortgage payments</li>
-                </ul>
-                
-                <div class="alert alert-info small">
-                    <strong>💡 Tip:</strong> When you make payments, they'll automatically be recorded as expenses in the selected category and reduce your debt balance.
                 </div>
-                
-                <div class="alert alert-warning small">
-                    <strong>⚠️ Note:</strong> Interest rates should be entered as percentages (e.g., enter 18.5 for 18.5% APR).
+
+                <!-- Actions -->
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <a href="{{ url_for('debts.list_debts') }}" class="btn-kanso btn-kanso-ghost">
+                        Cancel
+                    </a>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button type="reset" class="btn-kanso btn-kanso-ghost">
+                            Reset
+                        </button>
+                        <button type="submit" class="btn-kanso btn-kanso-primary">
+                            Save Debt Account
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- ── Help sidebar ── -->
+        <div class="col-md-4">
+            <div class="kanso-card" style="padding:18px 20px; margin-bottom:16px;">
+                <div class="kanso-form-section" style="margin-bottom:14px;">Help &amp; Tips</div>
+
+                <div style="font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:8px;">Debt Types</div>
+                <ul style="margin:0 0 14px; padding-left:16px; font-size:12.5px; color:var(--text-muted); line-height:1.8;">
+                    <li><strong style="color:var(--text);">Credit Card</strong> — Revolving credit accounts</li>
+                    <li><strong style="color:var(--text);">Car Loan</strong> — Vehicle financing</li>
+                    <li><strong style="color:var(--text);">Student Loan</strong> — Education loans</li>
+                    <li><strong style="color:var(--text);">Personal Loan</strong> — Unsecured loans</li>
+                    <li><strong style="color:var(--text);">Mortgage</strong> — Home loans</li>
+                    <li><strong style="color:var(--text);">Other</strong> — Any other type</li>
+                </ul>
+
+                <div style="font-size:12.5px; font-weight:600; color:var(--text); margin-bottom:8px;">Categories</div>
+                <ul style="margin:0 0 14px; padding-left:16px; font-size:12.5px; color:var(--text-muted); line-height:1.8;">
+                    <li><strong style="color:var(--text);">Debt</strong> — General debt payments</li>
+                    <li><strong style="color:var(--text);">Transport</strong> — Car loan payments</li>
+                    <li><strong style="color:var(--text);">Learning</strong> — Student loan payments</li>
+                    <li><strong style="color:var(--text);">Home</strong> — Mortgage payments</li>
+                </ul>
+
+                <div class="kanso-tip-box" style="margin-bottom:10px;">
+                    <strong>Tip:</strong> When you make payments, they'll automatically be recorded as expenses in the selected category and reduce your debt balance.
+                </div>
+
+                <div class="kanso-note-box">
+                    <strong>Note:</strong> Interest rates should be entered as percentages — e.g., enter 18.5 for 18.5% APR.
                 </div>
             </div>
-        </div>
-        
-        <!-- Progress Preview -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5 class="mb-0">📊 What You'll See</h5>
-            </div>
-            <div class="card-body">
-                <p class="small text-muted mb-3">Once added, you'll be able to:</p>
-                <ul class="small">
-                    <li>✅ Track payment history</li>
-                    <li>✅ See debt reduction progress</li>
-                    <li>✅ View interest calculations</li>
-                    <li>✅ Monitor due dates</li>
-                    <li>✅ Auto-create expense transactions</li>
+
+            <div class="kanso-card" style="padding:18px 20px;">
+                <div class="kanso-form-section" style="margin-bottom:12px;">What You'll See</div>
+                <ul style="margin:0; padding-left:16px; font-size:12.5px; color:var(--text-muted); line-height:2;">
+                    <li>Track payment history</li>
+                    <li>Debt reduction progress bar</li>
+                    <li>Interest calculations</li>
+                    <li>Due date monitoring</li>
+                    <li>Auto-created expense transactions</li>
                 </ul>
             </div>
         </div>
-    </div>
+
+    </div><!-- /row -->
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-calculate interest rate conversion
     const interestRateInput = document.getElementById('interest_rate');
     const originalBalanceInput = document.getElementById('original_balance');
     const currentBalanceInput = document.getElementById('current_balance');
-    
-    // Set current balance to original balance by default
+
+    // Pre-fill current balance when original is entered
     originalBalanceInput.addEventListener('input', function() {
         if (!currentBalanceInput.value) {
             currentBalanceInput.value = this.value;
         }
     });
-    
-    // Validate that current balance doesn't exceed original balance
+
+    // Validate current <= original
     currentBalanceInput.addEventListener('input', function() {
         const original = parseFloat(originalBalanceInput.value) || 0;
         const current = parseFloat(this.value) || 0;
-        
         if (current > original && original > 0) {
             this.setCustomValidity('Current balance cannot exceed original balance');
         } else {
             this.setCustomValidity('');
         }
     });
-    
-    // Form validation
+
+    // On submit: convert interest rate % → decimal
     const form = document.querySelector('form');
     form.addEventListener('submit', function(e) {
         const original = parseFloat(originalBalanceInput.value) || 0;
         const current = parseFloat(currentBalanceInput.value) || 0;
-        
         if (current > original && original > 0) {
             e.preventDefault();
             alert('Current balance cannot exceed original balance.');
             return false;
         }
-        
-        // Convert interest rate from percentage to decimal
         if (interestRateInput.value) {
             const rate = parseFloat(interestRateInput.value);
-            // Create hidden input with decimal value
             const hiddenRate = document.createElement('input');
             hiddenRate.type = 'hidden';
             hiddenRate.name = 'interest_rate';
             hiddenRate.value = (rate / 100).toFixed(6);
             form.appendChild(hiddenRate);
-            
-            // Disable the original input so it doesn't submit
             interestRateInput.disabled = true;
         }
     });
-    
-    // Auto-suggest category based on debt type
+
+    // Auto-suggest category from debt type
     document.getElementById('debt_type').addEventListener('change', function() {
         const categorySelect = document.getElementById('category');
-        
         switch(this.value) {
-            case 'Car Loan':
-                categorySelect.value = 'Transport';
-                break;
-            case 'Student Loan':
-                categorySelect.value = 'Learning';
-                break;
-            case 'Mortgage':
-                categorySelect.value = 'Home';
-                break;
-            default:
-                categorySelect.value = 'Debt';
+            case 'Car Loan':     categorySelect.value = 'Transport'; break;
+            case 'Student Loan': categorySelect.value = 'Learning';  break;
+            case 'Mortgage':     categorySelect.value = 'Home';       break;
+            default:             categorySelect.value = 'Debt';
         }
     });
 });

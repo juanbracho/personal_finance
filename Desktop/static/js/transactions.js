@@ -914,11 +914,11 @@ function deleteTransaction(transactionId, description) {
         return;
     }
 
-    // Find and fade out the row immediately for smooth UX
-    const row = document.querySelector(`button[onclick*="deleteTransaction(${transactionId}"]`)?.closest('tr');
-    if (row) {
-        row.style.transition = 'opacity 0.3s ease';
-        row.style.opacity = '0.5';
+    // Find and fade out the item immediately for smooth UX
+    const item = document.querySelector(`.txn-item[data-txn-id="${transactionId}"]`);
+    if (item) {
+        item.style.transition = 'opacity 0.3s ease';
+        item.style.opacity = '0.5';
     }
 
     // Delete the transaction
@@ -931,11 +931,11 @@ function deleteTransaction(transactionId, description) {
     .then(response => response.json())
     .then(result => {
         if (result.success) {
-            // Remove the row with animation
-            if (row) {
-                row.style.opacity = '0';
+            // Remove the item with animation
+            if (item) {
+                item.style.opacity = '0';
                 setTimeout(() => {
-                    row.remove();
+                    item.remove();
                 }, 300);
             }
             // Refresh page after brief delay to update counts
@@ -943,14 +943,14 @@ function deleteTransaction(transactionId, description) {
                 window.location.reload();
             }, 500);
         } else {
-            // Restore row opacity on error
-            if (row) row.style.opacity = '1';
+            // Restore item opacity on error
+            if (item) item.style.opacity = '1';
             FinanceUtils.showAlert(`Error deleting transaction: ${result.error}`, 'danger');
         }
     })
     .catch(error => {
         console.error('Error deleting transaction:', error);
-        if (row) row.style.opacity = '1';
+        if (item) item.style.opacity = '1';
         FinanceUtils.showAlert('Error deleting transaction', 'danger');
     });
 }
@@ -1179,6 +1179,20 @@ window.Transactions = {
     applySimilarTransaction
 };
 
+
+// ============================================================================
+// TRANSACTION DETAIL EXPAND/COLLAPSE
+// ============================================================================
+
+function toggleTxnDetails(txnId) {
+    const details = document.getElementById('txn-details-' + txnId);
+    const btn = document.querySelector('.txn-item[data-txn-id="' + txnId + '"] .txn-expand-btn');
+    if (!details) return;
+    const isOpen = details.style.display !== 'none';
+    details.style.display = isOpen ? 'none' : 'block';
+    if (btn) btn.classList.toggle('open', !isOpen);
+}
+window.toggleTxnDetails = toggleTxnDetails;
 
 // Export functions for global access
 window.editTransaction = editTransaction;

@@ -1,117 +1,307 @@
-/* Dashboard Specific Styles */
+/* ============================================================
+   Dashboard — Kanso Design System
+   ============================================================ */
 
-/* Dashboard View Navigation */
-.dashboard-view-nav .btn-group .btn {
-    border-radius: 8px 0 0 8px;
-}
+/* ── View tab navigation ─────────────────────────────────── */
 
-.dashboard-view-nav .btn-group .btn:last-child {
-    border-radius: 0 8px 8px 0;
-}
-
-.dashboard-view-nav .btn-group .btn:not(:first-child):not(:last-child) {
-    border-radius: 0;
-}
-
-/* Time Filter Controls */
-.time-filter-form {
-    background: rgba(255, 255, 255, 0.1);
+.dsh-tab-nav {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 0.5rem;
+    padding: 4px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
-/* Dashboard Charts Specific */
-.dashboard-chart-container {
-    position: relative;
-    min-height: 400px;
-}
-
-.dashboard-chart-container .chart-loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-/* Dashboard Overview Styles */
-.overview-summary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-}
-
-.overview-summary .metric-value {
-    color: white;
-}
-
-/* Dashboard Monthly Analysis */
-.monthly-analysis-card {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-}
-
-/* Dashboard Yearly Analysis */
-.yearly-comparison-header {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #2c3e50;
-}
-
-/* Quick Actions Section */
-.quick-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-}
-
-.quick-action-btn {
-    padding: 1rem;
-    border-radius: 12px;
-    transition: all 0.3s ease;
+.dsh-tab-btn {
+    padding: 8px 20px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-weight: 500;
     text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+}
+
+.dsh-tab-btn:hover {
+    color: var(--text);
+    background: var(--surface-raised);
+    text-decoration: none;
+}
+
+.dsh-tab-btn.active {
+    background: var(--surface-raised);
+    color: var(--text);
+    border-color: var(--border);
+    font-weight: 600;
+}
+
+/* Bootstrap tab-driven variant (categories inner tabs) */
+.dsh-tab-nav button.dsh-tab-btn {
+    font-family: inherit;
+}
+
+/* ── Stat grid ───────────────────────────────────────────── */
+
+.dsh-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+}
+
+.dsh-stat-item {
+    padding: 20px 24px;
+    text-align: center;
+    border-right: 1px solid var(--border-subtle);
+}
+
+.dsh-stat-item:last-child { border-right: none; }
+
+.dsh-stat-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.dsh-stat-value.positive { color: var(--success); }
+.dsh-stat-value.negative { color: var(--danger); }
+.dsh-stat-value.neutral  { color: var(--text-muted); }
+
+.dsh-stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    margin-top: 4px;
+}
+
+.dsh-stat-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ── Budget progress ─────────────────────────────────────── */
+
+.dsh-budget-progress {
+    padding: 18px 20px;
+}
+
+.dsh-budget-progress-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.dsh-budget-progress-labels strong {
+    color: var(--text);
+    font-size: 14px;
+}
+
+.dsh-budget-progress-sub {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+
+/* ── Recent transactions list ────────────────────────────── */
+
+.dsh-recent-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.dsh-recent-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 0.15s ease;
+}
+
+.dsh-recent-item:last-child { border-bottom: none; }
+.dsh-recent-item:hover { background: var(--surface-raised); }
+
+.dsh-recent-left { flex: 1; min-width: 0; }
+
+.dsh-recent-desc {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dsh-recent-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
     display: block;
 }
 
-.quick-action-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+.dsh-recent-amount {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
-/* Chart Filter Controls */
-.chart-filters {
-    background: rgba(52, 152, 219, 0.1);
-    border-radius: 10px;
-    padding: 1rem;
-    margin-bottom: 1rem;
+.dsh-recent-amount.income  { color: var(--success); }
+.dsh-recent-amount.expense { color: var(--danger); }
+
+/* ── Budget performance grid ─────────────────────────────── */
+
+.dsh-perf-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
 }
 
-.chart-type-selector {
+.dsh-perf-item {
+    text-align: center;
+    padding: 20px;
+    border-right: 1px solid var(--border-subtle);
+}
+
+.dsh-perf-item:last-child { border-right: none; }
+
+.dsh-perf-value {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.dsh-perf-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+/* ── Data table (mirror anl-table; analytics.css not loaded here) ── */
+
+.anl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+
+.anl-table th {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--text-faint); padding: 8px 12px;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    white-space: nowrap;
+}
+
+.anl-table td {
+    padding: 9px 12px; border-bottom: 1px solid var(--border-subtle);
+    color: var(--text); vertical-align: middle;
+}
+
+.anl-table tbody tr:last-child td { border-bottom: none; }
+.anl-table tbody tr:hover td { background: var(--surface-raised); }
+
+.anl-positive { color: var(--success); font-weight: 600; }
+.anl-negative { color: var(--danger); font-weight: 600; }
+.anl-neutral  { color: var(--text-faint); }
+
+/* ── Budget table row levels ─────────────────────────────── */
+
+.dsh-budget-row {
+    background: var(--surface-raised);
+}
+
+.dsh-subcat-row {
+    background: var(--surface);
+}
+
+.dsh-txn-row {
+    border-left: 3px solid var(--border);
+    font-size: 13px;
+}
+
+.dsh-txn-row td { padding: 7px 12px; font-size: 13px; color: var(--text-muted); }
+.dsh-txn-row:hover td { background: var(--surface-raised); }
+
+/* Hover states for clickable budget rows */
+.dsh-budget-row:hover td { background: var(--surface-hover); cursor: pointer; }
+.dsh-subcat-row:hover td { background: var(--surface-raised); cursor: pointer; }
+
+/* Toggle chevron icon */
+.toggle-icon, .toggle-icon-cat, .toggle-icon-trans {
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+/* ── Insights box ────────────────────────────────────────── */
+
+.dsh-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 16px 18px;
+}
+
+/* ── Chart section headers ───────────────────────────────── */
+
+.dsh-card-header {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 0;
 }
 
-.chart-type-selector .btn-check:checked + .btn {
-    background-color: var(--secondary-color);
-    border-color: var(--secondary-color);
-    color: white;
+/* ── Chart container ─────────────────────────────────────── */
+
+.chart-container {
+    min-height: 300px;
+    padding: 8px 4px 4px;
 }
 
-/* Dashboard Responsive Adjustments */
+/* ── Responsive ──────────────────────────────────────────── */
+
 @media (max-width: 768px) {
-    .metric-card {
-        margin-bottom: 1rem;
-        padding: 1rem;
+    .dsh-stat-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
-    
-    .metric-value {
-        font-size: 1.5rem;
-    }
-    
-    .quick-actions-grid {
+
+    .dsh-stat-item:nth-child(even) { border-right: none; }
+    .dsh-stat-item:nth-child(odd)  { border-right: 1px solid var(--border-subtle); }
+    .dsh-stat-item:nth-last-child(-n+2) { border-bottom: none; }
+
+    .dsh-perf-grid {
         grid-template-columns: 1fr;
     }
-    
-    .chart-container {
-        min-height: 300px;
+
+    .dsh-perf-item { border-right: none; border-bottom: 1px solid var(--border-subtle); }
+    .dsh-perf-item:last-child { border-bottom: none; }
+
+    .dsh-tab-nav {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .dsh-insight-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -1,282 +1,202 @@
-<!-- dashboard_overview.html - Enhanced Overview -->
-<!-- Time Period Summary -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-info">
-            <h5 class="mb-2">📅 Financial Overview: {{ current_year }}-{{ "%02d"|format(current_month) }}
-                {% if current_owner != 'all' %} | {{ current_owner }}{% endif %}
-            </h5>
-            <div class="row">
-                <div class="col-md-3">
-                    <strong>Current Period:</strong> ${{ "%.2f"|format(current_total) }}
-                </div>
-                <div class="col-md-3">
-                    <strong>Same Month Last Year:</strong> ${{ "%.2f"|format(prev_year_total) }}
-                </div>
-                <div class="col-md-3">
-                    <strong>Year-to-Date:</strong> ${{ "%.2f"|format(ytd_total) }}
-                </div>
-                <div class="col-md-3">
-                    <strong>YTD Change:</strong> 
-                    <span class="{{ 'text-danger' if ytd_change > 0 else 'text-success' if ytd_change < 0 else 'text-muted' }}">
-                        {{ "%.1f"|format(ytd_change) }}%
-                    </span>
-                </div>
-            </div>
-        </div>
+<!-- dashboard_overview.html — Kanso redesign -->
+
+<!-- Info strip -->
+<div class="kanso-info-strip" style="margin-bottom: 20px;">
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">This Month</div>
+    <div class="kanso-info-value">${{ "%.2f"|format(current_total) }}</div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">vs Last Year</div>
+    <div class="kanso-info-value {{ 'anl-positive' if month_change < 0 else 'anl-negative' if month_change > 0 else 'muted' }}">
+      {{ "%.1f"|format(month_change) }}%
     </div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">YTD Spending</div>
+    <div class="kanso-info-value">${{ "%.2f"|format(ytd_total) }}</div>
+  </div>
+  <div class="kanso-info-item">
+    <div class="kanso-info-label">Total Debt</div>
+    <div class="kanso-info-value {{ 'anl-negative' if total_debt > 0 else 'anl-positive' }}">${{ "%.2f"|format(total_debt) }}</div>
+  </div>
 </div>
 
-<!-- Enhanced Key Metrics Row -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Monthly Spending</div>
-            <div class="metric-value negative">${{ "%.2f"|format(current_total) }}</div>
-            <small class="text-muted">{{ current_year }}-{{ "%02d"|format(current_month) }}</small>
-        </div>
+<!-- Stat grid -->
+<div class="kanso-card" style="margin-bottom: 20px;">
+  <div class="dsh-stat-grid">
+    <div class="dsh-stat-item">
+      <div class="dsh-stat-value negative">${{ "%.2f"|format(current_total) }}</div>
+      <div class="dsh-stat-label">Monthly Spending</div>
+      <div class="dsh-stat-sub">{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][current_month-1] }} {{ current_year }}</div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">vs Last Year</div>
-            <div class="metric-value {{ 'positive' if month_change < 0 else 'negative' }}">
-                {{ "%.1f"|format(month_change) }}%
-            </div>
-            <small class="text-muted">{{ prev_year_total > 0 and "Same Month " + (current_year-1)|string or "No Data" }}</small>
-        </div>
+    <div class="dsh-stat-item">
+      <div class="dsh-stat-value {{ 'positive' if ytd_change < 0 else 'negative' if ytd_change > 0 else 'neutral' }}">{{ "%.1f"|format(ytd_change) }}%</div>
+      <div class="dsh-stat-label">YTD Change</div>
+      <div class="dsh-stat-sub">Year-over-Year</div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="metric-label">Budget Status</div>
-            <div class="metric-value {{ 'positive' if budget_performance.over_budget_count == 0 else 'negative' }}">
-                {{ budget_performance.on_track_count + budget_performance.under_budget_count }}/{{ budget_performance.on_track_count + budget_performance.under_budget_count + budget_performance.over_budget_count }}
-            </div>
-            <small class="text-muted">Categories On Track</small>
-        </div>
+    <div class="dsh-stat-item">
+      {% if budget_performance %}
+      {% set on_ok = budget_performance.on_track_count + budget_performance.under_budget_count %}
+      {% set total_cats = on_ok + budget_performance.over_budget_count %}
+      <div class="dsh-stat-value {{ 'positive' if budget_performance.over_budget_count == 0 else 'negative' }}">{{ on_ok }}/{{ total_cats }}</div>
+      {% else %}
+      <div class="dsh-stat-value neutral">—</div>
+      {% endif %}
+      <div class="dsh-stat-label">Budget Status</div>
+      <div class="dsh-stat-sub">Categories On Track</div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card {{ 'debt-card' if total_debt > 0 else '' }}">
-            <div class="metric-label">Total Debt</div>
-            <div class="metric-value {{ 'negative' if total_debt > 0 else 'neutral' }}">${{ "%.2f"|format(total_debt) }}</div>
-            <small class="text-muted">{{ "Active Debts" if total_debt > 0 else "Debt Free!" }}</small>
-        </div>
+    <div class="dsh-stat-item">
+      <div class="dsh-stat-value {{ 'negative' if total_debt > 0 else 'neutral' }}">${{ "%.2f"|format(total_debt) }}</div>
+      <div class="dsh-stat-label">{{ "Active Debts" if total_debt > 0 else "Total Debt" }}</div>
+      <div class="dsh-stat-sub">{{ "Outstanding balance" if total_debt > 0 else "Debt Free!" }}</div>
     </div>
+  </div>
 </div>
 
-<!-- Charts Row -->
-<div class="row mb-4">
-    <!-- Monthly Spending by Type -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📈 Spending by Type</h5>
-            </div>
-            <div class="card-body">
-                {% if monthly_spending %}
-                    <div id="spendingTypeChart" class="chart-container"></div>
-                {% else %}
-                    <div class="alert alert-info">No spending data for selected period</div>
-                {% endif %}
-            </div>
-        </div>
+<!-- 3 Charts row -->
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:20px;">
+  <div class="kanso-card">
+    <div class="dsh-card-header">
+      <div class="kanso-section-label" style="margin-bottom:0;">Spending by Type</div>
     </div>
-
-    <!-- Top 5 Categories -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">🏆 Top 5 Categories</h5>
-            </div>
-            <div class="card-body">
-                {% if top_categories %}
-                    <div id="topCategoriesChart" class="chart-container"></div>
-                {% else %}
-                    <div class="alert alert-info">No category data for selected period</div>
-                {% endif %}
-            </div>
-        </div>
+    <div id="spendingTypeChart" class="chart-container"></div>
+  </div>
+  <div class="kanso-card">
+    <div class="dsh-card-header">
+      <div class="kanso-section-label" style="margin-bottom:0;">Top 5 Categories</div>
     </div>
-
-    <!-- 3-Month Trend -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📊 3-Month Trend</h5>
-            </div>
-            <div class="card-body">
-                {% if monthly_trend %}
-                    <div id="monthlyTrendChart" class="chart-container"></div>
-                {% else %}
-                    <div class="alert alert-info">Insufficient data for trend analysis</div>
-                {% endif %}
-            </div>
-        </div>
+    <div id="topCategoriesChart" class="chart-container"></div>
+  </div>
+  <div class="kanso-card">
+    <div class="dsh-card-header">
+      <div class="kanso-section-label" style="margin-bottom:0;">3-Month Trend</div>
     </div>
+    <div id="monthlyTrendChart" class="chart-container"></div>
+  </div>
 </div>
 
-<!-- Detailed Analysis Row -->
-<div class="row mb-4">
-    <!-- Spending Breakdown -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📊 Spending Breakdown</h5>
-            </div>
-            <div class="card-body">
-                {% if monthly_spending %}
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Amount</th>
-                                <th>Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for type, amount, count in monthly_spending %}
-                            <tr>
-                                <td>
-                                    <span class="badge bg-{{ 
-                                        'danger' if type == 'Needs' 
-                                        else 'warning' if type == 'Wants'
-                                        else 'success' if type == 'Savings'
-                                        else 'info' if type == 'Business'
-                                        else 'secondary'
-                                    }}">
-                                        {{ type }}
-                                    </span>
-                                </td>
-                                <td class="fw-bold">${{ "%.2f"|format(amount) }}</td>
-                                <td>{{ count }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="text-muted">No transactions for selected period</p>
-                {% endif %}
-            </div>
-        </div>
+<!-- 2-col: Spending Breakdown + Owner Comparison -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+  <!-- Spending Breakdown -->
+  <div class="kanso-card">
+    <div class="kanso-section-label" style="padding:14px 18px 10px;">Spending Breakdown</div>
+    {% if monthly_spending %}
+    <div style="overflow-x:auto; padding:0 18px 16px;">
+      <table class="anl-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th style="text-align:right;">Amount</th>
+            <th style="text-align:right;">Txns</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for type, amount, count in monthly_spending %}
+          <tr>
+            <td>
+              <span class="txn-type-badge txn-type-{{ type.lower() }}">{{ type }}</span>
+            </td>
+            <td style="text-align:right; font-weight:600;">${{ "%.2f"|format(amount) }}</td>
+            <td style="text-align:right; color:var(--text-muted);">{{ count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    
-    <!-- Owner Comparison -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">👥 Owner Comparison</h5>
-            </div>
-            <div class="card-body">
-                {% if owner_comparison %}
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Owner</th>
-                                <th>Current</th>
-                                <th>Change</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for owner_data in owner_comparison %}
-                            <tr>
-                                <td class="fw-bold">{{ owner_data.owner }}</td>
-                                <td>${{ "%.2f"|format(owner_data.current_month) }}</td>
-                                <td>
-                                    <span class="{{ 'text-danger' if owner_data.change_percent > 0 else 'text-success' if owner_data.change_percent < 0 else 'text-muted' }}">
-                                        {{ "%.1f"|format(owner_data.change_percent) }}%
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p class="text-muted">No owner data available</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+    {% else %}
+    <div class="kanso-feedback info" style="margin:12px 18px 16px; text-align:center;">No spending data for selected period</div>
+    {% endif %}
+  </div>
 
-    <!-- Recent Transactions -->
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">📝 Recent Transactions</h5>
-            </div>
-            <div class="card-body">
-                {% if recent_transactions %}
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        {% for transaction in recent_transactions[:8] %}
-                        <div class="border-bottom py-2">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <strong class="small">{{ transaction.description[:25] }}{% if transaction.description|length > 25 %}...{% endif %}</strong><br>
-                                    <small class="text-muted">{{ transaction.date }} | {{ transaction.owner }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="fw-bold {{ 'text-danger' if transaction.amount > 0 else 'text-success' }}">
-                                        {% if transaction.amount < 0 %}-{% endif %}${{ "%.2f"|format(transaction.amount|abs) }}
-                                    </span><br>
-                                    <small class="text-muted">{{ transaction.category }}</small>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        {% if recent_transactions|length > 8 %}
-                        <div class="text-center mt-2">
-                            <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-sm btn-outline-primary">View All</a>
-                        </div>
-                        {% endif %}
-                    </div>
-                {% else %}
-                    <p class="text-muted">No recent transactions</p>
-                {% endif %}
-            </div>
-        </div>
+  <!-- Owner Comparison -->
+  <div class="kanso-card">
+    <div class="kanso-section-label" style="padding:14px 18px 10px;">Owner Comparison</div>
+    {% if owner_comparison %}
+    <div style="overflow-x:auto; padding:0 18px 16px;">
+      <table class="anl-table">
+        <thead>
+          <tr>
+            <th>Owner</th>
+            <th style="text-align:right;">This Month</th>
+            <th style="text-align:right;">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for owner_data in owner_comparison %}
+          <tr>
+            <td style="font-weight:600;">{{ owner_data.owner }}</td>
+            <td style="text-align:right;">${{ "%.2f"|format(owner_data.current_month) }}</td>
+            <td class="{{ 'anl-positive' if owner_data.change_percent < 0 else 'anl-negative' if owner_data.change_percent > 0 else 'anl-neutral' }}" style="text-align:right;">
+              {{ "%.1f"|format(owner_data.change_percent) }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+    {% else %}
+    <div class="kanso-feedback info" style="margin:12px 18px 16px; text-align:center;">No owner data available</div>
+    {% endif %}
+  </div>
 </div>
 
-<!-- Budget Performance Summary -->
+<!-- Recent Transactions -->
+<div class="kanso-card" style="margin-bottom:20px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px 0;">
+    <div class="kanso-section-label" style="margin-bottom:0;">Recent Activity</div>
+    {% if recent_transactions and recent_transactions|length > 8 %}
+    <a href="{{ url_for('transactions.list_transactions') }}" class="btn-kanso btn-kanso-ghost btn-kanso-sm">View All</a>
+    {% endif %}
+  </div>
+  {% if recent_transactions %}
+  <ul class="dsh-recent-list" style="margin-top:8px;">
+    {% for transaction in recent_transactions[:8] %}
+    <li class="dsh-recent-item">
+      <div class="dsh-recent-left">
+        <strong class="dsh-recent-desc">{{ transaction.description[:30] }}{% if transaction.description|length > 30 %}…{% endif %}</strong>
+        <span class="dsh-recent-meta">{{ transaction.date }} · {{ transaction.category }}</span>
+      </div>
+      <span class="dsh-recent-amount {{ 'income' if transaction.amount < 0 else 'expense' }}">
+        {% if transaction.amount < 0 %}+{% endif %}${{ "%.2f"|format(transaction.amount|abs) }}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="kanso-feedback info" style="margin:12px 18px 16px; text-align:center;">No recent transactions</div>
+  {% endif %}
+</div>
+
+<!-- Budget Performance -->
 {% if budget_performance %}
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">💰 Budget Performance Summary</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="text-center">
-                            <div class="display-6 text-success">{{ budget_performance.under_budget_count }}</div>
-                            <div class="text-muted">Under Budget</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-center">
-                            <div class="display-6 text-primary">{{ budget_performance.on_track_count }}</div>
-                            <div class="text-muted">On Track</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="text-center">
-                            <div class="display-6 text-danger">{{ budget_performance.over_budget_count }}</div>
-                            <div class="text-muted">Over Budget</div>
-                        </div>
-                    </div>
-                </div>
-                {% if budget_performance.over_budget_count > 0 %}
-                <div class="mt-3">
-                    <div class="alert alert-warning">
-                        <strong>⚠️ Attention:</strong> {{ budget_performance.over_budget_count }} categories are over budget this month.
-                        <a href="{{ url_for('dashboards.enhanced_dashboard', view='budget', year=current_year, month=current_month, owner=current_owner) }}" class="alert-link">View Budget Details</a>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+<div class="kanso-card">
+  <div class="kanso-section-label" style="padding:14px 18px 0;">Budget Performance</div>
+  <div class="dsh-perf-grid" style="margin-top:8px;">
+    <div class="dsh-perf-item">
+      <div class="dsh-perf-value" style="color:var(--success);">{{ budget_performance.under_budget_count }}</div>
+      <div class="dsh-perf-label">Under Budget</div>
     </div>
+    <div class="dsh-perf-item">
+      <div class="dsh-perf-value" style="color:var(--primary);">{{ budget_performance.on_track_count }}</div>
+      <div class="dsh-perf-label">On Track</div>
+    </div>
+    <div class="dsh-perf-item">
+      <div class="dsh-perf-value" style="color:var(--danger);">{{ budget_performance.over_budget_count }}</div>
+      <div class="dsh-perf-label">Over Budget</div>
+    </div>
+  </div>
+  {% if budget_performance.over_budget_count > 0 %}
+  <div style="padding:12px 18px 16px;">
+    <div class="kanso-flash" style="background:var(--warning-dim); color:var(--warning); border:1px solid var(--warning); border-radius:9px;">
+      <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15"><path d="M8 1L1 14h14L8 1zm0 2.6L13.3 13H2.7L8 3.6zM7 7h2v3H7zm0 4h2v1.5H7z"/></svg>
+      {{ budget_performance.over_budget_count }} {{ 'category' if budget_performance.over_budget_count == 1 else 'categories' }} over budget this month.
+      <a href="{{ url_for('dashboards.enhanced_dashboard', view='budget', year=current_year, month=current_month, owner=current_owner) }}"
+         style="color:inherit; font-weight:600; margin-left:6px; text-decoration:underline;">View Budget</a>
+    </div>
+  </div>
+  {% else %}
+  <div style="padding:0 18px 16px;"></div>
+  {% endif %}
 </div>
 {% endif %}

@@ -17,23 +17,28 @@ let debtState = {
 // Initialize debt management
 document.addEventListener('DOMContentLoaded', function() {
     if (window.location.pathname.includes('/debts')) {
-        console.log('💳 Loading debt management...');
+        console.log('Loading debt management...');
         loadFormData();
+
+        // Initialize debt charts if Plotly is available
+        if (typeof Plotly !== 'undefined') {
+            setTimeout(loadDebtCharts, 500);
+        }
     }
 });
 
 // Load form data for dropdowns
 function loadFormData() {
-    console.log('📊 Loading form data for dropdowns...');
-    
+    console.log('Loading form data for dropdowns...');
+
     fetch('/transactions/api/get_form_data')
         .then(response => response.json())
         .then(data => {
             debtState.formData = data;
-            console.log('📊 Form data loaded:', data);
+            console.log('Form data loaded:', data);
         })
         .catch(error => {
-            console.error('❌ Error loading form data:', error);
+            console.error('Error loading form data:', error);
             // Set defaults
             debtState.formData = {
                 accounts: ['Venture', 'Cacas', 'Cata'],
@@ -42,9 +47,20 @@ function loadFormData() {
         });
 }
 
+// Toggle debt detail expand
+function toggleDebtDetails(debtId) {
+    const details = document.getElementById(`debt-details-${debtId}`);
+    const btn = document.querySelector(`.debt-item[data-debt-id="${debtId}"] .debt-expand-btn`);
+    if (!details) return;
+    const isOpen = details.style.display !== 'none';
+    details.style.display = isOpen ? 'none' : 'block';
+    if (btn) btn.classList.toggle('expanded', !isOpen);
+}
+window.toggleDebtDetails = toggleDebtDetails;
+
 // Show payment modal
 function showPaymentModal(debtId, debtName, currentBalance, minimumPayment) {
-    console.log(`💰 Opening payment modal for debt: ${debtName} (ID: ${debtId})`);
+    console.log(`Opening payment modal for debt: ${debtName} (ID: ${debtId})`);
 
     debtState.currentDebtId = debtId;
     debtState.currentDebtName = debtName;
@@ -100,7 +116,7 @@ function showPaymentModal(debtId, debtName, currentBalance, minimumPayment) {
 
 // Load unpaid charges for payment modal
 function loadUnpaidCharges(debtId) {
-    console.log(`💳 Loading unpaid charges for debt ID ${debtId}...`);
+    console.log(`Loading unpaid charges for debt ID ${debtId}...`);
 
     // Create/update charge selection dropdown
     const amountField = document.getElementById('paymentAmount').closest('.col-md-6');
@@ -125,15 +141,15 @@ function loadUnpaidCharges(debtId) {
     FinanceUtils.apiCall(`/debts/api/unpaid_charges/${debtId}`)
         .then(result => {
             if (result.success) {
-                console.log(`✅ Loaded ${result.count} unpaid charges`);
+                console.log(`Loaded ${result.count} unpaid charges`);
                 populateChargeDropdown(result.charges);
             } else {
-                console.error('❌ Error loading charges:', result.error);
+                console.error('Error loading charges:', result.error);
                 populateChargeDropdown([]);
             }
         })
         .catch(error => {
-            console.error('❌ Error fetching unpaid charges:', error);
+            console.error('Error fetching unpaid charges:', error);
             populateChargeDropdown([]);
         });
 }
@@ -179,7 +195,7 @@ function handleChargeSelection() {
         amountInput.value = chargeAmount.toFixed(2);
         descriptionInput.value = `Payment for ${chargeDescription}`;
 
-        console.log(`💳 Selected charge: ${chargeDescription} - $${chargeAmount}`);
+        console.log(`Selected charge: ${chargeDescription} - $${chargeAmount}`);
     } else {
         // General payment - clear amount, keep default description
         amountInput.value = '';
@@ -189,8 +205,8 @@ function handleChargeSelection() {
 
 // Populate payment form dropdowns
 function populatePaymentDropdowns() {
-    console.log('📋 Populating payment dropdowns...');
-    
+    console.log('Populating payment dropdowns...');
+
     // Populate accounts
     const accountSelect = document.getElementById('paymentAccount');
     if (accountSelect && debtState.formData.accounts) {
@@ -202,7 +218,7 @@ function populatePaymentDropdowns() {
             accountSelect.appendChild(option);
         });
     }
-    
+
     // Populate owners
     const ownerSelect = document.getElementById('paymentOwner');
     if (ownerSelect && debtState.formData.owners) {
@@ -218,17 +234,17 @@ function populatePaymentDropdowns() {
 
 // Submit payment
 function submitPayment() {
-    console.log('💸 Submitting payment...');
-    
+    console.log('Submitting payment...');
+
     // Get form values
     const form = document.getElementById('paymentForm');
     if (!form) return;
-    
+
     // Validate form
     if (!validatePaymentForm()) {
         return;
     }
-    
+
     // Prepare payment data
     const chargeSelect = document.getElementById('paymentChargeId');
     const paymentData = {
@@ -245,18 +261,18 @@ function submitPayment() {
     // Add debt_charge_id if specific charge selected
     if (chargeSelect && chargeSelect.value) {
         paymentData.debt_charge_id = parseInt(chargeSelect.value);
-        console.log(`💳 Paying specific charge ID: ${paymentData.debt_charge_id}`);
+        console.log(`Paying specific charge ID: ${paymentData.debt_charge_id}`);
     }
-    
-    console.log('💸 Payment data:', paymentData);
-    
+
+    console.log('Payment data:', paymentData);
+
     // Disable submit button
     const submitBtn = document.getElementById('submitPaymentBtn');
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
     }
-    
+
     // Submit payment
     FinanceUtils.apiCall(`/debts/api/make_payment/${debtState.currentDebtId}`, {
         method: 'POST',
@@ -264,7 +280,7 @@ function submitPayment() {
     })
     .then(result => {
         if (result.success) {
-            console.log('✅ Payment successful:', result);
+            console.log('Payment successful:', result);
 
             // Update UI
             updateDebtDisplay(debtState.currentDebtId, result.new_balance, result.is_paid_off);
@@ -296,21 +312,21 @@ function submitPayment() {
         }
     })
     .catch(error => {
-        console.error('❌ Error submitting payment:', error);
+        console.error('Error submitting payment:', error);
         FinanceUtils.showAlert('Error processing payment', 'danger');
     })
     .finally(() => {
         // Re-enable submit button
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '💰 Submit Payment';
+            submitBtn.innerHTML = 'Submit Payment';
         }
     });
 }
 
 // Validate payment form with enhanced checks
 function validatePaymentForm() {
-    console.log('🔍 Validating payment form with enhanced checks...');
+    console.log('Validating payment form with enhanced checks...');
 
     let isValid = true;
     const errors = [];
@@ -365,7 +381,7 @@ function validatePaymentForm() {
 
             // Check if this will pay off the debt
             if (Math.abs(amount - currentBalance) < 0.01) {
-                warnings.push('🎉 This payment will pay off the entire debt!');
+                warnings.push('This payment will pay off the entire debt!');
             }
         }
     }
@@ -385,9 +401,9 @@ function validatePaymentForm() {
     // Show warnings and ask for confirmation if any
     if (warnings.length > 0 && isValid) {
         const warningMessage = warnings.join('\n\n');
-        const confirmed = confirm(`⚠️ Warning:\n\n${warningMessage}\n\nDo you want to continue?`);
+        const confirmed = confirm(`Warning:\n\n${warningMessage}\n\nDo you want to continue?`);
         if (!confirmed) {
-            console.log('❌ User cancelled payment after warning');
+            console.log('User cancelled payment after warning');
             return false;
         }
     }
@@ -402,8 +418,8 @@ function validatePaymentForm() {
 
 // Update debt display after payment
 function updateDebtDisplay(debtId, newBalance) {
-    console.log(`📊 Updating debt display for ID ${debtId}, new balance: $${newBalance}`);
-    
+    console.log(`Updating debt display for ID ${debtId}, new balance: $${newBalance}`);
+
     // Find the debt row
     const debtRows = document.querySelectorAll('tbody tr');
     debtRows.forEach(row => {
@@ -414,26 +430,26 @@ function updateDebtDisplay(debtId, newBalance) {
             if (balanceCell) {
                 balanceCell.innerHTML = `<span class="fw-bold text-danger">$${parseFloat(newBalance).toFixed(2)}</span>`;
             }
-            
+
             // Update progress bar
             const progressCell = row.querySelector('td:nth-child(8)');
             if (progressCell) {
                 const progressBar = progressCell.querySelector('.progress-bar');
-                const originalBalanceCell = row.querySelector('td:nth-child(4)'); // This needs to be extracted from button onclick
-                
+                const originalBalanceCell = row.querySelector('td:nth-child(4)');
+
                 // Extract original balance from payment button onclick
                 const onclickStr = paymentBtn.getAttribute('onclick');
                 const match = onclickStr.match(/showPaymentModal\(\d+,\s*'[^']+',\s*[\d.]+,\s*[\d.]+,\s*([\d.]+)\)/);
                 if (match) {
                     const originalBalance = parseFloat(match[1]);
                     const progress = ((originalBalance - newBalance) / originalBalance * 100);
-                    
+
                     if (progressBar) {
                         progressBar.style.width = progress + '%';
                         progressBar.setAttribute('aria-valuenow', progress);
                         progressBar.textContent = progress.toFixed(1) + '%';
                     }
-                    
+
                     // Update paid off amount
                     const paidOffSmall = progressCell.querySelector('small');
                     if (paidOffSmall) {
@@ -441,10 +457,10 @@ function updateDebtDisplay(debtId, newBalance) {
                     }
                 }
             }
-            
+
             // Update payment button with new balance
-            paymentBtn.setAttribute('onclick', 
-                paymentBtn.getAttribute('onclick').replace(/showPaymentModal\((\d+),\s*'([^']+)',\s*[\d.]+/, 
+            paymentBtn.setAttribute('onclick',
+                paymentBtn.getAttribute('onclick').replace(/showPaymentModal\((\d+),\s*'([^']+)',\s*[\d.]+/,
                 `showPaymentModal($1, '$2', ${newBalance}`)
             );
         }
@@ -496,7 +512,7 @@ function clearPaymentValidation() {
 
 // Show payment history modal
 function showPaymentHistory(debtId, debtName) {
-    console.log(`📊 Opening payment history for debt: ${debtName} (ID: ${debtId})`);
+    console.log(`Opening payment history for debt: ${debtName} (ID: ${debtId})`);
 
     // Set modal title
     const modalTitle = document.getElementById('paymentHistoryModalLabel');
@@ -518,8 +534,8 @@ function showPaymentHistory(debtId, debtName) {
     if (tableBody) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center">
-                    <div class="spinner-border text-primary" role="status">
+                <td colspan="5" class="text-center" style="padding:24px;">
+                    <div class="spinner-border" role="status" style="width:20px;height:20px;">
                         <span class="visually-hidden">Loading...</span>
                     </div>
                 </td>
@@ -535,27 +551,27 @@ function showPaymentHistory(debtId, debtName) {
     FinanceUtils.apiCall(`/debts/api/payment_history/${debtId}`)
         .then(result => {
             if (result.success) {
-                console.log('✅ Loaded payment history:', result);
+                console.log('Loaded payment history:', result);
                 populatePaymentHistory(result);
             } else {
-                console.error('❌ Error loading payment history:', result.error);
+                console.error('Error loading payment history:', result.error);
                 showPaymentHistoryError(result.error || 'Failed to load payment history');
             }
         })
         .catch(error => {
-            console.error('❌ Error fetching payment history:', error);
+            console.error('Error fetching payment history:', error);
             showPaymentHistoryError('Failed to load payment history');
         });
 }
 
 // Populate payment history table
 function populatePaymentHistory(data) {
-    console.log('📊 Populating payment history with charges and payments');
+    console.log('Populating payment history with charges and payments');
 
     // Store data for view switching
     debtState.paymentHistory.data = data;
 
-    // Update summary cards
+    // Update summary strip
     document.getElementById('historyOriginalBalance').textContent = `$${data.original_balance.toFixed(2)}`;
     document.getElementById('historyCurrentBalance').textContent = `$${data.current_balance.toFixed(2)}`;
     document.getElementById('historyTotalPaid').textContent = `$${data.total_paid.toFixed(2)}`;
@@ -579,19 +595,11 @@ function addHistoryToggleButtons() {
     // Create toggle button group
     const toggleDiv = document.createElement('div');
     toggleDiv.id = 'historyViewToggle';
-    toggleDiv.className = 'btn-group mb-3 w-100';
-    toggleDiv.setAttribute('role', 'group');
-    toggleDiv.innerHTML = `
-        <button type="button" class="btn btn-outline-primary" onclick="switchHistoryView('charges')">
-            📦 Charges (${debtState.paymentHistory.data?.charge_count || 0})
-        </button>
-        <button type="button" class="btn btn-outline-success" onclick="switchHistoryView('payments')">
-            💵 Payments (${debtState.paymentHistory.data?.payment_count || 0})
-        </button>
-        <button type="button" class="btn btn-outline-info active" onclick="switchHistoryView('all')">
-            📊 All Activity
-        </button>
-    `;
+    toggleDiv.className = 'history-view-toggle';
+    toggleDiv.innerHTML =
+        '<button type="button" class="history-toggle-btn" onclick="switchHistoryView(\'charges\')">Charges (' + (debtState.paymentHistory.data && debtState.paymentHistory.data.charge_count || 0) + ')</button>' +
+        '<button type="button" class="history-toggle-btn" onclick="switchHistoryView(\'payments\')">Payments (' + (debtState.paymentHistory.data && debtState.paymentHistory.data.payment_count || 0) + ')</button>' +
+        '<button type="button" class="history-toggle-btn active" onclick="switchHistoryView(\'all\')">All Activity</button>';
 
     // Insert before table
     const tableContainer = modalBody.querySelector('.table-responsive');
@@ -602,17 +610,16 @@ function addHistoryToggleButtons() {
 
 // Switch between history views
 function switchHistoryView(view) {
-    console.log(`🔄 Switching to ${view} view`);
+    console.log(`Switching to ${view} view`);
     debtState.paymentHistory.currentView = view;
 
     // Update button states
-    const buttons = document.querySelectorAll('#historyViewToggle button');
-    buttons.forEach(btn => {
+    document.querySelectorAll('#historyViewToggle button').forEach(function(btn) {
         btn.classList.remove('active');
-        const btnText = btn.textContent.toLowerCase();
-        if ((view === 'charges' && btnText.includes('charges')) ||
-            (view === 'payments' && btnText.includes('payments')) ||
-            (view === 'all' && btnText.includes('all'))) {
+        var t = btn.textContent.toLowerCase();
+        if ((view === 'charges' && t.includes('charges')) ||
+            (view === 'payments' && t.includes('payments')) ||
+            (view === 'all' && t.includes('all'))) {
             btn.classList.add('active');
         }
     });
@@ -693,15 +700,15 @@ function renderPaymentHistoryView() {
         data.charges.forEach(charge => {
             const row = document.createElement('tr');
             const statusBadge = charge.is_paid ?
-                '<span class="badge bg-success">Paid</span>' :
-                '<span class="badge bg-warning">Unpaid</span>';
+                '<span class="kanso-badge kanso-badge-payment">Paid</span>' :
+                '<span class="kanso-badge kanso-badge-charge">Unpaid</span>';
 
             row.innerHTML = `
                 <td>${formatDate(charge.charge_date)}</td>
                 <td>${charge.description}</td>
-                <td><span class="badge bg-secondary">${charge.category || '-'}</span></td>
-                <td class="fw-bold text-danger">${formatCurrency(charge.charge_amount)}</td>
-                <td><span class="badge bg-info">${charge.charge_type}</span></td>
+                <td><span class="kanso-badge kanso-badge-type">${charge.category || '-'}</span></td>
+                <td style="font-weight:600;color:var(--danger);">${formatCurrency(charge.charge_amount)}</td>
+                <td><span class="kanso-badge kanso-badge-type">${charge.charge_type}</span></td>
                 <td>${statusBadge}</td>
             `;
             tableBody.appendChild(row);
@@ -721,10 +728,10 @@ function renderPaymentHistoryView() {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${formatDate(payment.payment_date)}</td>
-                <td class="fw-bold text-success">${formatCurrency(payment.payment_amount)}</td>
+                <td style="font-weight:600;color:var(--success);">${formatCurrency(payment.payment_amount)}</td>
                 <td>${formatCurrency(payment.balance_after_payment)}</td>
-                <td><span class="badge bg-info">${payment.payment_type || 'Regular'}</span></td>
-                <td><small class="text-muted">${payment.notes || '-'}</small></td>
+                <td><span class="kanso-badge kanso-badge-type">${payment.payment_type || 'Regular'}</span></td>
+                <td style="font-size:12px;color:var(--text-muted);">${payment.notes || '-'}</td>
             `;
             tableBody.appendChild(row);
         });
@@ -739,7 +746,7 @@ function renderPaymentHistoryView() {
                 type: 'charge',
                 description: charge.description,
                 amount: charge.charge_amount,
-                balance: null,  // We don't track balance per charge
+                balance: null,
                 data: charge
             });
         });
@@ -771,17 +778,17 @@ function renderPaymentHistoryView() {
             const row = document.createElement('tr');
             const isCharge = activity.type === 'charge';
             const typeBadge = isCharge ?
-                '<span class="badge bg-danger">Charge</span>' :
-                '<span class="badge bg-success">Payment</span>';
-            const amountClass = isCharge ? 'text-danger' : 'text-success';
+                '<span class="kanso-badge kanso-badge-charge">Charge</span>' :
+                '<span class="kanso-badge kanso-badge-payment">Payment</span>';
+            const amountStyle = isCharge ? 'color:var(--danger);' : 'color:var(--success);';
             const amountPrefix = isCharge ? '+' : '-';
 
             row.innerHTML = `
                 <td>${formatDate(activity.date)}</td>
                 <td>${typeBadge}</td>
                 <td>${activity.description}</td>
-                <td class="fw-bold ${amountClass}">${amountPrefix}${formatCurrency(activity.amount).replace('$', '$')}</td>
-                <td>${activity.balance !== null ? formatCurrency(activity.balance) : '<span class="text-muted">-</span>'}</td>
+                <td style="font-weight:600;${amountStyle}">${amountPrefix}${formatCurrency(activity.amount).replace('$', '$')}</td>
+                <td>${activity.balance !== null ? formatCurrency(activity.balance) : '<span style="color:var(--text-faint);">-</span>'}</td>
             `;
             tableBody.appendChild(row);
         });
@@ -794,8 +801,7 @@ function showPaymentHistoryError(message) {
     if (tableBody) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center text-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
+                <td colspan="5" class="text-center" style="color:var(--danger);padding:24px;">
                     ${message}
                 </td>
             </tr>
@@ -805,27 +811,27 @@ function showPaymentHistoryError(message) {
 
 // Edit debt account
 function editDebt(debtId) {
-    console.log(`✏️ Editing debt ID: ${debtId}`);
-    
+    console.log(`Editing debt ID: ${debtId}`);
+
     // Set the debt ID
     document.getElementById('editDebtId').value = debtId;
-    
+
     // Set modal title
     const modalTitle = document.getElementById('editDebtModalLabel');
     modalTitle.textContent = 'Loading debt details...';
-    
+
     // Show modal first
     const modal = document.getElementById('editDebtModal');
     if (typeof bootstrap !== 'undefined' && modal) {
         const bsModal = new bootstrap.Modal(modal);
         bsModal.show();
     }
-    
+
     // Load debt details
     FinanceUtils.apiCall(`/debts/api/get_debt/${debtId}`)
         .then(result => {
             if (result.success) {
-                console.log('✅ Loaded debt details:', result.debt);
+                console.log('Loaded debt details:', result.debt);
                 populateEditForm(result.debt);
                 modalTitle.textContent = `Edit Debt Account: ${result.debt.name}`;
             } else {
@@ -836,7 +842,7 @@ function editDebt(debtId) {
             }
         })
         .catch(error => {
-            console.error('❌ Error loading debt:', error);
+            console.error('Error loading debt:', error);
             FinanceUtils.showAlert('Error loading debt details', 'danger');
             // Close modal on error
             const bsModal = bootstrap.Modal.getInstance(modal);
@@ -846,27 +852,27 @@ function editDebt(debtId) {
 
 // Populate edit form with debt data
 function populateEditForm(debt) {
-    console.log('📝 Populating edit form with debt data');
-    
+    console.log('Populating edit form with debt data');
+
     // Basic Information
     document.getElementById('editName').value = debt.name;
     document.getElementById('editDebtType').value = debt.debt_type;
     document.getElementById('editOwner').value = debt.owner;
     document.getElementById('editAccountNumberLast4').value = debt.account_number_last4 || '';
-    
+
     // Financial Details
     document.getElementById('editOriginalBalance').value = debt.original_balance;
     document.getElementById('editCurrentBalance').value = debt.current_balance;
-    
+
     // Interest rate - convert from decimal to percentage for display
     if (debt.interest_rate) {
         document.getElementById('editInterestRate').value = (debt.interest_rate * 100).toFixed(2);
     } else {
         document.getElementById('editInterestRate').value = '';
     }
-    
+
     document.getElementById('editMinimumPayment').value = debt.minimum_payment || '';
-    
+
     // Payment & Category
     document.getElementById('editDueDate').value = debt.due_date || '';
     document.getElementById('editCategory').value = debt.category;
@@ -874,15 +880,15 @@ function populateEditForm(debt) {
 
 // Save debt edits
 function saveDebtEdit() {
-    console.log('💾 Saving debt edits...');
-    
+    console.log('Saving debt edits...');
+
     // Validate form
     if (!validateEditForm()) {
         return;
     }
-    
+
     const debtId = document.getElementById('editDebtId').value;
-    
+
     // Prepare update data
     const updateData = {
         name: document.getElementById('editName').value.trim(),
@@ -891,24 +897,24 @@ function saveDebtEdit() {
         account_number_last4: document.getElementById('editAccountNumberLast4').value.trim() || null,
         original_balance: parseFloat(document.getElementById('editOriginalBalance').value),
         current_balance: parseFloat(document.getElementById('editCurrentBalance').value),
-        interest_rate: document.getElementById('editInterestRate').value ? 
+        interest_rate: document.getElementById('editInterestRate').value ?
             parseFloat(document.getElementById('editInterestRate').value) / 100 : null,
-        minimum_payment: document.getElementById('editMinimumPayment').value ? 
+        minimum_payment: document.getElementById('editMinimumPayment').value ?
             parseFloat(document.getElementById('editMinimumPayment').value) : null,
-        due_date: document.getElementById('editDueDate').value ? 
+        due_date: document.getElementById('editDueDate').value ?
             parseInt(document.getElementById('editDueDate').value) : null,
         category: document.getElementById('editCategory').value
     };
-    
-    console.log('📊 Update data:', updateData);
-    
+
+    console.log('Update data:', updateData);
+
     // Disable save button
     const saveBtn = document.getElementById('saveDebtEditBtn');
     if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
     }
-    
+
     // Submit update
     FinanceUtils.apiCall(`/debts/api/update_debt/${debtId}`, {
         method: 'PUT',
@@ -916,43 +922,43 @@ function saveDebtEdit() {
     })
     .then(result => {
         if (result.success) {
-            console.log('✅ Debt updated successfully');
+            console.log('Debt updated successfully');
             FinanceUtils.showAlert(result.message, 'success');
-            
+
             // Hide modal
             const modal = document.getElementById('editDebtModal');
             if (typeof bootstrap !== 'undefined' && modal) {
                 const bsModal = bootstrap.Modal.getInstance(modal);
                 if (bsModal) bsModal.hide();
             }
-            
+
             // Reload page to show updates
             refreshDebtRow(debtId, updateData);
-            showDebtNotification(`Debt account "${updateData.name}" updated successfully!`, 'success');;
+            showDebtNotification(`Debt account "${updateData.name}" updated successfully!`, 'success');
         } else {
             FinanceUtils.showAlert(`Error: ${result.error}`, 'danger');
         }
     })
     .catch(error => {
-        console.error('❌ Error updating debt:', error);
+        console.error('Error updating debt:', error);
         FinanceUtils.showAlert('Error updating debt account', 'danger');
     })
     .finally(() => {
         // Re-enable save button
         if (saveBtn) {
             saveBtn.disabled = false;
-            saveBtn.innerHTML = '💾 Save Changes';
+            saveBtn.innerHTML = 'Save Changes';
         }
     });
 }
 
 // Validate edit form
 function validateEditForm() {
-    console.log('🔍 Validating edit form...');
-    
+    console.log('Validating edit form...');
+
     let isValid = true;
     const errors = [];
-    
+
     // Check required fields
     const requiredFields = [
         { id: 'editName', name: 'Account Name' },
@@ -962,7 +968,7 @@ function validateEditForm() {
         { id: 'editCurrentBalance', name: 'Current Balance' },
         { id: 'editCategory', name: 'Category' }
     ];
-    
+
     requiredFields.forEach(field => {
         const element = document.getElementById(field.id);
         if (!element || !element.value.trim()) {
@@ -976,23 +982,23 @@ function validateEditForm() {
             element.classList.add('is-valid');
         }
     });
-    
+
     // Validate balances
     const originalBalance = parseFloat(document.getElementById('editOriginalBalance').value);
     const currentBalance = parseFloat(document.getElementById('editCurrentBalance').value);
-    
+
     if (isNaN(originalBalance) || originalBalance < 0) {
         errors.push('Original balance must be a valid positive number');
         document.getElementById('editOriginalBalance').classList.add('is-invalid');
         isValid = false;
     }
-    
+
     if (isNaN(currentBalance) || currentBalance < 0) {
         errors.push('Current balance must be a valid positive number');
         document.getElementById('editCurrentBalance').classList.add('is-invalid');
         isValid = false;
     }
-    
+
     // Validate interest rate if provided
     const interestRateInput = document.getElementById('editInterestRate');
     if (interestRateInput.value) {
@@ -1003,195 +1009,115 @@ function validateEditForm() {
             isValid = false;
         }
     }
-    
+
     // Show errors if any
     if (!isValid) {
         FinanceUtils.showAlert('Please fix the following errors:\n• ' + errors.join('\n• '), 'danger');
     }
-    
+
     return isValid;
 }
 
 // Update the debt summary cards after payment/edit
 function updateDebtSummaryCards() {
-    console.log('📊 Updating debt summary cards...');
+    var totalDebt = 0;
+    var totalMinimumPayments = 0;
 
-    // Calculate new totals from the table (only active debts)
-    let totalDebt = 0;
-    let totalMinimumPayments = 0;
-    let activeAccounts = 0;
-
-    const debtRows = document.querySelectorAll('tbody tr');
-    debtRows.forEach(row => {
-        // Skip if no data
-        if (!row.querySelector('td:nth-child(4)')) return;
-
-        // Skip paid-off debts (check for "Paid Off" badge or table-success class)
-        const isPaidOff = row.classList.contains('table-success') ||
-                         row.querySelector('.badge.bg-success[textContent="Paid Off"]');
-        if (isPaidOff) return;
-
-        activeAccounts++;
-
-        // Get current balance
-        const balanceText = row.querySelector('td:nth-child(4)').textContent;
-        const balance = parseFloat(balanceText.replace(/[$,]/g, ''));
-        if (!isNaN(balance) && balance > 0) {
-            totalDebt += balance;
-        }
-
-        // Get minimum payment
-        const minPaymentText = row.querySelector('td:nth-child(5)').textContent;
-        const minPayment = parseFloat(minPaymentText.replace(/[$,]/g, ''));
-        if (!isNaN(minPayment)) {
-            totalMinimumPayments += minPayment;
-        }
+    document.querySelectorAll('.debt-item').forEach(function(row) {
+        if (row.classList.contains('debt-paid-off')) return;
+        var balance = parseFloat(row.dataset.debtBalance);
+        if (!isNaN(balance)) totalDebt += balance;
+        var minPay = parseFloat(row.dataset.minPayment);
+        if (!isNaN(minPay)) totalMinimumPayments += minPay;
     });
 
-    // Update the metric cards
-    const totalDebtCard = document.querySelector('.metric-card.debt-card .metric-value');
-    if (totalDebtCard) {
-        totalDebtCard.textContent = `$${totalDebt.toFixed(2)}`;
-    }
-
-    const minPaymentsCard = document.querySelector('.metric-card:nth-child(2) .metric-value');
-    if (minPaymentsCard) {
-        minPaymentsCard.textContent = `$${totalMinimumPayments.toFixed(2)}`;
-    }
-
-    const accountsCard = document.querySelector('.metric-card:nth-child(3) .metric-value');
-    if (accountsCard) {
-        accountsCard.textContent = activeAccounts;
-    }
+    var totalDebtEl = document.getElementById('totalDebtValue');
+    if (totalDebtEl) totalDebtEl.textContent = '$' + totalDebt.toFixed(2);
+    var totalMinEl = document.getElementById('totalMinimumsValue');
+    if (totalMinEl) totalMinEl.textContent = '$' + totalMinimumPayments.toFixed(2);
 }
 
 // Enhanced updateDebtDisplay function
-function updateDebtDisplayEnhanced(debtId, newBalance, isPaidOff = false) {
-    console.log(`📊 Updating debt display for ID ${debtId}, new balance: $${newBalance}, paid off: ${isPaidOff}`);
+function updateDebtDisplayEnhanced(debtId, newBalance, isPaidOff) {
+    if (isPaidOff === undefined) isPaidOff = false;
+    console.log(`Updating debt display for ID ${debtId}, new balance: $${newBalance}, paid off: ${isPaidOff}`);
 
-    // Find the debt row
-    const debtRows = document.querySelectorAll('tbody tr');
-    debtRows.forEach(row => {
-        const paymentBtn = row.querySelector(`button[onclick*="showPaymentModal(${debtId}"]`);
-        if (paymentBtn) {
-            // Get original balance from the row data
-            const progressBar = row.querySelector('.progress-bar');
-            const originalBalanceText = row.querySelector('small').textContent;
-            const paidMatch = originalBalanceText.match(/\$([\d,]+\.?\d*) paid off/);
-            const paidAmount = paidMatch ? parseFloat(paidMatch[1].replace(/,/g, '')) : 0;
-            const originalBalance = newBalance + paidAmount;
+    var row = document.querySelector('.debt-item[data-debt-id="' + debtId + '"]');
+    if (!row) return;
 
-            // Update current balance with formatting
-            const balanceCell = row.querySelector('td:nth-child(4)');
-            if (balanceCell) {
-                if (isPaidOff) {
-                    balanceCell.innerHTML = `<span class="fw-bold text-success">$${newBalance.toFixed(2)}</span>`;
-                } else {
-                    balanceCell.innerHTML = `<span class="fw-bold text-danger">$${newBalance.toFixed(2)}</span>`;
-                }
-            }
+    row.dataset.debtBalance = newBalance;
+    var originalBalance = parseFloat(row.dataset.originalBalance) || 0;
+    var progress = originalBalance > 0 ? ((originalBalance - newBalance) / originalBalance * 100) : 0;
+    progress = Math.max(0, Math.min(100, progress));
 
-            // Update progress bar
-            if (progressBar && originalBalance > 0) {
-                const progress = ((originalBalance - newBalance) / originalBalance * 100);
-                progressBar.style.width = progress + '%';
-                progressBar.setAttribute('aria-valuenow', progress);
-                progressBar.textContent = progress.toFixed(1) + '%';
+    // Balance display
+    var balanceEl = row.querySelector('.debt-balance-value');
+    if (balanceEl) {
+        balanceEl.textContent = '$' + newBalance.toFixed(2);
+        if (isPaidOff) balanceEl.classList.add('paid-off'); else balanceEl.classList.remove('paid-off');
+    }
 
-                // Change color based on progress
-                progressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
-                if (progress >= 100 || isPaidOff) {
-                    progressBar.classList.add('bg-success');
-                } else if (progress >= 75) {
-                    progressBar.classList.add('bg-success');
-                } else if (progress >= 50) {
-                    progressBar.classList.add('bg-warning');
-                } else {
-                    progressBar.classList.add('bg-danger');
-                }
-            }
+    // Mini progress
+    var miniBar = row.querySelector('.debt-progress-mini-fill');
+    if (miniBar) miniBar.style.width = progress + '%';
+    var miniLabel = row.querySelector('.debt-progress-mini-label');
+    if (miniLabel) miniLabel.textContent = Math.round(progress) + '% paid';
 
-            // Update paid off amount
-            const paidOffSmall = row.querySelector('td:nth-child(8) small');
-            if (paidOffSmall) {
-                paidOffSmall.textContent = `$${(originalBalance - newBalance).toFixed(2)} paid off`;
-            }
+    // Details: paid amount
+    var paidDetail = row.querySelector('.debt-detail-paid');
+    if (paidDetail) paidDetail.textContent = '$' + (originalBalance - newBalance).toFixed(2);
 
-            // Update payment button with new balance
-            const onclickStr = paymentBtn.getAttribute('onclick');
-            const newOnclick = onclickStr.replace(/showPaymentModal\(\d+,\s*'[^']+',\s*[\d.]+/,
-                `showPaymentModal(${debtId}, '${paymentBtn.getAttribute('onclick').match(/'([^']+)'/)[1]}', ${newBalance}`);
-            paymentBtn.setAttribute('onclick', newOnclick);
+    // Full progress bar
+    var fullBar = row.querySelector('.debt-progress-full-fill');
+    if (fullBar) {
+        fullBar.style.width = progress + '%';
+        fullBar.textContent = progress.toFixed(1) + '%';
+        fullBar.classList.remove('mid', 'high');
+        if (progress >= 70) fullBar.classList.add('high');
+        else if (progress >= 30) fullBar.classList.add('mid');
+    }
 
-            // Handle paid-off status
-            if (isPaidOff) {
-                // Add success row styling
-                row.classList.add('table-success');
+    // Payment button onclick
+    var payBtn = row.querySelector('.debt-action-btn.payment');
+    if (payBtn) {
+        var nameEl = row.querySelector('.debt-item-name-text');
+        var debtName = nameEl ? nameEl.textContent : '';
+        var minPay = row.dataset.minPayment || 'null';
+        payBtn.setAttribute('onclick', 'showPaymentModal(' + debtId + ', \'' + debtName + '\', ' + newBalance + ', ' + minPay + ')');
+    }
 
-                // Add "Paid Off" badge to name column if not already present
-                const nameCell = row.querySelector('td:first-child');
-                if (nameCell && !nameCell.querySelector('.badge.bg-success')) {
-                    const badgeHtml = '<span class="badge bg-success ms-2">Paid Off</span>';
-                    const nameDiv = nameCell.querySelector('div.d-flex') || nameCell.querySelector('div');
-                    if (nameDiv) {
-                        nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
-                    }
-                }
-            } else {
-                // Remove success styling if not paid off
-                row.classList.remove('table-success');
-
-                // Remove "Paid Off" badge if present
-                const badge = row.querySelector('.badge.bg-success');
-                if (badge && badge.textContent === 'Paid Off') {
-                    badge.remove();
-                }
-            }
+    // Paid-off visual
+    if (isPaidOff) {
+        row.classList.add('debt-paid-off');
+        var nameArea = row.querySelector('.debt-item-name-text');
+        if (nameArea && !row.querySelector('.debt-paid-badge')) {
+            nameArea.insertAdjacentHTML('afterend', '<span class="debt-paid-badge">Paid Off</span>');
         }
-    });
+    } else {
+        row.classList.remove('debt-paid-off');
+        var badge = row.querySelector('.debt-paid-badge');
+        if (badge) badge.remove();
+    }
 
-    // Update summary cards
     updateDebtSummaryCards();
 }
-
-// Replace the original updateDebtDisplay with this enhanced version
 updateDebtDisplay = updateDebtDisplayEnhanced;
-
-// Initialize debt charts on page load
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.location.pathname.includes('/debts')) {
-        console.log('💳 Loading debt management...');
-        loadFormData();
-        
-        // Initialize debt charts if Plotly is available
-        if (typeof Plotly !== 'undefined') {
-            setTimeout(loadDebtCharts, 500);
-        }
-    }
-});
 
 // Load debt charts
 function loadDebtCharts() {
-    console.log('📊 Loading debt charts...');
-    
-    // Get data from the table
+    console.log('Loading debt charts...');
+
+    // Read from data attributes on .debt-item elements
     const debtData = [];
-    const debtRows = document.querySelectorAll('tbody tr');
-    
-    debtRows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 8) {
-            const type = cells[1].textContent.trim();
-            const owner = cells[2].textContent.trim();
-            const balanceText = cells[3].textContent.trim();
-            const balance = parseFloat(balanceText.replace(/[$,]/g, ''));
-            
-            if (!isNaN(balance) && balance > 0) {
-                debtData.push({ type, owner, balance });
-            }
+    document.querySelectorAll('.debt-item').forEach(function(row) {
+        var type = row.dataset.debtType;
+        var owner = row.dataset.debtOwner;
+        var balance = parseFloat(row.dataset.debtBalance);
+        if (type && owner && !isNaN(balance) && balance > 0) {
+            debtData.push({ type: type, owner: owner, balance: balance });
         }
     });
-    
+
     if (debtData.length > 0) {
         createDebtByTypeChart(debtData);
         createDebtByOwnerChart(debtData);
@@ -1200,6 +1126,11 @@ function loadDebtCharts() {
 
 // Create debt by type chart
 function createDebtByTypeChart(debtData) {
+    var isDark = ['warm-ink','indigo'].includes(document.documentElement.dataset.theme || 'warm-ink');
+    var textColor = isDark ? '#8A8278' : '#7A6F65';
+    var paperBg = 'rgba(0,0,0,0)';
+    var plotBg = 'rgba(0,0,0,0)';
+
     const typeData = {};
     debtData.forEach(debt => {
         if (!typeData[debt.type]) {
@@ -1207,7 +1138,7 @@ function createDebtByTypeChart(debtData) {
         }
         typeData[debt.type] += debt.balance;
     });
-    
+
     const data = [{
         labels: Object.keys(typeData),
         values: Object.values(typeData),
@@ -1216,21 +1147,32 @@ function createDebtByTypeChart(debtData) {
         textinfo: 'label+percent',
         textposition: 'outside',
         marker: {
-            colors: ['#e74c3c', '#f39c12', '#27ae60', '#3498db', '#9b59b6', '#e67e22']
+            colors: ['#7BAF8E', '#C49A5E', '#6A8FBF', '#A67FB5', '#D4956A', '#E8761F']
         }
     }];
-    
+
     const layout = {
         showlegend: true,
-        height: 300,
-        margin: { t: 20, r: 20, b: 20, l: 20 }
+        height: 280,
+        margin: { t: 20, r: 20, b: 20, l: 20 },
+        font: { color: textColor, family: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif' },
+        paper_bgcolor: paperBg,
+        plot_bgcolor: plotBg,
+        legend: { font: { color: textColor } },
+        xaxis: { color: textColor, gridcolor: isDark ? '#332E28' : '#DDD9D2' },
+        yaxis: { color: textColor, gridcolor: isDark ? '#332E28' : '#DDD9D2' }
     };
-    
+
     Plotly.newPlot('debtByTypeChart', data, layout, { responsive: true });
 }
 
 // Create debt by owner chart
 function createDebtByOwnerChart(debtData) {
+    var isDark = ['warm-ink','indigo'].includes(document.documentElement.dataset.theme || 'warm-ink');
+    var textColor = isDark ? '#8A8278' : '#7A6F65';
+    var paperBg = 'rgba(0,0,0,0)';
+    var plotBg = 'rgba(0,0,0,0)';
+
     const ownerData = {};
     debtData.forEach(debt => {
         if (!ownerData[debt.owner]) {
@@ -1238,146 +1180,101 @@ function createDebtByOwnerChart(debtData) {
         }
         ownerData[debt.owner] += debt.balance;
     });
-    
+
     const data = [{
         x: Object.keys(ownerData),
         y: Object.values(ownerData),
         type: 'bar',
         marker: {
-            color: '#3498db',
+            color: '#C49A5E',
             opacity: 0.8
         },
         text: Object.values(ownerData).map(val => `$${val.toFixed(2)}`),
         textposition: 'outside'
     }];
-    
+
     const layout = {
-        xaxis: { title: 'Owner' },
-        yaxis: { title: 'Total Debt ($)' },
-        height: 300,
-        margin: { t: 20, r: 20, b: 40, l: 60 }
+        xaxis: { title: 'Owner', color: textColor, gridcolor: isDark ? '#332E28' : '#DDD9D2' },
+        yaxis: { title: 'Total Debt ($)', color: textColor, gridcolor: isDark ? '#332E28' : '#DDD9D2' },
+        height: 280,
+        margin: { t: 20, r: 20, b: 40, l: 60 },
+        font: { color: textColor, family: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif' },
+        paper_bgcolor: paperBg,
+        plot_bgcolor: plotBg,
+        legend: { font: { color: textColor } }
     };
-    
+
     Plotly.newPlot('debtByOwnerChart', data, layout, { responsive: true });
 }
 
-// Enhanced notification function
-function showDebtNotification(message, type = 'success') {
-    // Remove any existing notifications
-    const existingAlerts = document.querySelectorAll('.debt-notification');
-    existingAlerts.forEach(alert => alert.remove());
-    
-    // Create new notification
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show debt-notification`;
-    alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    
-    const icon = type === 'success' ? '✅' : type === 'danger' ? '❌' : 'ℹ️';
-    alertDiv.innerHTML = `
-        ${icon} ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.classList.remove('show');
-            setTimeout(() => alertDiv.remove(), 150);
+// Kanso-styled toast notification
+function showDebtNotification(message, type) {
+    type = type || 'success';
+    document.querySelectorAll('.debt-notification').forEach(function(el) { el.remove(); });
+
+    var div = document.createElement('div');
+    div.className = 'kanso-feedback debt-notification ' + (type === 'danger' ? 'error' : (type === 'info' ? 'info' : 'success'));
+    div.style.cssText = 'position:fixed;top:70px;right:20px;z-index:9999;min-width:280px;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,0.3);';
+
+    var icon = type === 'success' ? '\u2713' : type === 'danger' ? '\u2717' : '\u2139';
+    div.innerHTML = icon + ' ' + message + ' <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:16px;line-height:1;">\u00d7</button>';
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.gap = '8px';
+
+    document.body.appendChild(div);
+    setTimeout(function() {
+        if (div.parentNode) {
+            div.style.opacity = '0';
+            div.style.transition = 'opacity 0.3s ease';
+            setTimeout(function() { div.remove(); }, 300);
         }
     }, 5000);
 }
 
 // Refresh debt row after edit
 function refreshDebtRow(debtId, debtData) {
-    console.log(`🔄 Refreshing debt row for ID ${debtId}`);
-    
-    const debtRows = document.querySelectorAll('tbody tr');
-    debtRows.forEach(row => {
-        const editBtn = row.querySelector(`button[onclick*="editDebt(${debtId})"]`);
-        if (editBtn) {
-            // Update name
-            const nameCell = row.querySelector('td:first-child');
-            if (nameCell) {
-                let nameHtml = `<div class="fw-bold">${debtData.name}</div>`;
-                if (debtData.account_number_last4) {
-                    nameHtml += `<small class="text-muted">****${debtData.account_number_last4}</small>`;
-                }
-                nameCell.innerHTML = nameHtml;
-            }
-            
-            // Update type
-            const typeCell = row.querySelector('td:nth-child(2)');
-            if (typeCell) {
-                typeCell.innerHTML = `<span class="badge bg-secondary">${debtData.debt_type}</span>`;
-            }
-            
-            // Update owner
-            const ownerCell = row.querySelector('td:nth-child(3)');
-            if (ownerCell) {
-                ownerCell.textContent = debtData.owner;
-            }
-            
-            // Update current balance
-            const balanceCell = row.querySelector('td:nth-child(4)');
-            if (balanceCell) {
-                balanceCell.innerHTML = `<span class="fw-bold text-danger">$${parseFloat(debtData.current_balance).toFixed(2)}</span>`;
-            }
-            
-            // Update minimum payment
-            const minPaymentCell = row.querySelector('td:nth-child(5)');
-            if (minPaymentCell) {
-                if (debtData.minimum_payment) {
-                    minPaymentCell.textContent = `$${parseFloat(debtData.minimum_payment).toFixed(2)}`;
-                } else {
-                    minPaymentCell.innerHTML = '<span class="text-muted">Not set</span>';
-                }
-            }
-            
-            // Update interest rate
-            const interestCell = row.querySelector('td:nth-child(6)');
-            if (interestCell) {
-                if (debtData.interest_rate) {
-                    interestCell.textContent = `${(parseFloat(debtData.interest_rate) * 100).toFixed(2)}%`;
-                } else {
-                    interestCell.innerHTML = '<span class="text-muted">Not set</span>';
-                }
-            }
-            
-            // Update due date
-            const dueDateCell = row.querySelector('td:nth-child(7)');
-            if (dueDateCell) {
-                if (debtData.due_date) {
-                    const suffix = debtData.due_date == 1 || debtData.due_date == 21 || debtData.due_date == 31 ? 'st' :
-                                  debtData.due_date == 2 || debtData.due_date == 22 ? 'nd' :
-                                  debtData.due_date == 3 || debtData.due_date == 23 ? 'rd' : 'th';
-                    dueDateCell.textContent = `${debtData.due_date}${suffix}`;
-                } else {
-                    dueDateCell.innerHTML = '<span class="text-muted">Not set</span>';
-                }
-            }
-            
-            // Flash the row to indicate update
-            row.style.backgroundColor = 'rgba(39, 174, 96, 0.1)';
-            setTimeout(() => {
-                row.style.backgroundColor = '';
-            }, 1000);
-        }
-    });
-    
-    // Update summary cards
+    console.log(`Refreshing debt row for ID ${debtId}`);
+
+    var row = document.querySelector('.debt-item[data-debt-id="' + debtId + '"]');
+    if (!row) return;
+
+    row.dataset.debtType = debtData.debt_type;
+    row.dataset.debtOwner = debtData.owner;
+    row.dataset.debtBalance = debtData.current_balance;
+    row.dataset.originalBalance = debtData.original_balance;
+    row.dataset.minPayment = debtData.minimum_payment || 0;
+
+    var nameEl = row.querySelector('.debt-item-name-text');
+    if (nameEl) nameEl.textContent = debtData.name;
+
+    var last4El = row.querySelector('.debt-item-last4');
+    if (last4El) last4El.textContent = debtData.account_number_last4 ? '****' + debtData.account_number_last4 : '';
+
+    var typeEl = row.querySelector('.debt-type-badge');
+    if (typeEl) typeEl.textContent = debtData.debt_type;
+
+    var ownerEl = row.querySelector('.debt-item-owner');
+    if (ownerEl) ownerEl.textContent = debtData.owner;
+
+    var minPayEl = row.querySelector('.debt-min-payment');
+    if (minPayEl) minPayEl.textContent = debtData.minimum_payment ? '$' + parseFloat(debtData.minimum_payment).toFixed(2) : '\u2014';
+
+    var dueStr = debtData.due_date ? ' \u00b7 due ' + debtData.due_date + 'th' : '';
+    var minLabelEl = row.querySelector('.debt-min-label');
+    if (minLabelEl) minLabelEl.textContent = 'min' + dueStr;
+
+    // Flash
+    row.style.background = 'var(--success-dim)';
+    setTimeout(function() { row.style.background = ''; }, 1200);
+
     updateDebtSummaryCards();
-    
-    // Reload charts
-    if (typeof Plotly !== 'undefined') {
-        loadDebtCharts();
-    }
+    if (typeof Plotly !== 'undefined') loadDebtCharts();
 }
 
 // Toggle paid-off debts visibility
 function togglePaidOffDebts(showPaidOff) {
-    console.log(`🔄 Toggling paid-off debts: ${showPaidOff}`);
+    console.log(`Toggling paid-off debts: ${showPaidOff}`);
 
     // Reload page with query parameter
     const url = new URL(window.location.href);
@@ -1392,13 +1289,13 @@ function togglePaidOffDebts(showPaidOff) {
 
 // Delete debt account
 function deleteDebt(debtId, debtName) {
-    console.log(`🗑️ Requesting delete for debt: ${debtName} (ID: ${debtId})`);
+    console.log(`Requesting delete for debt: ${debtName} (ID: ${debtId})`);
 
     // Confirmation dialog
-    const confirmMessage = `⚠️ Are you sure you want to delete "${debtName}"?\n\nThis will permanently delete:\n• The debt account\n• All payment history records\n\nNote: Your transaction records will be preserved.\n\nThis action CANNOT be undone!`;
+    const confirmMessage = `Are you sure you want to delete "${debtName}"?\n\nThis will permanently delete:\n- The debt account\n- All payment history records\n\nNote: Your transaction records will be preserved.\n\nThis action CANNOT be undone!`;
 
     if (!confirm(confirmMessage)) {
-        console.log('❌ User cancelled deletion');
+        console.log('User cancelled deletion');
         return;
     }
 
@@ -1411,7 +1308,7 @@ function deleteDebt(debtId, debtName) {
     })
     .then(result => {
         if (result.success) {
-            console.log('✅ Debt deleted successfully:', result);
+            console.log('Debt deleted successfully:', result);
             showDebtNotification(result.message, 'success');
 
             // Reload page after short delay
@@ -1423,7 +1320,7 @@ function deleteDebt(debtId, debtName) {
         }
     })
     .catch(error => {
-        console.error('❌ Error deleting debt:', error);
+        console.error('Error deleting debt:', error);
         showDebtNotification('Error deleting debt account', 'danger');
     });
 }
@@ -1441,3 +1338,4 @@ window.handleChargeSelection = handleChargeSelection;
 window.clearPaymentValidation = clearPaymentValidation;
 window.togglePaidOffDebts = togglePaidOffDebts;
 window.deleteDebt = deleteDebt;
+window.toggleDebtDetails = toggleDebtDetails;

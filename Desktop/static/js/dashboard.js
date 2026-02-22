@@ -89,9 +89,30 @@ function loadOverviewCharts() {
     }
 }
 
+const CHART_COLORS = {
+    'warm-ink': {
+        needs: '#7BAF8E', wants: '#D4956A', business: '#6A8FBF', savings: '#A67FB5',
+        primary: '#C49A5E', bg: '#201D18', text: '#F0EBE3', grid: '#332E28'
+    },
+    'indigo': {
+        needs: '#7BAF8E', wants: '#D4956A', business: '#6A8FBF', savings: '#A67FB5',
+        primary: '#7B9ED9', bg: '#1A1F2C', text: '#E8EDF7', grid: '#252B3B'
+    },
+    'washi': {
+        needs: '#4A8B60', wants: '#B86A3A', business: '#3A6A9F', savings: '#7A5A9F',
+        primary: '#8C6A3F', bg: '#FFFFFF', text: '#2C2622', grid: '#DDD9D2'
+    }
+};
+
 function createSpendingTypeChart(data) {
     console.log('Creating spending type chart with data:', data);
-    
+
+    const theme = document.documentElement.dataset.theme || 'warm-ink';
+    const colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+
+    const typeColorMap = { needs: colors.needs, wants: colors.wants, business: colors.business, savings: colors.savings };
+    const chartColors = data.map(item => typeColorMap[(item.type || '').toLowerCase()] || colors.primary);
+
     const chartData = [{
         labels: data.map(item => item.type),
         values: data.map(item => item.amount),
@@ -99,100 +120,93 @@ function createSpendingTypeChart(data) {
         hole: 0.4,
         textinfo: 'label+percent',
         textposition: 'outside',
-        marker: {
-            colors: ['#e74c3c', '#f39c12', '#27ae60', '#3498db']
-        }
+        marker: { colors: chartColors }
     }];
-    
+
     const layout = {
         ...chartConfig.layout,
-        title: 'Spending by Type',
-        showlegend: false,
-        height: 350
+        title: { text: 'Spending by Type', font: { color: colors.text, size: 13 } },
+        showlegend: true,
+        legend: { font: { color: colors.text } },
+        paper_bgcolor: colors.bg,
+        plot_bgcolor: colors.bg,
+        font: { color: colors.text },
+        height: 300
     };
-    
-    Plotly.newPlot('spendingTypeChart', chartData, layout, chartConfig);
+
+    Plotly.newPlot('spendingTypeChart', chartData, layout, { responsive: true, displayModeBar: false });
 }
 
 function createTopCategoriesChart(data) {
     console.log('Creating top categories chart with data:', data);
-    
+
+    const theme = document.documentElement.dataset.theme || 'warm-ink';
+    const colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+
     const chartData = [{
         x: data.map(item => item.total),
         y: data.map(item => item.category),
         type: 'bar',
         orientation: 'h',
-        marker: {
-            color: '#3498db',
-            opacity: 0.8
-        },
+        marker: { color: colors.primary, opacity: 0.85 },
         text: data.map(item => `$${item.total.toFixed(2)}`),
         textposition: 'outside',
         hovertemplate: '<b>%{y}</b><br>Amount: $%{x:.2f}<extra></extra>'
     }];
-    
+
     const layout = {
         ...chartConfig.layout,
-        title: 'Top 5 Categories',
-        xaxis: { 
-            title: 'Amount ($)',
-            showgrid: true
-        },
-        yaxis: { 
-            title: '',
-            automargin: true
-        },
-        height: 350,
+        title: { text: 'Top 5 Categories', font: { color: colors.text, size: 13 } },
+        xaxis: { title: 'Amount ($)', showgrid: true, gridcolor: colors.grid, color: colors.text },
+        yaxis: { title: '', automargin: true, color: colors.text },
+        paper_bgcolor: colors.bg,
+        plot_bgcolor: colors.bg,
+        font: { color: colors.text },
+        height: 300,
         showlegend: false
     };
-    
-    Plotly.newPlot('topCategoriesChart', chartData, layout, chartConfig);
+
+    Plotly.newPlot('topCategoriesChart', chartData, layout, { responsive: true, displayModeBar: false });
 }
 
 
 // Monthly Trend Chart
 function createMonthlyTrendChart(trendData) {
     console.log('Creating monthly trend chart with data:', trendData);
-    
+
     if (!trendData || trendData.length === 0) {
         showNoDataMessage('monthlyTrendChart', 'No trend data available');
         return;
     }
-    
+
+    const theme = document.documentElement.dataset.theme || 'warm-ink';
+    const colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+
     const chartData = [{
         x: trendData.map(item => item.month),
         y: trendData.map(item => item.total),
         type: 'scatter',
         mode: 'lines+markers',
-        line: {
-            color: '#3498db',
-            width: 3
-        },
-        marker: {
-            color: '#3498db',
-            size: 8
-        },
+        line: { color: colors.primary, width: 3 },
+        marker: { color: colors.primary, size: 8 },
         text: trendData.map(item => `$${item.total.toFixed(2)}`),
         textposition: 'top center',
         hovertemplate: '<b>%{x}</b><br>Spending: $%{y:.2f}<extra></extra>'
     }];
-    
+
     const layout = {
         ...chartConfig.layout,
-        title: '3-Month Spending Trend',
-        xaxis: { 
-            title: 'Month',
-            showgrid: true
-        },
-        yaxis: { 
-            title: 'Amount ($)',
-            showgrid: true
-        },
-        height: 350,
+        title: { text: '3-Month Trend', font: { color: colors.text, size: 13 } },
+        xaxis: { title: 'Month', showgrid: true, gridcolor: colors.grid, color: colors.text },
+        yaxis: { title: 'Amount ($)', showgrid: true, gridcolor: colors.grid, color: colors.text },
+        paper_bgcolor: colors.bg,
+        plot_bgcolor: colors.bg,
+        font: { color: colors.text },
+        height: 300,
         showlegend: false
     };
-    
-    Plotly.newPlot('monthlyTrendChart', chartData, layout, chartConfig);
+
+    Plotly.newPlot('monthlyTrendChart', chartData, layout, { responsive: true, displayModeBar: false });
 }
 
 // Categories Management
@@ -206,15 +220,15 @@ function loadCategoriesManagement() {
     const yearSelect = document.querySelector('select[name="year"]');
     const monthSelect = document.querySelector('select[name="month"]');
     
-    if (yearSelect && monthSelect) {
+    if (yearSelect) {
         dashboardState.currentFilter = {
             year: yearSelect.value,
-            month: monthSelect.value
+            month: monthSelect ? monthSelect.value : 'all'
         };
-        
+
         // Add event listeners for filter changes
         yearSelect.addEventListener('change', loadCategoriesData);
-        monthSelect.addEventListener('change', loadCategoriesData);
+        if (monthSelect) monthSelect.addEventListener('change', loadCategoriesData);
     } else {
         dashboardState.currentFilter = {
             year: dashboardState.currentYear,
@@ -242,15 +256,15 @@ function loadCategoriesData() {
     const yearSelect = document.querySelector('select[name="year"]');
     const monthSelect = document.querySelector('select[name="month"]');
     
-    if (yearSelect && monthSelect) {
+    if (yearSelect) {
         dashboardState.currentFilter = {
             year: yearSelect.value,
-            month: monthSelect.value
+            month: monthSelect ? monthSelect.value : 'all'
         };
     }
     
     // Load data for the currently active tab
-    const activeTab = document.querySelector('#managementTabs .nav-link.active');
+    const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
     if (activeTab) {
         const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
         loadTabData(targetTab);
@@ -311,79 +325,58 @@ function loadCategories() {
 }
 
 function renderCategoriesTable(categories) {
-    console.log('🎨 Rendering categories table with', categories.length, 'categories');
-    
     const tableBody = document.getElementById('categoriesTableBody');
-    if (!tableBody) {
-        console.error('Categories table body not found');
-        return;
-    }
-    
-    if (categories.length === 0) {
+    if (!tableBody) return;
+
+    if (!categories || categories.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-4">
-                    <p class="text-muted">No categories found for the selected period.</p>
-                    <button class="btn btn-primary btn-sm" onclick="showAddModal('category')">
-                        ➕ Add Your First Category
-                    </button>
+                <td colspan="7" style="text-align:center;padding:32px;">
+                    <div style="color:var(--text-muted);margin-bottom:12px;font-size:13px;">No categories found for the selected period.</div>
+                    <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('category')">Add Your First Category</button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
         return;
     }
-    
+
     let html = '';
     categories.forEach(category => {
-        const typeClass = getTypeClass(category.type || '');
         html += `
             <tr>
-                <td class="fw-bold">${category.name}</td>
-                <td>
-                    <span class="badge ${typeClass}">${category.type || 'Not Set'}</span>
-                </td>
-                <td>${category.transaction_count || 0}</td>
-                <td class="fw-bold text-danger">$${(category.total_amount || 0).toFixed(2)}</td>
-                <td>$${(category.avg_amount || 0).toFixed(2)}</td>
-                <td class="text-primary">$${(category.budget_amount || 0).toFixed(2)}</td>
-                <td>
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-outline-primary btn-sm" 
-                                onclick="editItem('category', '${category.name}')"
-                                title="Edit Category">
-                            ✏️
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm" 
-                                onclick="deleteItem('category', '${category.name}', ${category.transaction_count || 0})"
-                                title="Delete Category">
-                            🗑️
-                        </button>
+                <td style="font-weight:600;">${category.name}</td>
+                <td>${getTypeBadgeHtml(category.type || '')}</td>
+                <td style="text-align:right;color:var(--text-muted);">${category.transaction_count || 0}</td>
+                <td style="text-align:right;font-weight:600;color:var(--danger);">$${(category.total_amount || 0).toFixed(2)}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${(category.avg_amount || 0).toFixed(2)}</td>
+                <td style="text-align:right;color:var(--primary);">$${(category.budget_amount || 0).toFixed(2)}</td>
+                <td style="text-align:center;">
+                    <div style="display:inline-flex;gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editItem('category','${category.name}')" title="Edit">${_SVG_EDIT}</button>
+                        <button class="debt-action-btn delete" onclick="deleteItem('category','${category.name}',${category.transaction_count || 0})" title="Delete">${_SVG_DELETE}</button>
                     </div>
                 </td>
-            </tr>
-        `;
+            </tr>`;
     });
-    
     tableBody.innerHTML = html;
 }
 
-// Add this function to support category badge rendering
-function getTypeClass(type) {
-    switch ((type || '').toLowerCase()) {
-        case 'living expenses':
-            return 'bg-info';
-        case 'debt':
-            return 'bg-danger';
-        case 'discretionary':
-            return 'bg-success';
-        case 'transport':
-            return 'bg-warning';
-        case 'travel':
-            return 'bg-primary';
-        default:
-            return 'bg-secondary';
+// Kanso type badge helper
+function getTypeBadgeHtml(type) {
+    const colorMap = {
+        'needs':    'var(--needs)',
+        'wants':    'var(--wants)',
+        'savings':  'var(--savings)',
+        'business': 'var(--business)'
+    };
+    const color = colorMap[(type || '').toLowerCase()] || 'var(--text-muted)';
+    if (!type) {
+        return `<span class="kanso-badge" style="background:var(--surface-raised);color:var(--text-muted);border:1px solid var(--border);">Not Set</span>`;
     }
+    return `<span class="kanso-badge" style="color:${color};background:color-mix(in srgb,${color} 15%,transparent);border:1px solid ${color};">${type}</span>`;
 }
+
+const _SVG_EDIT   = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" width="13" height="13"><path d="M9.5 2.5L11.5 4.5L5.5 10.5H3.5V8.5L9.5 2.5Z"/></svg>`;
+const _SVG_DELETE = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" width="13" height="13"><polyline points="2 4 12 4"/><path d="M5 4V2h4v2"/><path d="M3 4l.8 8h6.4L11 4"/></svg>`;
 // SubCategories Management
 function loadSubCategories() {
     console.log('🏷️ Loading sub-categories...');
@@ -409,41 +402,30 @@ function loadSubCategories() {
 function renderSubCategoriesTable(subcategories) {
     const tbody = document.getElementById('subcategoriesTableBody');
     if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (subcategories.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" class="text-center py-4">
-                    <p class="text-muted">No sub-categories found</p>
-                </td>
-            </tr>
-        `;
+
+    if (!subcategories || subcategories.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No sub-categories found</td></tr>`;
         return;
     }
-    
-    subcategories.forEach(subcategory => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="fw-bold">${subcategory.name}</td>
-            <td><span class="badge bg-info">${subcategory.category}</span></td>
-            <td>${subcategory.transaction_count}</td>
-            <td class="fw-bold">$${subcategory.total_amount.toFixed(2)}</td>
-            <td>$${subcategory.avg_amount.toFixed(2)}</td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-outline-primary btn-sm" onclick="editItem('subcategory', '${subcategory.name}')" title="Edit">
-                        ✏️
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="deleteItem('subcategory', '${subcategory.name}', ${subcategory.transaction_count})" title="Delete">
-                        🗑️
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(row);
+
+    let html = '';
+    subcategories.forEach(sub => {
+        html += `
+            <tr>
+                <td style="font-weight:600;">${sub.name}</td>
+                <td><span class="kanso-badge" style="background:var(--primary-dim);color:var(--primary);">${sub.category}</span></td>
+                <td style="text-align:right;color:var(--text-muted);">${sub.transaction_count}</td>
+                <td style="text-align:right;font-weight:600;">$${sub.total_amount.toFixed(2)}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${sub.avg_amount.toFixed(2)}</td>
+                <td style="text-align:center;">
+                    <div style="display:inline-flex;gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editItem('subcategory','${sub.name}')" title="Edit">${_SVG_EDIT}</button>
+                        <button class="debt-action-btn delete" onclick="deleteItem('subcategory','${sub.name}',${sub.transaction_count})" title="Delete">${_SVG_DELETE}</button>
+                    </div>
+                </td>
+            </tr>`;
     });
+    tbody.innerHTML = html;
 }
 
 // Owners Management
@@ -472,40 +454,29 @@ function loadOwners() {
 function renderOwnersTable(owners) {
     const tbody = document.getElementById('ownersTableBody');
     if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (owners.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-4">
-                    <p class="text-muted">No owners found</p>
-                </td>
-            </tr>
-        `;
+
+    if (!owners || owners.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No owners found</td></tr>`;
         return;
     }
-    
+
+    let html = '';
     owners.forEach(owner => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="fw-bold">${owner.name}</td>
-            <td>${owner.transaction_count}</td>
-            <td class="fw-bold">$${owner.total_amount.toFixed(2)}</td>
-            <td>$${owner.avg_amount.toFixed(2)}</td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-outline-primary btn-sm" onclick="editItem('owner', '${owner.name}')" title="Edit">
-                        ✏️
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="deleteItem('owner', '${owner.name}', ${owner.transaction_count})" title="Delete">
-                        🗑️
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(row);
+        html += `
+            <tr>
+                <td style="font-weight:600;">${owner.name}</td>
+                <td style="text-align:right;color:var(--text-muted);">${owner.transaction_count}</td>
+                <td style="text-align:right;font-weight:600;">$${owner.total_amount.toFixed(2)}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${owner.avg_amount.toFixed(2)}</td>
+                <td style="text-align:center;">
+                    <div style="display:inline-flex;gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editItem('owner','${owner.name}')" title="Edit">${_SVG_EDIT}</button>
+                        <button class="debt-action-btn delete" onclick="deleteItem('owner','${owner.name}',${owner.transaction_count})" title="Delete">${_SVG_DELETE}</button>
+                    </div>
+                </td>
+            </tr>`;
     });
+    tbody.innerHTML = html;
 }
 
 // Account Management
@@ -534,40 +505,29 @@ function loadAccounts() {
 function renderAccountsTable(accounts) {
     const tbody = document.getElementById('accountsTableBody');
     if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (accounts.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-4">
-                    <p class="text-muted">No accounts found</p>
-                </td>
-            </tr>
-        `;
+
+    if (!accounts || accounts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No accounts found</td></tr>`;
         return;
     }
-    
+
+    let html = '';
     accounts.forEach(account => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="fw-bold">${account.name}</td>
-            <td>${account.transaction_count}</td>
-            <td class="fw-bold">$${account.total_amount.toFixed(2)}</td>
-            <td>$${account.avg_amount.toFixed(2)}</td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-outline-primary btn-sm" onclick="editItem('account', '${account.name}')" title="Edit">
-                        ✏️
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="deleteItem('account', '${account.name}', ${account.transaction_count})" title="Delete">
-                        🗑️
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(row);
+        html += `
+            <tr>
+                <td style="font-weight:600;">${account.name}</td>
+                <td style="text-align:right;color:var(--text-muted);">${account.transaction_count}</td>
+                <td style="text-align:right;font-weight:600;">$${account.total_amount.toFixed(2)}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${account.avg_amount.toFixed(2)}</td>
+                <td style="text-align:center;">
+                    <div style="display:inline-flex;gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editItem('account','${account.name}')" title="Edit">${_SVG_EDIT}</button>
+                        <button class="debt-action-btn delete" onclick="deleteItem('account','${account.name}',${account.transaction_count})" title="Delete">${_SVG_DELETE}</button>
+                    </div>
+                </td>
+            </tr>`;
     });
+    tbody.innerHTML = html;
 }
 // Placeholder functions for categories management
 
@@ -775,7 +735,7 @@ function saveItem() {
             }
             
             // Reload current tab data
-            const activeTab = document.querySelector('#managementTabs .nav-link.active');
+            const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
             if (activeTab) {
                 const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
                 loadTabData(targetTab);
@@ -819,7 +779,7 @@ function deleteItem(type, name, transactionCount) {
             FinanceUtils.showAlert(result.message, 'success');
             
             // Reload current tab data
-            const activeTab = document.querySelector('#managementTabs .nav-link.active');
+            const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
             if (activeTab) {
                 const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
                 loadTabData(targetTab);
@@ -936,7 +896,7 @@ function executeMigration() {
             }
             
             // Reload current tab data
-            const activeTab = document.querySelector('#managementTabs .nav-link.active');
+            const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
             if (activeTab) {
                 const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
                 loadTabData(targetTab);
@@ -989,7 +949,7 @@ function getTemplateData(variableName) {
 function showNoDataMessage(elementId, message) {
     const element = document.getElementById(elementId);
     if (element) {
-        element.innerHTML = `<div class="alert alert-info">${message}</div>`;
+        element.innerHTML = `<div class="kanso-feedback info" style="text-align:center; padding:32px; margin:8px;">${message}</div>`;
     }
 }
 

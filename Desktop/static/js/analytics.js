@@ -889,11 +889,15 @@ function renderFilteredTransactionsTable(transactions) {
             <td>${tx.account_name || ''}</td>
             <td>${tx.type || ''}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="editTransactionFromAnalytics(${tx.id})" title="Edit">
-                    <i class="bi bi-pencil"></i> ✏️
+                <button class="debt-action-btn edit" onclick="editTransactionFromAnalytics(${tx.id})" title="Edit">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M11 2l3 3-9 9H2v-3L11 2z"/>
+                    </svg>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteTransactionFromAnalytics(${tx.id}, '${tx.description}')" title="Delete">
-                    <i class="bi bi-trash"></i> 🗑️
+                <button class="debt-action-btn delete" onclick="deleteTransactionFromAnalytics(${tx.id}, '${tx.description}')" title="Delete">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/>
+                    </svg>
                 </button>
             </td>
         `;
@@ -1203,7 +1207,7 @@ function renderMonthlySpendingMatrixTable(matrix) {
     ];
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const years = Object.keys(matrix).sort();
-    let html = '<div class="table-responsive"><table class="table table-bordered table-sm align-middle text-center">';
+    let html = '<div style="overflow-x:auto;"><table class="anl-table" style="text-align:center;">';
     // Header row
     html += '<thead><tr><th>Year</th>';
     months.forEach((m,i) => {
@@ -1221,7 +1225,7 @@ function renderMonthlySpendingMatrixTable(matrix) {
             } else {
                 const pct = cell.pct_change;
                 let pctStr = pct === null ? '-' : (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
-                let pctClass = pct > 0 ? 'text-success' : (pct < 0 ? 'text-danger' : 'text-muted');
+                let pctClass = pct > 0 ? 'anl-positive' : (pct < 0 ? 'anl-negative' : 'anl-neutral');
                 html += `<td class="${pctClass}">${pctStr}</td>`;
             }
         });

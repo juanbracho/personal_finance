@@ -14,7 +14,10 @@ def list_transactions():
 
     try:
         page = request.args.get('page', 1, type=int)
-        per_page = 50
+        _allowed_per_page = [25, 50, 100, 150, 200, 250]
+        per_page = request.args.get('per_page', 50, type=int)
+        if per_page not in _allowed_per_page:
+            per_page = 50
         offset = (page - 1) * per_page
         
         # Use raw SQL for consistency
@@ -96,8 +99,8 @@ def list_transactions():
         
         print(f"📝 Successfully loaded {len(transaction_items)} transactions, page {page}/{pages}")
         
-        return render_template('transactions.html', transactions=pagination)
-        
+        return render_template('transactions.html', transactions=pagination, per_page=per_page)
+
     except Exception as e:
         print(f"❌ Error in transactions route: {e}")
         import traceback
@@ -113,7 +116,7 @@ def list_transactions():
         empty_pagination.has_next = False
         empty_pagination.iter_pages = lambda: []
 
-        return render_template('transactions.html', transactions=empty_pagination)
+        return render_template('transactions.html', transactions=empty_pagination, per_page=50)
 
 @transactions_bp.route('/add', methods=['GET', 'POST'])
 def add_transaction():

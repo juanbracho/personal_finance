@@ -1,84 +1,83 @@
 {% extends "base.html" %}
-{% block extra_css %}
-<link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet">
-{% endblock %}
+
+{% block title %}Bulk Transaction — Kanso{% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/bulk_transactions.js') }}"></script>
 {% endblock %}
 
-{% block title %}Bulk Transaction - Personal Finance{% endblock %}
-
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1 class="display-6 fw-bold text-primary">📦 Bulk Transaction</h1>
-        <p class="lead text-muted">Add multiple transactions with shared category, type, account, and owner</p>
-    </div>
-    <div class="col-md-4 text-end">
-        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary">
+<div class="kanso-page-wide">
+
+    <!-- Page Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+        <div>
+            <div class="kanso-section-label" style="margin-bottom:4px;">Transactions</div>
+            <h1 style="font-size:22px; font-weight:700; color:var(--text); margin:0;">Bulk Transaction</h1>
+        </div>
+        <a href="{{ url_for('transactions.list_transactions') }}" class="btn-kanso btn-kanso-ghost">
             ← Back to Transactions
         </a>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-lg-10">
-        <form method="POST" id="bulkTransactionForm">
-            <input type="hidden" id="transactionItems" name="transaction_items" value="[]">
+    <div class="row g-4">
 
-            <!-- Common Fields Section -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">🏷️ Common Fields (Applied to All Transactions)</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="category" class="form-label">Category *</label>
-                            <select class="form-select" id="category" name="category" required>
-                                <option value="">Select category...</option>
+        <!-- ── Main form column ── -->
+        <div class="col-lg-10">
+            <form method="POST" id="bulkTransactionForm">
+                <input type="hidden" id="transactionItems" name="transaction_items" value="[]">
+
+                <!-- Common Fields -->
+                <div class="kanso-card" style="margin-bottom:16px; padding:20px 22px;">
+                    <div class="kanso-form-section">Common Fields — Applied to All Transactions</div>
+
+                    <!-- 3-col: Category | Sub-category | Type -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px 20px; margin-bottom:16px;">
+                        <div>
+                            <label class="kanso-form-label" for="category">Category <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="category" name="category" required>
+                                <option value="">Select category…</option>
                                 {% for category in categories %}
                                 <option value="{{ category }}">{{ category }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label for="sub_category" class="form-label">Sub-Category</label>
-                            <select class="form-select" id="sub_category" name="sub_category">
-                                <option value="">Select sub-category...</option>
+                        <div>
+                            <label class="kanso-form-label" for="sub_category">Sub-Category</label>
+                            <select class="kanso-select" id="sub_category" name="sub_category">
+                                <option value="">Select sub-category…</option>
                                 {% for sub_category in sub_categories %}
                                 <option value="{{ sub_category }}">{{ sub_category }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label for="type" class="form-label">Type *</label>
-                            <select class="form-select" id="type" name="type" required>
-                                <option value="">Select type...</option>
+                        <div>
+                            <label class="kanso-form-label" for="type">Type <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="type" name="type" required>
+                                <option value="">Select type…</option>
                                 <option value="Needs">Needs</option>
                                 <option value="Wants">Wants</option>
                                 <option value="Savings">Savings</option>
                                 <option value="Business">Business</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="account_name" class="form-label">Account *</label>
-                            <select class="form-select" id="account_name" name="account_name" required>
-                                <option value="">Select account...</option>
+                    <!-- 2-col: Account | Owner -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 20px;">
+                        <div>
+                            <label class="kanso-form-label" for="account_name">Account <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="account_name" name="account_name" required>
+                                <option value="">Select account…</option>
                                 {% for account in accounts %}
                                 <option value="{{ account }}">{{ account }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label for="owner" class="form-label">Owner *</label>
-                            <select class="form-select" id="owner" name="owner" required>
-                                <option value="">Select owner...</option>
+                        <div>
+                            <label class="kanso-form-label" for="owner">Owner <span style="color:var(--danger)">*</span></label>
+                            <select class="kanso-select" id="owner" name="owner" required>
+                                <option value="">Select owner…</option>
                                 {% for owner in owners %}
                                 <option value="{{ owner }}">{{ owner }}</option>
                                 {% endfor %}
@@ -86,89 +85,80 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Transaction Items Section -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📝 Transaction Items</h5>
-                    <button type="button" class="btn btn-success btn-sm" onclick="addRow()">
-                        ➕ Add Row
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="itemsTable">
-                            <thead>
-                                <tr>
-                                    <th style="width: 150px;">Date *</th>
-                                    <th>Description *</th>
-                                    <th style="width: 150px;">Amount *</th>
-                                    <th style="width: 60px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemsTableBody">
-                                <!-- Rows will be added dynamically -->
-                            </tbody>
-                        </table>
+                <!-- Transaction Items -->
+                <div class="kanso-card" style="margin-bottom:16px; padding:0; overflow:hidden;">
+
+                    <!-- Card header -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border-subtle);">
+                        <span style="font-size:13px; font-weight:600; color:var(--text);">Transaction Items</span>
+                        <button type="button" class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="addRow()">
+                            + Add Row
+                        </button>
                     </div>
 
-                    <div class="text-center text-muted py-3" id="emptyMessage">
-                        No items added yet. Click "Add Row" to start.
-                    </div>
+                    <div style="padding:16px 18px;">
+                        <!-- Column header labels -->
+                        <div style="display:flex; gap:10px; padding-bottom:8px; font-size:11px; font-weight:600; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border-subtle); margin-bottom:4px;">
+                            <div style="flex:0 0 160px;">Date</div>
+                            <div style="flex:1;">Description</div>
+                            <div style="flex:0 0 160px;">Amount</div>
+                            <div style="flex:0 0 36px;"></div>
+                        </div>
 
-                    <!-- Summary -->
-                    <div class="bulk-summary mt-3 p-3 bg-light rounded" id="summarySection" style="display: none;">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <span class="text-muted">Items: </span>
-                                <strong id="itemCount">0</strong>
-                            </div>
-                            <div class="col-md-6 text-end">
-                                <span class="text-muted">Total: </span>
-                                <strong class="fs-5" id="totalAmount">$0.00</strong>
+                        <!-- Rows container (JS appends divs here) -->
+                        <div id="itemsTableBody"></div>
+
+                        <!-- Empty state -->
+                        <div id="emptyMessage" style="text-align:center; padding:24px 0; font-size:13.5px; color:var(--text-faint);">
+                            No items added yet. Click "Add Row" to start.
+                        </div>
+
+                        <!-- Summary strip -->
+                        <div id="summarySection" style="display:none; margin-top:12px;">
+                            <div style="padding:12px 16px; background:var(--surface-raised); border-radius:10px; border:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:13px; color:var(--text-muted);">
+                                    Items: <strong id="itemCount" style="color:var(--text);">0</strong>
+                                </span>
+                                <span style="font-size:13px; color:var(--text-muted);">
+                                    Total: <strong id="totalAmount" style="color:var(--text);">$0.00</strong>
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Form Actions -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary">
-                            Cancel
-                        </a>
-                        <div>
-                            <button type="button" class="btn btn-outline-warning me-2" onclick="resetForm()">
-                                Reset
-                            </button>
-                            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-                                💾 Save All Transactions
-                            </button>
-                        </div>
+                <!-- Actions -->
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="btn-kanso btn-kanso-ghost">
+                        Cancel
+                    </a>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button type="button" class="btn-kanso btn-kanso-ghost" onclick="resetForm()">
+                            Reset
+                        </button>
+                        <button type="submit" class="btn-kanso btn-kanso-primary" id="submitBtn" disabled>
+                            Save All Transactions
+                        </button>
                     </div>
                 </div>
-            </div>
-        </form>
-    </div>
 
-    <!-- Tips Sidebar -->
-    <div class="col-lg-2">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">💡 Tips</h6>
-            </div>
-            <div class="card-body">
-                <ul class="small mb-0">
-                    <li class="mb-2">Common fields apply to ALL items</li>
-                    <li class="mb-2"><span class="text-danger">Positive</span> = Expense</li>
-                    <li class="mb-2"><span class="text-success">Negative</span> = Income</li>
-                    <li class="mb-2">Each row needs date, description, and amount</li>
+            </form>
+        </div>
+
+        <!-- ── Tips sidebar ── -->
+        <div class="col-lg-2">
+            <div class="kanso-card" style="padding:18px 20px;">
+                <div class="kanso-form-section" style="margin-bottom:12px;">Tips</div>
+                <ul style="margin:0; padding-left:16px; font-size:12.5px; color:var(--text-muted); line-height:2;">
+                    <li>Common fields apply to ALL items</li>
+                    <li><span style="color:var(--danger);">Positive</span> = Expense</li>
+                    <li><span style="color:var(--success);">Negative</span> = Income</li>
+                    <li>Each row needs date, description &amp; amount</li>
                 </ul>
             </div>
         </div>
-    </div>
-</div>
+
+    </div><!-- /row -->
+</div><!-- /kanso-page-wide -->
 {% endblock %}

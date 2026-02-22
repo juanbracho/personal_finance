@@ -21,29 +21,29 @@ function addRow() {
     const tbody = document.getElementById('itemsTableBody');
     const today = new Date().toISOString().split('T')[0];
 
-    const row = document.createElement('tr');
+    const row = document.createElement('div');
     row.id = `row-${rowCounter}`;
     row.className = 'bulk-item-row';
     row.innerHTML = `
-        <td>
+        <div style="flex:0 0 160px;">
             <input type="date"
-                   class="form-control form-control-sm item-date"
+                   class="kanso-input item-date"
                    value="${today}"
                    data-row="${rowCounter}"
                    required>
-        </td>
-        <td>
+        </div>
+        <div style="flex:1;">
             <input type="text"
-                   class="form-control form-control-sm item-description"
+                   class="kanso-input item-description"
                    placeholder="Enter description..."
                    data-row="${rowCounter}"
                    required>
-        </td>
-        <td>
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">$</span>
+        </div>
+        <div style="flex:0 0 160px;">
+            <div class="kanso-input-group">
+                <span class="kanso-input-affix prefix">$</span>
                 <input type="number"
-                       class="form-control item-amount"
+                       class="kanso-input has-prefix item-amount"
                        step="0.01"
                        placeholder="0.00"
                        data-row="${rowCounter}"
@@ -51,15 +51,17 @@ function addRow() {
                        oninput="updateTotals()"
                        required>
             </div>
-        </td>
-        <td>
+        </div>
+        <div style="flex:0 0 36px; display:flex; align-items:center; justify-content:center;">
             <button type="button"
-                    class="btn btn-outline-danger btn-sm"
+                    class="debt-action-btn delete"
                     onclick="removeRow(${rowCounter})"
                     title="Remove row">
-                🗑️
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/>
+                </svg>
             </button>
-        </td>
+        </div>
     `;
 
     tbody.appendChild(row);
@@ -118,10 +120,10 @@ function updateTotals() {
     const totalElement = document.getElementById('totalAmount');
     if (total < 0) {
         totalElement.textContent = `-$${Math.abs(total).toFixed(2)}`;
-        totalElement.className = 'fs-5 text-success';
+        totalElement.className = 'txn-amount income';
     } else {
         totalElement.textContent = `$${total.toFixed(2)}`;
-        totalElement.className = 'fs-5 text-danger';
+        totalElement.className = 'txn-amount expense';
     }
 }
 

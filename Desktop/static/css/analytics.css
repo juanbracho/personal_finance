@@ -1,38 +1,25 @@
 /* Analytics Page Specific Styles */
 
 /* Filter Panel */
-.filter-panel {
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    margin-bottom: 1.5rem;
-}
-
-.filter-panel.collapsed {
-    display: none;
-}
-
-.filter-panel .card-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 12px 12px 0 0;
-    padding: 0.75rem 1rem;
-}
-
-/* Filter Form Elements */
 .analytics-filter-group {
     margin-bottom: 1.5rem;
 }
 
+/* ID-based selector — JS toggles .collapsed on #filterPanel */
+#filterPanel.collapsed {
+    display: none;
+}
+
+/* Filter Form Elements */
 .form-select[multiple] {
     border-radius: 8px;
-    border: 2px solid #e9ecef;
+    border: 2px solid var(--border);
     transition: border-color 0.2s;
 }
 
 .form-select[multiple]:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.2rem var(--primary-dim);
 }
 
 .form-select[multiple] option {
@@ -42,15 +29,15 @@
 }
 
 .form-select[multiple] option:checked {
-    background-color: #667eea !important;
-    color: white !important;
+    background-color: var(--primary) !important;
+    color: var(--bg) !important;
 }
 
 /* Quick Preset Buttons */
 .btn-group .btn-outline-secondary.active {
-    background-color: #667eea;
-    border-color: #667eea;
-    color: white;
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--surface);
 }
 
 /* Analytics Charts */
@@ -70,7 +57,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -79,7 +66,7 @@
 }
 
 #loadingIndicator {
-    background: rgba(102, 126, 234, 0.1);
+    background: var(--primary-dim);
     border-radius: 15px;
     padding: 2rem;
 }
@@ -106,22 +93,10 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Analytics Cards */
-.analytics-card {
-    border-radius: 15px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease;
-}
-
+/* Analytics card hover only (no card or card-header overrides) */
 .analytics-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
-
-.analytics-card .card-header {
-    background: white;
-    border-bottom: 2px solid #e9ecef;
-    border-radius: 15px 15px 0 0;
 }
 
 /* Multi-select Styling Enhancements */
@@ -133,8 +108,8 @@
     position: absolute;
     top: -8px;
     right: 8px;
-    background: #667eea;
-    color: white;
+    background: var(--primary);
+    color: var(--surface);
     font-size: 0.7rem;
     padding: 2px 6px;
     border-radius: 10px;
@@ -147,9 +122,9 @@
 }
 
 .amount-input-group .input-group-text {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: #667eea;
+    background: var(--primary);
+    color: var(--surface);
+    border-color: var(--primary);
 }
 
 /* Chart Error States */
@@ -158,14 +133,14 @@
     justify-content: center;
     align-items: center;
     min-height: 300px;
-    color: #6c757d;
+    color: var(--text-muted);
     font-style: italic;
 }
 
 .chart-no-data {
     text-align: center;
     padding: 3rem;
-    color: #6c757d;
+    color: var(--text-muted);
 }
 
 .chart-no-data i {
@@ -176,26 +151,13 @@
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
-    .filter-panel .row {
-        margin-bottom: 1rem;
-    }
-    
-    .filter-panel .col-md-3,
-    .filter-panel .col-md-6 {
-        margin-bottom: 1rem;
-    }
-    
     .btn-group .btn {
         font-size: 0.8rem;
         padding: 0.25rem 0.5rem;
     }
-    
+
     .chart-container {
         min-height: 250px;
-    }
-    
-    #summaryStats .col-md-3 {
-        margin-bottom: 1rem;
     }
 }
 
@@ -230,9 +192,9 @@
     right: -2px;
     width: 8px;
     height: 8px;
-    background: #28a745;
+    background: var(--success);
     border-radius: 50%;
-    border: 2px solid white;
+    border: 2px solid var(--surface);
 }
 
 /* Subcategory filter specific styling */
@@ -242,19 +204,13 @@
 
 /* Enhanced subcategory filter label */
 #subcategoriesFilter {
-    background-color: #f8f9fa;
-    border-left: 3px solid #667eea;
+    background: var(--surface-raised);
+    border-left: 3px solid var(--primary);
 }
 
 /* Compact filter styles */
 .filter-panel .card-body {
     padding: 1rem;
-}
-
-.form-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
 }
 
 .form-select-sm[multiple] {
@@ -277,83 +233,63 @@
     margin-bottom: 1rem !important;
 }
 
-/* Data Tables Styling */
-.table-responsive {
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.table th {
-    background-color: #f8f9fa;
-    border-top: none;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.5rem;
-}
-
-.table td {
-    font-size: 0.85rem;
-    padding: 0.5rem;
-    vertical-align: middle;
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(102, 126, 234, 0.05);
-}
-
-/* Top ranking indicators */
-.table tbody tr:first-child {
-    background-color: rgba(255, 193, 7, 0.1) !important;
-}
-
-.table tbody tr:nth-child(2) {
-    background-color: rgba(108, 117, 125, 0.1) !important;
-}
-
-.table tbody tr:nth-child(3) {
-    background-color: rgba(205, 133, 63, 0.1) !important;
-}
-
-/* Category/Subcategory table specific styling */
-#categoryAmountsTable .fw-bold,
-#categoryCountsTable .fw-bold,
-#subcategoryAmountsTable .fw-bold {
-    color: #667eea;
-}
-
-/* Subcategory table special styling */
-#subcategoryAmountsTable td:nth-child(2) {
-    line-height: 1.3;
-}
-
-#subcategoryAmountsTable small {
-    font-size: 0.75rem;
-    opacity: 0.7;
-}
-
 /* Responsive improvements for mobile */
 @media (max-width: 768px) {
-    .filter-panel .col-md-2,
-    .filter-panel .col-md-3 {
-        margin-bottom: 0.75rem;
-    }
-    
     .btn-group {
         flex-wrap: wrap;
     }
-    
+
     .btn-group .btn {
         margin-bottom: 0.25rem;
     }
-    
-    /* Make tables more mobile friendly */
-    .table th,
-    .table td {
-        font-size: 0.75rem;
-        padding: 0.375rem 0.25rem;
-    }
-    
-    .col-md-4 {
-        margin-bottom: 1rem;
-    }
+}
+
+/* ── Analytics data table ─────────────────────────────── */
+.anl-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+.anl-table th {
+    font-size:11px; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.5px; color:var(--text-faint); padding:8px 12px;
+    border-bottom:1px solid var(--border); background:var(--surface);
+    position:sticky; top:0; white-space:nowrap;
+}
+.anl-table td {
+    padding:9px 12px; border-bottom:1px solid var(--border-subtle);
+    color:var(--text); vertical-align:middle;
+}
+.anl-table tbody tr:last-child td { border-bottom:none; }
+.anl-table tbody tr:hover td { background:var(--surface-raised); }
+/* Rank highlights */
+.anl-table tbody tr:first-child td { background:color-mix(in srgb, var(--primary) 8%, transparent); }
+.anl-table tbody tr:nth-child(2) td { background:var(--surface-raised); }
+.anl-table tbody tr:nth-child(3) td { background:color-mix(in srgb, var(--wants) 8%, transparent); }
+
+/* ── YoY % change colors ──────────────────────────────── */
+.anl-positive { color:var(--success); font-weight:600; }
+.anl-negative { color:var(--danger); font-weight:600; }
+.anl-neutral  { color:var(--text-faint); }
+
+/* ── YoY view toggle buttons ──────────────────────────── */
+.anl-view-toggle { display:flex; gap:4px; }
+.anl-view-btn {
+    padding:5px 12px; border-radius:7px; border:1px solid var(--border);
+    background:var(--surface-raised); color:var(--text-muted);
+    font-size:12.5px; font-weight:500; cursor:pointer;
+    transition:all 0.15s ease; user-select:none;
+}
+.anl-view-btn.active {
+    background:var(--primary-dim); color:var(--primary); border-color:var(--primary);
+}
+
+/* ── Multi-select override ────────────────────────────── */
+.kanso-select[multiple] { height:auto; padding:4px; background-image:none; }
+.kanso-select[multiple] option { padding:4px 8px; border-radius:4px; }
+.kanso-select[multiple] option:checked {
+    background:var(--primary) !important; color:var(--bg) !important;
+}
+
+/* ── Bulk edit info box ───────────────────────────────── */
+.anl-info-box {
+    background:var(--primary-dim); border:1px solid var(--primary);
+    border-radius:9px; padding:12px 14px;
+    font-size:13px; color:var(--text-muted); margin-bottom:16px;
 }
