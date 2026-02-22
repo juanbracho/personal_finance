@@ -1094,3 +1094,46 @@ window.Dashboard = {
     loadCategoriesManagement,
     copyTemplateBudget
 };
+
+// ── Theme-change chart refresh ─────────────────────────────────
+// Patch setTheme (defined in base.html) so charts re-render whenever
+// the user switches themes. setTheme is already defined before this
+// script loads (it's in a <script> block above extra_js).
+(function() {
+    var _orig = window.setTheme;
+    if (typeof _orig !== 'function') return;
+    window.setTheme = function(name) {
+        _orig(name);
+        refreshChartsForTheme(name);
+    };
+})();
+
+function refreshChartsForTheme(theme) {
+    var colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+
+    // Overview view: re-create charts — they read theme at creation time
+    var overviewEl = document.getElementById('spendingTypeChart');
+    if (overviewEl && overviewEl._fullLayout) {
+        loadOverviewCharts();
+        return;
+    }
+
+    // Budget view: relayout existing Plotly figures with new bg/text colors
+    var layoutUpdate = {
+        paper_bgcolor: colors.bg,
+        plot_bgcolor:  colors.bg,
+        'font.color':          colors.text,
+        'legend.font.color':   colors.text,
+        'xaxis.color':         colors.text,
+        'xaxis.gridcolor':     colors.grid,
+        'yaxis.color':         colors.text,
+        'yaxis.gridcolor':     colors.grid
+    };
+
+    ['budgetVsActualChart', 'budgetImpactChart'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && el._fullLayout && typeof Plotly !== 'undefined') {
+            Plotly.relayout(id, layoutUpdate);
+        }
+    });
+}

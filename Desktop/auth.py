@@ -42,6 +42,13 @@ def check_api_key():
     if not expected_key:
         return None
 
+    # Allow logged-in web users to reach API endpoints without a Bearer token.
+    # Their browser requests carry session cookies instead.
+    if session.get('logged_in'):
+        login_time = session.get('login_time', 0)
+        if time.time() - login_time <= SESSION_LIFETIME_SECONDS:
+            return None
+
     auth_header = request.headers.get('Authorization', '')
     if not auth_header.startswith('Bearer '):
         return jsonify({
