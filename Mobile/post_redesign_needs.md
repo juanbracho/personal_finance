@@ -21,3 +21,9 @@
 
   ---
   Those are the four distinct things to address.
+
+  User extra issues:
+
+  In development enviroment categories view in dashboard load all categories, sub, type, owners but on Railway live server does not load. 
+
+  Add the same mobile signing screen design to webapp
