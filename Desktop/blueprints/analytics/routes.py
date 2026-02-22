@@ -64,18 +64,35 @@ def analytics_dashboard():
         available_subcategories = [{'subcategory': row['sub_category'], 'category': row['category']} 
                                  for _, row in subcategories_df.iterrows()]
         
+        # Build types list: defaults + transactions + custom_types
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS custom_types (name TEXT PRIMARY KEY, created_at TEXT NOT NULL)")
+        cursor.execute("SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type")
+        txn_types = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT name FROM custom_types ORDER BY name")
+        custom_type_names = [r[0] for r in cursor.fetchall()]
+
         conn.close()
-        
+
+        _defaults = ['Needs', 'Wants', 'Savings', 'Business']
+        seen = set(_defaults)
+        available_types = _defaults.copy()
+        for t in (txn_types + custom_type_names):
+            if t not in seen:
+                seen.add(t)
+                available_types.append(t)
+
         # Default date range (last 6 months)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=180)
-        
+
         return render_template('analytics.html',
                              available_years=available_years,
                              available_owners=available_owners,
                              available_categories=available_categories,
                              available_accounts=available_accounts,
                              available_subcategories=available_subcategories,
+                             available_types=available_types,
                              default_start_date=start_date.strftime('%Y-%m-%d'),
                              default_end_date=end_date.strftime('%Y-%m-%d'))
                              

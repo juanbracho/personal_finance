@@ -524,6 +524,47 @@ function addNewOwner() {
     FinanceUtils.showAlert(`Owner "${ownerName}" will be saved with the transaction`, 'success');
 }
 
+function addNewType() {
+    console.log('➕ Adding new type...');
+
+    const newType = prompt('Enter new type name:');
+    if (!newType || !newType.trim()) {
+        return;
+    }
+
+    const typeName = newType.trim();
+
+    if (typeName.length < 2) {
+        FinanceUtils.showAlert('Type name must be at least 2 characters long', 'danger');
+        return;
+    }
+
+    fetch('/api/categories/types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: typeName })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const typeSelect = document.getElementById('type');
+            if (typeSelect) {
+                const option = new Option(typeName, typeName);
+                typeSelect.add(option);
+                typeSelect.value = typeName;
+                typeSelect.classList.add('is-valid');
+            }
+            FinanceUtils.showAlert(`Type "${typeName}" added successfully!`, 'success');
+        } else {
+            FinanceUtils.showAlert(`Error adding type: ${result.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error adding type:', error);
+        FinanceUtils.showAlert('Error adding type', 'danger');
+    });
+}
+
 // ============================================================================
 // QUICK ACTIONS AND TEMPLATES
 // ============================================================================
@@ -573,6 +614,9 @@ function setupQuickActionHandlers() {
                     break;
                 case 'add-owner':
                     addNewOwner();
+                    break;
+                case 'add-type':
+                    addNewType();
                     break;
             }
         });
@@ -1162,6 +1206,7 @@ window.addNewCategory = addNewCategory;
 window.addNewSubCategory = addNewSubCategory;
 window.addNewAccount = addNewAccount;
 window.addNewOwner = addNewOwner;
+window.addNewType = addNewType;
 window.applySimilarTransaction = applySimilarTransaction;
 
 // Export transaction functions

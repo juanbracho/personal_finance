@@ -11,6 +11,10 @@
     <div class="kanso-info-value" id="totalSubCategories">—</div>
   </div>
   <div class="kanso-info-item">
+    <div class="kanso-info-label">Types</div>
+    <div class="kanso-info-value" id="totalTypes">—</div>
+  </div>
+  <div class="kanso-info-item">
     <div class="kanso-info-label">Owners</div>
     <div class="kanso-info-value" id="totalOwners">—</div>
   </div>
@@ -44,6 +48,11 @@
             data-bs-toggle="tab" data-bs-target="#accounts" type="button" role="tab"
             aria-controls="accounts" aria-selected="false">
       Accounts
+    </button>
+    <button class="dsh-tab-btn" id="types-tab"
+            data-bs-toggle="tab" data-bs-target="#types" type="button" role="tab"
+            aria-controls="types" aria-selected="false">
+      Types
     </button>
   </div>
 
@@ -171,6 +180,37 @@
             <tr>
               <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">
                 Click the Accounts tab to load data
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Types pane -->
+    <div class="tab-pane fade" id="types" role="tabpanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="kanso-section-label" style="margin-bottom:0;">Types</div>
+        <button class="btn-kanso btn-kanso-primary btn-kanso-sm" onclick="showAddModal('type')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg>
+          Add Type
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="anl-table" id="typesTable">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th style="text-align:right;">Transactions</th>
+              <th style="text-align:right;">Total Amount</th>
+              <th style="text-align:right;">Average</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="typesTableBody">
+            <tr>
+              <td colspan="5" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">
+                Click the Types tab to load data
               </td>
             </tr>
           </tbody>

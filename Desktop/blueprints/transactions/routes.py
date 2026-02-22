@@ -59,25 +59,39 @@ def list_transactions():
         column_names = [description[0] for description in cursor.description]
         print(f"📊 Found {len(transactions_data)} transactions for page {page}")
         
+        # Build types list for edit modal
+        cursor.execute("CREATE TABLE IF NOT EXISTS custom_types (name TEXT PRIMARY KEY, created_at TEXT NOT NULL)")
+        cursor.execute("SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type")
+        txn_types = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT name FROM custom_types ORDER BY name")
+        custom_type_names = [r[0] for r in cursor.fetchall()]
+
         conn.close()
-        
+
+        _defaults = ['Needs', 'Wants', 'Savings', 'Business']
+        seen = set(_defaults)
+        types_list = _defaults.copy()
+        for t in (txn_types + custom_type_names):
+            if t not in seen:
+                seen.add(t)
+                types_list.append(t)
+
         # Convert to objects for template
         transaction_items = []
         for row in transactions_data:
             transaction_obj = type('Transaction', (), {})()
             for i, col in enumerate(column_names):
                 if col == 'date':
-                    # Convert date string to date object
                     transaction_obj.date = datetime.strptime(row[i], '%Y-%m-%d').date()
                 else:
                     setattr(transaction_obj, col, row[i])
             transaction_items.append(transaction_obj)
-        
+
         # Calculate pagination info
         has_prev = page > 1
         has_next = offset + per_page < total
         pages = (total + per_page - 1) // per_page
-        
+
         # Create pagination object
         pagination = type('Pagination', (), {})()
         pagination.items = transaction_items
@@ -88,7 +102,7 @@ def list_transactions():
         pagination.has_next = has_next
         pagination.prev_num = page - 1 if has_prev else None
         pagination.next_num = page + 1 if has_next else None
-        
+
         # Add iter_pages method
         def iter_pages():
             start = max(1, page - 2)
@@ -96,10 +110,10 @@ def list_transactions():
             for p in range(start, end):
                 yield p
         pagination.iter_pages = iter_pages
-        
+
         print(f"📝 Successfully loaded {len(transaction_items)} transactions, page {page}/{pages}")
-        
-        return render_template('transactions.html', transactions=pagination, per_page=per_page)
+
+        return render_template('transactions.html', transactions=pagination, per_page=per_page, types=types_list)
 
     except Exception as e:
         print(f"❌ Error in transactions route: {e}")
@@ -323,49 +337,68 @@ def add_transaction():
         """, conn)
         
         owners_df = pd.read_sql_query("""
-            SELECT DISTINCT owner FROM transactions 
-            WHERE owner IS NOT NULL 
+            SELECT DISTINCT owner FROM transactions
+            WHERE owner IS NOT NULL
             ORDER BY owner
         """, conn)
-        
+
+        # Build types list: defaults + any from transactions + custom types
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS custom_types (name TEXT PRIMARY KEY, created_at TEXT NOT NULL)")
+        cursor.execute("SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type")
+        txn_types = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT name FROM custom_types ORDER BY name")
+        custom_type_names = [r[0] for r in cursor.fetchall()]
+
         conn.close()
-        
+
         # Convert to lists for template
         categories_list = categories_df['category'].tolist()
         sub_categories_list = sub_categories_df['sub_category'].tolist()
         accounts_list = accounts_df['account_name'].tolist()
         owners_list = owners_df['owner'].tolist()
-        
+
+        _defaults = ['Needs', 'Wants', 'Savings', 'Business']
+        seen = set(_defaults)
+        types_list = _defaults.copy()
+        for t in (txn_types + custom_type_names):
+            if t not in seen:
+                seen.add(t)
+                types_list.append(t)
+
         # Add default options if empty (for fresh database)
         if not accounts_list:
             accounts_list = ['Venture', 'Cacas', 'Cata']
-        
+
         if not owners_list:
             owners_list = ['Cata', 'Suricata', 'Cacas']
-        
+
         print(f"📊 Dropdown data loaded:")
         print(f"   - Categories: {len(categories_list)} ({categories_list[:5]}...)")
         print(f"   - Sub-categories: {len(sub_categories_list)}")
         print(f"   - Accounts: {len(accounts_list)} ({accounts_list})")
         print(f"   - Owners: {len(owners_list)} ({owners_list})")
-        
+        print(f"   - Types: {types_list}")
+
         return render_template('add_transaction.html',
                              categories=categories_list,
                              sub_categories=sub_categories_list,
                              accounts=accounts_list,
-                             owners=owners_list)
-                             
+                             owners=owners_list,
+                             types=types_list)
+
     except Exception as e:
         print(f"❌ Error loading form data: {e}")
         import traceback
         traceback.print_exc()
-        
+
         # Return form with default lists
         return render_template('add_transaction.html',
                              categories=[],
                              sub_categories=[],
                              accounts=['Venture', 'Cacas', 'Cata'],
-                             owners=['Cata', 'Suricata', 'Cacas'])
+                             owners=['Cata', 'Suricata', 'Cacas'],
+                             types=['Needs', 'Wants', 'Savings', 'Business'])
 
 @transactions_bp.route('/bulk', methods=['GET', 'POST'])
 def bulk_transaction():
@@ -513,6 +546,14 @@ def bulk_transaction():
             ORDER BY owner
         """, conn)
 
+        # Build types list: defaults + any from transactions + custom types
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS custom_types (name TEXT PRIMARY KEY, created_at TEXT NOT NULL)")
+        cursor.execute("SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type")
+        txn_types = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT name FROM custom_types ORDER BY name")
+        custom_type_names = [r[0] for r in cursor.fetchall()]
+
         conn.close()
 
         # Convert to lists for template
@@ -520,6 +561,14 @@ def bulk_transaction():
         sub_categories_list = sub_categories_df['sub_category'].tolist()
         accounts_list = accounts_df['account_name'].tolist()
         owners_list = owners_df['owner'].tolist()
+
+        _defaults = ['Needs', 'Wants', 'Savings', 'Business']
+        seen = set(_defaults)
+        types_list = _defaults.copy()
+        for t in (txn_types + custom_type_names):
+            if t not in seen:
+                seen.add(t)
+                types_list.append(t)
 
         # Add default options if empty
         if not accounts_list:
@@ -534,7 +583,8 @@ def bulk_transaction():
                              categories=categories_list,
                              sub_categories=sub_categories_list,
                              accounts=accounts_list,
-                             owners=owners_list)
+                             owners=owners_list,
+                             types=types_list)
 
     except Exception as e:
         print(f"❌ Error loading bulk form data: {e}")
@@ -546,7 +596,8 @@ def bulk_transaction():
                              categories=[],
                              sub_categories=[],
                              accounts=['Venture', 'Cacas', 'Cata'],
-                             owners=['Cata', 'Suricata', 'Cacas'])
+                             owners=['Cata', 'Suricata', 'Cacas'],
+                             types=['Needs', 'Wants', 'Savings', 'Business'])
 
 @transactions_bp.route('/api/get_transaction/<int:transaction_id>')
 def get_transaction(transaction_id):

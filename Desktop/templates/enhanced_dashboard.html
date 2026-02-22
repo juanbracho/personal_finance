@@ -21,7 +21,7 @@
   <!-- Filter Bar -->
   <form method="GET" class="kanso-info-strip" style="margin-bottom: 24px;">
     <input type="hidden" name="view" value="{{ view }}">
-    <!-- Year: all views; categories uses JS-only reload (no page submit) -->
+    <!-- Year: all views; categories reloads via JS (no page submit) -->
     <div class="kanso-info-item">
       <div class="kanso-info-label">Year</div>
       <select name="year" class="kanso-select" {% if view != 'categories' %}onchange="this.form.submit()"{% endif %} style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
@@ -30,29 +30,26 @@
         {% endfor %}
       </select>
     </div>
-    <!-- Month: overview and budget only -->
-    {% if view in ['overview', 'budget'] %}
+    <!-- Month: all views; categories adds "All" option and reloads via JS -->
     <div class="kanso-info-item">
       <div class="kanso-info-label">Month</div>
-      <select name="month" class="kanso-select" onchange="this.form.submit()" style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+      <select name="month" class="kanso-select" {% if view != 'categories' %}onchange="this.form.submit()"{% endif %} style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+        {% if view == 'categories' %}<option value="all">All</option>{% endif %}
         {% for month_num, month_name in [(1,'Jan'),(2,'Feb'),(3,'Mar'),(4,'Apr'),(5,'May'),(6,'Jun'),(7,'Jul'),(8,'Aug'),(9,'Sep'),(10,'Oct'),(11,'Nov'),(12,'Dec')] %}
-        <option value="{{ month_num }}" {{ 'selected' if month_num == current_month }}>{{ month_name }}</option>
+        <option value="{{ month_num }}" {{ 'selected' if month_num == current_month and view != 'categories' }}>{{ month_name }}</option>
         {% endfor %}
       </select>
     </div>
-    {% endif %}
-    <!-- Owner: not for categories (backend hardcodes 'all' and ignores this param) -->
-    {% if view != 'categories' %}
+    <!-- Owner: all views; categories reloads via JS -->
     <div class="kanso-info-item">
       <div class="kanso-info-label">Owner</div>
-      <select name="owner" class="kanso-select" onchange="this.form.submit()" style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
+      <select name="owner" class="kanso-select" {% if view != 'categories' %}onchange="this.form.submit()"{% endif %} style="width:auto; padding:2px 28px 2px 8px; font-size:13px; border-radius:6px;">
         <option value="all" {{ 'selected' if current_owner == 'all' }}>All Owners</option>
         {% for owner in available_owners %}
         <option value="{{ owner }}" {{ 'selected' if owner == current_owner }}>{{ owner }}</option>
         {% endfor %}
       </select>
     </div>
-    {% endif %}
     <div class="kanso-info-item" style="flex:0 0 auto; align-self:center; padding-top:12px; padding-bottom:12px;">
       <div class="kanso-info-label">Period</div>
       <div class="kanso-info-value muted">

@@ -1,14 +1,14 @@
 # Kanso — Web Dashboard Redesign Tracker
-*Started: February 21, 2026*
+*Started: February 21, 2026 · Completed: February 22, 2026*
 
 ---
 
 ## What This File Is
 
 Session-by-session tracker for the web dashboard redesign.
-One page (or system) gets redesigned per session. Nothing gets coded until understood and approved here first.
+The backend is complete and stable. This file covers the web layer (Flask + HTML/CSS/JS).
 
-The backend is complete and stable. This file is web-only (Flask + HTML/CSS/JS).
+**Status: COMPLETE ✓** — All pages redesigned. All known bugs fixed. App is stable.
 
 ---
 
@@ -19,12 +19,12 @@ The backend is complete and stable. This file is web-only (Flask + HTML/CSS/JS).
 | Brand name | **Kanso** (renamed from "Personal Finance") |
 | Tagline | **"Mindful money tracking"** |
 | Logo | Static SVG file served from `static/img/kanso-icon.svg` used as `<img>` in navbar |
-| Theme system | Same 3-way cycle as mobile: **Warm Ink** (dark) → **Indigo** (dark) → **Washi Paper** (light) |
+| Theme system | 3-way cycle: **Warm Ink** (dark) → **Indigo** (dark) → **Washi Paper** (light) |
 | Theme toggle | 3-button pill in navbar top-right, persistent via `localStorage` |
 | Default theme | Warm Ink |
 | CSS approach | New `kanso.css` design system alongside Bootstrap (Bootstrap kept for grid/JS only) |
-| Page width | Narrow pages (settings, forms): max 860px · Wide pages (dashboard, analytics, transactions, debts): max 1120px |
-| List pattern | Expandable rows: collapsed = key info only · expanded = full details (used in Debts, Transactions) |
+| Page width | Narrow (settings, forms): max 860px · Wide (dashboard, analytics, transactions, debts): max 1120px |
+| List pattern | Expandable rows: collapsed = key info only · expanded = full details (Debts, Transactions) |
 | Form pages | Separate pages (not modals) for Add Debt, Add Transaction, Bulk Transaction |
 
 ---
@@ -50,7 +50,7 @@ Full CSS variable system for all 3 themes. Variables defined on `[data-theme]` a
 - `.kanso-danger-card` — danger zone with red border
 - `.backup-list` / `.backup-item` — backup history
 - `.theme-picker` / `.theme-option` — settings theme selector
-- `.btn-kanso` variants: primary / ghost / danger / danger-solid
+- `.btn-kanso` variants: primary / ghost / danger / danger-solid / sm
 - `.kanso-input` — text/number/date inputs
 - `.kanso-select` — styled select with custom chevron arrow
 - `.kanso-input-group` / `.kanso-input-affix` — prefix/suffix wrappers ($ / %)
@@ -80,120 +80,134 @@ Full CSS variable system for all 3 themes. Variables defined on `[data-theme]` a
 - `.kanso-pagination` — centered pill pagination with `.active` / `.disabled`
 - `.bulk-item-row` — flex row for bulk transaction inputs
 - `.kanso-input.is-invalid` — red border validation hook
+- `.dsh-tab-nav` / `.dsh-tab-btn` — dashboard outer view switcher (server-side `<a>` links)
+- `.dsh-stat-grid` / `.dsh-stat-item` / `.dsh-stat-value` / `.dsh-stat-label` / `.dsh-stat-sub` — 4-col stat grid
+- `.dsh-recent-list` / `.dsh-recent-item` / `.dsh-recent-meta` / `.dsh-recent-amount` — recent transactions list
+- `.dsh-perf-grid` / `.dsh-perf-item` / `.dsh-perf-value` / `.dsh-perf-label` — budget performance 3-col
+- `.dsh-budget-progress` — budget utilization bar wrapper
+- `.dsh-budget-row` / `.dsh-subcat-row` / `.dsh-txn-row` — budget table row hierarchy
+- `.anl-table` / `.anl-positive` / `.anl-negative` / `.anl-neutral` — mirrored in dashboard.css and budget.css
 
 ---
 
-## Redesign Backlog
+## Redesign Status
 
-Status: `[ ]` pending · `[~]` in progress · `[x]` done
+| # | Page | Status |
+|---|---|---|
+| 0 | Design System + Base Layout | ✓ Done |
+| 1 | Settings | ✓ Done |
+| 2 | Debts | ✓ Done |
+| 3 | Add Debt Account | ✓ Done |
+| 4 | Transactions + Add + Bulk | ✓ Done |
+| 5 | Dashboard (all 3 views) | ✓ Done |
+| 6 | Budget | ✓ Done |
+| 7 | Analytics | ✓ Done |
+| 8 | Login Page | — Skipped (not needed for current usage) |
 
 ---
 
-### 0. Design System + Base Layout  `[x]`
+## Page Notes
 
-- `kanso.css` — full token system, all components listed above
-- `base.html` — Kanso navbar (static SVG icon + wordmark), 3-theme toggle, nav links, footer
-- Theme applied via `data-theme` on `<html>`, saved to `localStorage`, applied before first paint (no flash)
-- `setTheme()` defined globally in `base.html` — syncs nav toggle AND settings picker cards
-
----
-
-### 1. Settings Page  `[x]`
-
-**After:**
-- Status strip at top: version · DB status (dot indicator) · size · last modified
-- Appearance: 3 `.theme-option` cards with color swatches, `data-theme-pick` attribute
-- Data Management: 3 `.kanso-row` rows (Export / Import / Create Backup) with SVG icons
-- Backup History: `.backup-list` / `.backup-item` with monospace filenames
-- Updates section: removed from UI (backend routes preserved)
+### Settings `[x]`
+- Status strip: version · DB status · size · last modified
+- Appearance: 3 `.theme-option` cards with color swatches
+- Data Management: 3 `.kanso-row` rows (Export / Import / Create Backup)
+- Backup History: `.backup-list` / `.backup-item`
 - Danger Zone: `.kanso-danger-card`, type-to-confirm input
+- **Cloud notice:** `.kanso-tip-box` warning added — Export/Import are the only safe flows on Railway (ephemeral filesystem). Local backup rows work only for self-hosted installs unless a Railway Volume is mounted at `data/`.
 
----
+### Debts `[x]`
+- Info strip: Total Debt + Monthly Minimums
+- Expandable debt list: collapsed = name/last4/type/owner/balance/mini-progress/min-payment; expanded = full detail
+- Charts: 2-col — By Type + By Owner (Plotly, theme-aware)
+- Insights: 3-col — Highest Balance / Lowest Rate / Highest Rate
+- 3 modals: Payment, Edit, History
 
-### 2. Debts Page  `[x]`
-
-**After:**
-- Info strip: 2 items — Total Debt (`#totalDebtValue`) + Monthly Minimums (`#totalMinimumsValue`)
-- Debt list: `<ul class="debt-list">` / `<li class="debt-item">` with `data-*` attributes
-  - Collapsed: name + last4 + type badge | owner | balance | mini progress bar | min payment | expand + edit + delete
-  - Expanded (`#debt-details-{id}`): Original Balance, Interest Rate, Amount Paid, full progress bar
-- Charts: 2-col grid — By Type + By Owner (Plotly, theme-aware via `document.documentElement.dataset.theme`)
-- Insights: 3-col — Highest Balance, Lowest Rate, Highest Rate
-- 3 modals: Payment, Edit, History — all use `class="modal fade kanso-modal"`
-- `debts.js` updated: `data-*` selectors, `toggleDebtDetails()`, `updateDebtSummaryCards()`, theme-aware charts, Kanso toast notifications
-
----
-
-### 3. Add Debt Account Page  `[x]`
-
-**After:**
-- 3 `kanso-card` sections: Basic Info, Financial Details, Payment & Category
+### Add Debt Account `[x]`
+- 3 kanso-card sections: Basic Info, Financial Details, Payment & Category
 - 2-col layout: form (col-md-8) + help sidebar (col-md-4)
-- `kanso-input` / `kanso-select` / `kanso-input-group` throughout
-- Help sidebar: `.kanso-tip-box` + `.kanso-note-box`
-- All JS logic preserved (balance validation, interest % → decimal, category auto-suggest)
+
+### Transactions `[x]`
+- Expandable card list; per-page selector (25/50/100/150/200/250); kanso pagination; kanso-modal edit
+- Add Transaction: 4 sections (Transaction Info, Categorization, Account & Owner, Credit Purchase) + sidebar (Quick Actions + Tips)
+- Bulk Transaction: Common Fields card + Transaction Items card (flex list, not a table)
+- Type dropdown is **dynamic** — populated from DB (`transactions` table + `custom_types` table), not hardcoded
+- "+ Add new type" button on Add Transaction form — calls `POST /api/categories/types`, adds option to select
+
+### Dashboard `[x]`
+- **3 views** (Overview / Budget / Categories) via server-side `<a>` links styled as `.dsh-tab-nav`
+- **Filters:** Year + Month + Owner selects in a `kanso-info-strip` filter bar; Overview and Budget submit via form; Categories view uses JS-driven AJAX (no page reload)
+- **Overview view:** info strip (4 items) · stat grid (4 cols) · 3 charts (Plotly donut/h-bar/line) · 2-col tables (Spending Breakdown + Owner Comparison) · Recent Transactions list · Budget Performance 3-col
+- **Budget view:** info strip · budget utilization progress bar · full budget table (category → subcategory → transaction drill-down with AJAX) · 2 charts · Insights card
+- **Categories view:** 5 inner tabs — Categories / Sub-Categories / Owners / Accounts / **Types** — with Bootstrap tab JS for switching; each tab has Add/Edit/Delete with migration support; `anl-table` for data display
+- **Types tab:** shows Needs/Wants/Savings/Business + any custom types; "Add Type" creates in `custom_types` SQLite table (persists types with 0 transactions)
+- Charts: Plotly with `CHART_COLORS` theme-aware object keyed by `document.documentElement.dataset.theme`
+- `dashboard.css`: all `.dsh-*` classes + `.anl-table` mirror; `dashboard.js`: theme-aware chart rendering, AJAX category/type management
+
+### Budget `[x]`
+- Custom `.bgt-tab-nav` / `.bgt-tab-btn` replaces Bootstrap nav-tabs
+- `budget.css`: broken CSS vars fixed, bgt-* + anl-table added
+- `budget_v2.js`: 7 patches — tab listener, renderSubcategoryBudgets, renderCommitments, renderUnexpectedExpenses, table sort colors, showToast, chart colors, createHiddenBudgetsModal, renderHiddenBudgets
+- Commitment summary tables: `display:grid; grid-template-columns:1fr 1fr` edge-to-edge
+- Collapse-all / Expand-all: SVG-only icon buttons using Bootstrap Collapse API
+
+### Analytics `[x]`
+- `analytics.css` migrated to CSS variable tokens
+- `analytics.html` full rewrite: kanso-page-wide, kanso-card panels, kanso buttons, kanso-modal for both modals
+- `analytics.js`: action buttons → `debt-action-btn`; matrix table → `anl-table`; pct-change → `anl-positive/negative/neutral`
+- Type filter is **dynamic** — `available_types` from backend, not hardcoded
 
 ---
 
-### 4. Transactions  `[x]`
+## Data / Backend Changes Made
 
-**After:**
-- `transactions.html` — expandable card list (`txn-list` / `txn-item`): collapsed shows date + desc + amount + type badge + edit/delete/chevron; expanded shows 4-col detail grid (category, sub-category, owner, account). `kanso-pagination` replaces Bootstrap pagination. `kanso-modal` edit modal with `modal-section-label` sections. Empty state as centered `kanso-card`.
-- `add_transaction.html` — 4 `kanso-card` sections: Transaction Information (date + amount + description), Categorization (category + sub-category + type), Account & Owner, Credit Purchase (toggle + `kanso-note-box`). Sidebar: Quick Actions card (`#quickActionsContainer` preserved) + Tips card with template buttons.
-- `bulk_transaction.html` — Common Fields card (3-col: category/sub/type + 2-col: account/owner). Transaction Items card with column header row + flex list (`id="itemsTableBody"` preserved, not a `<table>`). Summary strip preserved (`#summarySection`, `#itemCount`, `#totalAmount`).
-- `transactions.js` — `deleteTransaction()` selector changed from `button+tr` to `.txn-item[data-txn-id]`. Added `toggleTxnDetails()` + `window.toggleTxnDetails` export.
-- `bulk_transactions.js` — `addRow()` generates `<div class="bulk-item-row">` with `kanso-input` / `kanso-input-group` / `kanso-input-affix` / `debt-action-btn delete` SVG button. `updateTotals()` class names → `txn-amount income/expense`.
-- `kanso.css` — appended: transaction list, pagination, bulk row, `.kanso-input.is-invalid`.
-- `transactions/routes.py` — `per_page` query param (allowed: 25/50/100/150/200/250, default 50) passed to template; both render_template calls updated.
-- `transactions.html` — per-page `<select>` in info strip (3rd item); all pagination links include `per_page=per_page`.
+These were required to support dynamic types and are the only backend changes made during the redesign:
 
----
+### `custom_types` table
+```sql
+CREATE TABLE IF NOT EXISTS custom_types (name TEXT PRIMARY KEY, created_at TEXT NOT NULL)
+```
+Created lazily in each route that needs it. Stores user-defined types that have 0 transactions (so they appear in dropdowns before any transactions use them).
 
-### 5. Dashboard (Overview)  `[ ]`
+### API endpoints added (`blueprints/api/routes.py`)
+- `GET /api/categories/types` — returns merged list of types from transactions + custom_types, with stats; accepts `owner`, `year` filters
+- `POST /api/categories/types` — adds a new custom type
+- `PUT /api/categories/types/<name>` — renames a type (in both transactions + custom_types)
+- `DELETE /api/categories/types/<name>` — deletes only if 0 transactions; errors otherwise
+- All category/subcategory/type/statistics endpoints accept `owner` filter param
 
-TBD
+### `transactions/routes.py` changes
+- `list_transactions`, `add_transaction`, `bulk_transaction` GET: build `types` list from DB and pass to template
+- Deduplication uses a `seen` set — not just `if t not in _defaults`
 
----
-
-### 6. Budget  `[x]`
-
-**Decisions:**
-- Design-only pass — no data or logic changes
-- Keep Bootstrap collapse for subcategory groups; keep Bootstrap modal JS
-- Custom `.bgt-tab-nav` / `.bgt-tab-btn` replace Bootstrap nav-tabs
-- `budget.css` keeps page-specific styles; `.bgt-*` + mirrored `.anl-table` classes added here (analytics.css not loaded on budget page)
-- `budget_v2.js` patched in 7 targeted places + follow-up fixes in same session
-- Commitment summary tables go edge-to-edge (CSS grid 1fr 1fr, no Bootstrap row/col gutter)
-- Hidden Budget Items modal is JS-generated — both `createHiddenBudgetsModal()` and `renderHiddenBudgets()` patched
-- Category-level budgeting info box removed entirely (looked off between rows)
-- Collapse-all / Expand-all: two SVG-only icon buttons in subcategory panel header using Bootstrap Collapse API
-
-**Files involved:**
-- `budget.css` — broken CSS vars fixed; hardcoded colors replaced; modal-header gradient removed; all `.bgt-*` component classes added; `.anl-table` + `.anl-positive/negative/neutral` + `.anl-info-box` mirrored from analytics.css
-- `budget_management.html` — full rewrite: kanso-page-wide, `kanso-info-item` info strip (4 items), single kanso-card with bgt-tab-nav + 3 panels, 3 kanso-modals; commitment summaries restructured edge-to-edge; collapse/expand all SVG buttons added
-- `budget_v2.js` — tab listener removed; renderSubcategoryBudgets → bgt classes; renderCommitments → bgt-commitment-item; renderUnexpectedExpenses → debt-action-btn (flex-wrapped); table sort functions → inline CSS var colors (no Bootstrap text-primary/text-end); showToast → bgt-toast; chart colors theme-aware; createHiddenBudgetsModal + renderHiddenBudgets → kanso-modal + Kanso rows; category info box removed
+### `analytics/routes.py` changes
+- `analytics_dashboard` GET: builds `available_types` from DB with same deduplication
 
 ---
 
-### 7. Analytics  `[x]`
+## Gotchas to Carry Forward
 
-**Decisions:**
-- Keep `analytics.css` as a separate file (not folded into kanso.css)
-- Migrate all hardcoded colors in `analytics.css` → CSS variable tokens from kanso.css
-- Design-only pass — no data insight changes
-- Keep filtered transactions table + bulk edit (useful for finding and correcting old records)
-- Keep counts in category/subcategory tables (count + avg reveal purchase pattern vs. total)
-
-**Files involved:**
-- `analytics.css` — CSS variable migration; add `.anl-table`, `.anl-positive/negative/neutral` utilities
-- `analytics.html` — full rewrite: kanso-page-wide, kanso-card panels, kanso buttons, kanso-modal for both modals, kanso-info-strip for summary stats
-- `analytics.js` — targeted: action buttons in filtered table → `debt-action-btn`; matrix table class → `anl-table`; pct-change classes → `anl-positive/negative/neutral`
-
----
-
-### 8. Login Page  `[ ]`
-
-TBD
+- Bootstrap CSS still loaded for grid compatibility — `kanso.css` overrides visual styles on top
+- Bootstrap modal JS still used for show/hide/backdrop — HTML uses `class="modal fade"` + `kanso-modal` on `.modal-dialog`
+- `setTheme()` is defined in `base.html` — do NOT redefine in page `extra_js` blocks (causes infinite recursion)
+- Theme is applied on `<html>` via `data-theme`; all CSS variables cascade from there
+- Flash messages use Jinja2 categories: `success`, `error`, `info`, `warning`
+- `kanso-page` (max 860px) vs `kanso-page-wide` (max 1120px) — use wide for data-heavy pages
+- Page-specific CSS uses `{% block extra_css %}` — kanso.css is the base layer only
+- Plotly: CSS variables don't work inside canvas — read `document.documentElement.dataset.theme` at render time, map to explicit hex values via `CHART_COLORS` object
+- `kanso-info-strip` children must be `kanso-info-item` (not `kanso-info-strip-item`); label = `kanso-info-label`; value = `kanso-info-value`
+- `anl-table` is defined in `analytics.css` — pages not loading analytics.css must mirror it in their own CSS (done in budget.css and dashboard.css)
+- JS-generated modals need `kanso-modal` on `.modal-dialog`, not `.modal` wrapper
+- Bootstrap `.text-primary` in JS-rendered HTML gives Bootstrap blue — use `style="color:var(--primary)"` instead
+- `data-*` attributes on list items bridge HTML and JS — always add them for dynamically updated lists
+- `kanso-select` uses background-image SVG arrow with hardcoded hex color — acceptable tradeoff
+- Type strings (exact, locked for existing data): `Needs` / `Wants` / `Business` / `Savings`; custom types stored in `custom_types` table
+- Type colors: `--needs` (green) / `--wants` (orange) / `--business` (blue) / `--savings` (purple) / `--unexpected` (warning yellow)
+- SVG logo is 525KB — always `<img>` tag, never inline
+- Dashboard categories view: Year/Month/Owner filters are JS-only (no form submit) — they drive `loadCategoriesManagement()` AJAX calls; form submit only applies to Overview and Budget views
+- Inline `<script>` blocks in `{% block content %}` run BEFORE `{% block extra_js %}` JS files — don't put render function overrides in inline scripts if the same function exists in an external JS file (it will get clobbered)
+- Railway deployment: `data/` folder resets on container restart unless a Railway Volume is mounted at `data/` — Export Database (browser download) and Import Database are the only safe backup flows
+- Type deduplication: always use a `seen` set when building types_list — `if t not in _defaults` alone is insufficient if a type exists in both `transactions` and `custom_types`
 
 ---
 
@@ -204,33 +218,18 @@ TBD
 | Feb 21, 2026 | `kanso.css` design system — full token system + all base components |
 | Feb 21, 2026 | `base.html` — Kanso nav, static SVG icon, 3-theme toggle, flash messages, footer |
 | Feb 21, 2026 | Settings page — status strip, theme picker, data management rows, backup list, danger zone |
-| Feb 21, 2026 | Debts page — expandable card list, 2 info cards, charts, 3 styled modals, debts.js updated |
-| Feb 21, 2026 | Add Debt Account page — Kanso form with 3 sections, help sidebar, new form CSS components |
-| Feb 22, 2026 | Transactions page — expandable card list, per-page selector (25–250), kanso pagination, kanso-modal edit |
+| Feb 21, 2026 | Debts page — expandable card list, info strip, charts, 3 modals, debts.js updated |
+| Feb 21, 2026 | Add Debt Account page — Kanso form, 3 sections, help sidebar, new form CSS components |
+| Feb 22, 2026 | Transactions page — expandable card list, per-page selector, kanso pagination, kanso-modal edit |
 | Feb 22, 2026 | Add Transaction + Bulk Transaction pages — Kanso form redesign, bulk items as flex list |
 | Feb 22, 2026 | transactions.js + bulk_transactions.js — DOM selector fixes, toggleTxnDetails, kanso class names |
-| Feb 22, 2026 | Analytics page — analytics.css CSS-var migration; analytics.html full rewrite; analytics.js action-btn + anl-table patches |
-| Feb 22, 2026 | Budget page — budget.css overhauled (broken vars fixed, bgt-* + anl-table added); budget_management.html full rewrite; budget_v2.js 7 patches + follow-ups (info strip class names, edge-to-edge commitment tables, flex action buttons, hidden-budgets modal, collapse/expand all) |
-
----
-
-## Gotchas to Carry Forward
-
-- Bootstrap CSS is still loaded for grid compatibility — `kanso.css` overrides visual styles on top
-- Bootstrap modal JS still used for show/hide/backdrop — HTML uses `class="modal fade kanso-modal"`
-- `setTheme()` is defined in `base.html` — do NOT redefine it in page `extra_js` blocks (causes infinite recursion via hoisting)
-- Theme is applied on `<html>` via `data-theme` attribute; all CSS variables cascade from there
-- Flash messages use Jinja2 categories: `success`, `error`, `info`, `warning`
-- `kanso-page` (max 860px) vs `kanso-page-wide` (max 1120px) — use wide for data-heavy pages
-- Page-specific CSS should still use `{% block extra_css %}` — kanso.css is the base layer only
-- Plotly/Chart.js: CSS variables don't work inside canvas-rendered charts — read `document.documentElement.dataset.theme` at render time and map to explicit color values
-- `kanso-info-strip` uses child class `kanso-info-item` (not `kanso-info-strip-item`) — label: `kanso-info-label`, value: `kanso-info-value`; sub-labels use inline style `font-size:11px; color:var(--text-faint)`
-- `anl-table` is defined in `analytics.css` — pages that don't load analytics.css must mirror it in their own CSS file
-- JS-generated modals (Bootstrap `insertAdjacentHTML`) need `kanso-modal` on the `.modal-dialog` div, not the `.modal` wrapper
-- Bootstrap `.text-primary` inside JS-rendered HTML gives Bootstrap blue, not `--primary` — always use `style="color:var(--primary)"` instead
-- Commitment summary tables (and any multi-column data grids): use `display:grid; grid-template-columns:1fr 1fr` directly on the panel, outside the padded inner div, so tables go edge-to-edge
-- Kakeibo types (exact strings, locked): `Needs` / `Wants` / `Business` / `Savings`
-- Type colors: `--needs` (green) / `--wants` (orange) / `--business` (blue) / `--savings` (purple)
-- SVG icon is 525KB — always use `<img>` tag, never inline
-- `data-*` attributes on list items are the bridge between HTML and JS — always add them for any dynamically updated list
-- `kanso-select` uses a background-image SVG arrow — the arrow color is hardcoded `%238A8278` (hex for `--text-faint` in warm-ink) — acceptable tradeoff
+| Feb 22, 2026 | Analytics page — analytics.css CSS-var migration; analytics.html full rewrite; analytics.js patches |
+| Feb 22, 2026 | Budget page — budget.css overhauled; budget_management.html full rewrite; budget_v2.js 7 patches |
+| Feb 22, 2026 | Dashboard — enhanced_dashboard.html wrapper + 3 sub-templates (overview/budget/categories); dashboard.css; dashboard.js theme-aware charts |
+| Feb 22, 2026 | Dashboard bug fixes — Bootstrap tab active-class sync; categories view filter wiring; render function placement (inline vs external JS) |
+| Feb 22, 2026 | Categories view — all 3 filters (Year/Month/Owner) JS-driven; Types tab added (5th tab) with full CRUD + migration support |
+| Feb 22, 2026 | `custom_types` table + API endpoints — POST/PUT/DELETE for type management; owner filter on all category API endpoints |
+| Feb 22, 2026 | Dynamic type dropdowns — all type selects (Transactions, Add Transaction, Bulk, Analytics) now DB-driven instead of hardcoded |
+| Feb 22, 2026 | "+ Add new type" button on Add Transaction form — wired to `addNewType()` in transactions.js → POST /api/categories/types |
+| Feb 22, 2026 | Deduplication fix — type list building changed to `seen` set in all 4 routes (add_transaction, list_transactions, bulk_transaction, analytics_dashboard) |
+| Feb 22, 2026 | Settings — Railway/cloud hosting notice added |

@@ -96,10 +96,9 @@
                         <label class="kanso-form-label" for="typesFilter">Types</label>
                         <select class="kanso-select" id="typesFilter" multiple size="3">
                             <option value="all" selected>All Types</option>
-                            <option value="Needs">Needs</option>
-                            <option value="Wants">Wants</option>
-                            <option value="Savings">Savings</option>
-                            <option value="Business">Business</option>
+                            {% for t in available_types %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -385,11 +384,9 @@
                             <label class="kanso-form-label" for="editType">Type <span style="color:var(--danger)">*</span></label>
                             <select class="form-select" id="editType" required>
                                 <option value="">Select type...</option>
-                                <option value="Needs">Needs</option>
-                                <option value="Wants">Wants</option>
-                                <option value="Savings">Savings</option>
-                                <option value="Business">Business</option>
-                                <option value="Income">Income</option>
+                                {% for t in available_types %}
+                                <option value="{{ t }}">{{ t }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -466,11 +463,9 @@
                         <label class="kanso-form-label" for="bulkEditType">Type</label>
                         <select class="kanso-select" id="bulkEditType">
                             <option value="">— Don't Change —</option>
-                            <option value="Needs">Needs</option>
-                            <option value="Wants">Wants</option>
-                            <option value="Savings">Savings</option>
-                            <option value="Business">Business</option>
-                            <option value="Income">Income</option>
+                            {% for t in available_types %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div style="margin-bottom:14px;">

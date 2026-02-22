@@ -55,10 +55,9 @@
                             <label class="kanso-form-label" for="type">Type <span style="color:var(--danger)">*</span></label>
                             <select class="kanso-select" id="type" name="type" required>
                                 <option value="">Select type…</option>
-                                <option value="Needs">Needs</option>
-                                <option value="Wants">Wants</option>
-                                <option value="Savings">Savings</option>
-                                <option value="Business">Business</option>
+                                {% for t in types %}
+                                <option value="{{ t }}">{{ t }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>

@@ -220,19 +220,24 @@ function loadCategoriesManagement() {
     const yearSelect = document.querySelector('select[name="year"]');
     const monthSelect = document.querySelector('select[name="month"]');
     
+    const ownerSelect = document.querySelector('select[name="owner"]');
+
     if (yearSelect) {
         dashboardState.currentFilter = {
             year: yearSelect.value,
-            month: monthSelect ? monthSelect.value : 'all'
+            month: monthSelect ? monthSelect.value : 'all',
+            owner: ownerSelect ? ownerSelect.value : 'all'
         };
 
         // Add event listeners for filter changes
         yearSelect.addEventListener('change', loadCategoriesData);
         if (monthSelect) monthSelect.addEventListener('change', loadCategoriesData);
+        if (ownerSelect) ownerSelect.addEventListener('change', loadCategoriesData);
     } else {
         dashboardState.currentFilter = {
             year: dashboardState.currentYear,
-            month: dashboardState.currentMonth.toString()
+            month: 'all',
+            owner: 'all'
         };
     }
     
@@ -256,10 +261,12 @@ function loadCategoriesData() {
     const yearSelect = document.querySelector('select[name="year"]');
     const monthSelect = document.querySelector('select[name="month"]');
     
+    const ownerSelect2 = document.querySelector('select[name="owner"]');
     if (yearSelect) {
         dashboardState.currentFilter = {
             year: yearSelect.value,
-            month: monthSelect ? monthSelect.value : 'all'
+            month: monthSelect ? monthSelect.value : 'all',
+            owner: ownerSelect2 ? ownerSelect2.value : 'all'
         };
     }
     
@@ -292,6 +299,9 @@ function loadTabData(tabName) {
         case 'accounts':
             loadAccounts();
             break;
+        case 'types':
+            loadTypes();
+            break;
         default:
             console.warn(`Unknown tab: ${tabName}`);
     }
@@ -299,12 +309,13 @@ function loadTabData(tabName) {
 
 function loadCategories() {
     console.log('📊 Loading categories...');
-    
+
     const params = new URLSearchParams({
         year: dashboardState.currentFilter.year,
-        month: 'all'  // Show all categories for the year
+        month: dashboardState.currentFilter.month || 'all',
+        owner: dashboardState.currentFilter.owner || 'all'
     });
-    
+
     fetch(`/api/categories/categories?${params}`)
         .then(response => response.json())
         .then(data => {
@@ -380,12 +391,13 @@ const _SVG_DELETE = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" 
 // SubCategories Management
 function loadSubCategories() {
     console.log('🏷️ Loading sub-categories...');
-    
+
     const params = new URLSearchParams({
         year: dashboardState.currentFilter.year,
-        month: 'all'  // Show all sub-categories
+        month: dashboardState.currentFilter.month || 'all',
+        owner: dashboardState.currentFilter.owner || 'all'
     });
-    
+
     fetch(`/api/categories/subcategories?${params}`)
         .then(response => response.json())
         .then(data => {
@@ -529,7 +541,74 @@ function renderAccountsTable(accounts) {
     });
     tbody.innerHTML = html;
 }
+
+// Types Management
+
+function loadTypes() {
+    console.log('🔖 Loading types...');
+
+    const params = new URLSearchParams({
+        year: dashboardState.currentFilter.year,
+        month: dashboardState.currentFilter.month || 'all',
+        owner: dashboardState.currentFilter.owner || 'all'
+    });
+
+    fetch(`/api/categories/types?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('🔖 Types data:', data);
+            dashboardState.categoriesData.types = data;
+            renderTypesTable(data);
+        })
+        .catch(error => {
+            console.error('Error loading types:', error);
+            renderTypesTable([]);
+        });
+}
+
+function renderTypesTable(types) {
+    const tbody = document.getElementById('typesTableBody');
+    if (!tbody) return;
+
+    if (!types || types.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No types found. Add a custom type to get started.</td></tr>`;
+        return;
+    }
+
+    let html = '';
+    types.forEach(t => {
+        const amtStr = t.total_amount > 0 ? `$${t.total_amount.toFixed(2)}` : '—';
+        const avgStr = t.avg_amount > 0 ? `$${t.avg_amount.toFixed(2)}` : '—';
+        html += `
+            <tr>
+                <td>${getTypeBadgeHtml(t.name)}</td>
+                <td style="text-align:right;color:var(--text-muted);">${t.transaction_count}</td>
+                <td style="text-align:right;font-weight:600;color:var(--danger);">${amtStr}</td>
+                <td style="text-align:right;color:var(--text-muted);">${avgStr}</td>
+                <td style="text-align:center;">
+                    <div style="display:inline-flex;gap:4px;">
+                        <button class="debt-action-btn edit" onclick="editItem('type','${t.name}')" title="Edit">${_SVG_EDIT}</button>
+                        <button class="debt-action-btn delete" onclick="deleteItem('type','${t.name}',${t.transaction_count})" title="Delete">${_SVG_DELETE}</button>
+                    </div>
+                </td>
+            </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
 // Placeholder functions for categories management
+
+function populateTypeSelect(selectedValue) {
+    const select = document.getElementById('itemType');
+    if (!select) return;
+    const defaults = ['Needs', 'Wants', 'Savings', 'Business'];
+    const custom = (dashboardState.categoriesData.types || [])
+        .map(t => t.name)
+        .filter(n => !defaults.includes(n));
+    const all = [...defaults, ...custom];
+    select.innerHTML = '<option value="">Select type…</option>' +
+        all.map(n => `<option value="${n}"${n === selectedValue ? ' selected' : ''}>${n}</option>`).join('');
+}
 
 function showAddModal(type) {
     console.log(`➕ Showing add modal for ${type}`);
@@ -556,6 +635,7 @@ function showAddModal(type) {
             nameField.querySelector('input').placeholder = 'e.g., Entertainment, Food, etc.';
             parentCategoryField.classList.add('d-none');
             typeField.classList.remove('d-none');
+            populateTypeSelect();
             break;
             
         case 'subcategory':
@@ -593,10 +673,18 @@ function showAddModal(type) {
             parentCategoryField.classList.add('d-none');
             typeField.classList.add('d-none');
             break;
+
+        case 'type':
+            modalLabel.textContent = 'Add New Type';
+            nameField.querySelector('label').textContent = 'Type Name *';
+            nameField.querySelector('input').placeholder = 'e.g., Investments, Education, etc.';
+            parentCategoryField.classList.add('d-none');
+            typeField.classList.add('d-none');
+            break;
     }
-    
+
     saveButton.textContent = 'Save';
-    
+
     // Show modal
     if (typeof bootstrap !== 'undefined' && modal) {
         const bsModal = new bootstrap.Modal(modal);
@@ -625,7 +713,8 @@ function editItem(type, name) {
             nameField.querySelector('label').textContent = 'Category Name *';
             parentCategoryField.classList.add('d-none');
             typeField.classList.remove('d-none');
-            
+            populateTypeSelect();
+
             // Set current type if available
             const category = dashboardState.categoriesData.categories?.find(c => c.name === name);
             if (category && category.type) {
@@ -670,8 +759,15 @@ function editItem(type, name) {
             parentCategoryField.classList.add('d-none');
             typeField.classList.add('d-none');
             break;
+
+        case 'type':
+            modalLabel.textContent = `Edit Type: ${name}`;
+            nameField.querySelector('label').textContent = 'Type Name *';
+            parentCategoryField.classList.add('d-none');
+            typeField.classList.add('d-none');
+            break;
     }
-    
+
     saveButton.textContent = 'Update';
     
     // Show modal
@@ -821,6 +917,7 @@ function showMigrationModal(type, name, transactionCount) {
     const dataSource = type === 'category' ? dashboardState.categoriesData.categories :
                       type === 'subcategory' ? dashboardState.categoriesData.subcategories :
                       type === 'owner' ? dashboardState.categoriesData.owners :
+                      type === 'type' ? dashboardState.categoriesData.types :
                       dashboardState.categoriesData.accounts;
     
     if (dataSource) {
@@ -918,19 +1015,22 @@ function executeMigration() {
 function updateStatistics() {
     const params = new URLSearchParams({
         year: dashboardState.currentFilter.year,
-        month: dashboardState.currentFilter.month
+        month: dashboardState.currentFilter.month || 'all',
+        owner: dashboardState.currentFilter.owner || 'all'
     });
-    
+
     fetch(`/api/categories/statistics?${params}`)
         .then(response => response.json())
         .then(stats => {
             const categoriesEl = document.getElementById('totalCategories');
             const subCategoriesEl = document.getElementById('totalSubCategories');
+            const typesEl = document.getElementById('totalTypes');
             const ownersEl = document.getElementById('totalOwners');
             const accountsEl = document.getElementById('totalAccounts');
-            
+
             if (categoriesEl) categoriesEl.textContent = stats.categories || 0;
             if (subCategoriesEl) subCategoriesEl.textContent = stats.subcategories || 0;
+            if (typesEl) typesEl.textContent = stats.types || 0;
             if (ownersEl) ownersEl.textContent = stats.owners || 0;
             if (accountsEl) accountsEl.textContent = stats.accounts || 0;
         })

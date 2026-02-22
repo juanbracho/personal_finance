@@ -89,6 +89,18 @@
     <!-- ── Data management ── -->
     <div class="kanso-section">
         <div class="kanso-section-label">Data Management</div>
+
+        <!-- Railway / cloud hosting notice -->
+        <div class="kanso-tip-box" style="margin-bottom:12px; background:var(--warning-dim); border-left-color:var(--warning);">
+            <div style="font-weight:600; color:var(--warning); margin-bottom:4px;">Cloud Hosting Notice</div>
+            <div style="font-size:12.5px; color:var(--text-muted);">
+                If running on Railway (or any container platform), the server filesystem resets on every redeploy or restart.
+                <strong style="color:var(--text);">Export Database → keep the .db file locally → Import if you need to restore</strong> is the only safe backup flow
+                unless you have a persistent <strong style="color:var(--text);">Railway Volume</strong> mounted at <code>data/</code>.
+                "Create Local Backup" and the backup history below are useful for local/self-hosted installs only.
+            </div>
+        </div>
+
         <div class="kanso-card">
 
             <!-- Export -->

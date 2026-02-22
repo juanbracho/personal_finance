@@ -459,20 +459,25 @@ def dashboard_summary():
 @api_bp.route('/categories/categories')
 def api_categories():
     """Get categories with statistics"""
-    
+
     try:
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
-        
+        owner = request.args.get('owner', 'all')
+
         conn = sqlite3.connect('data/personal_finance.db')
-        
+
         # Build date filter
         date_filter = "strftime('%Y', date) = ?"
         params = [str(year)]
-        
+
         if month != 'all':
             date_filter += " AND strftime('%m', date) = ?"
             params.append(f"{int(month):02d}")
+
+        if owner != 'all':
+            date_filter += " AND owner = ?"
+            params.append(owner)
         
         # Get categories with statistics
         categories_query = f"""
@@ -537,20 +542,25 @@ def api_categories():
 @api_bp.route('/categories/subcategories')
 def api_subcategories():
     """Get subcategories with statistics"""
-    
+
     try:
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
-        
+        owner = request.args.get('owner', 'all')
+
         conn = sqlite3.connect('data/personal_finance.db')
-        
+
         # Build date filter
         date_filter = "strftime('%Y', date) = ?"
         params = [str(year)]
-        
+
         if month != 'all':
             date_filter += " AND strftime('%m', date) = ?"
             params.append(f"{int(month):02d}")
+
+        if owner != 'all':
+            date_filter += " AND owner = ?"
+            params.append(owner)
         
         # Get subcategories with statistics - FIXED QUERY
         subcategories_query = f"""
@@ -700,40 +710,60 @@ def api_accounts():
 
 @api_bp.route('/categories/types')
 def api_types():
-    """Get types with statistics"""
-    
+    """Get types with statistics (includes custom types with 0 transactions)"""
+
     try:
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
-        
+        owner = request.args.get('owner', 'all')
+
         conn = sqlite3.connect('data/personal_finance.db')
-        
+        cursor = conn.cursor()
+
+        # Ensure custom_types table exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_types (
+                name TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
+
         # Build date filter
         date_filter = "strftime('%Y', date) = ?"
         params = [str(year)]
-        
+
         if month != 'all':
             date_filter += " AND strftime('%m', date) = ?"
             params.append(f"{int(month):02d}")
-        
-        # Get types with statistics
+
+        if owner != 'all':
+            date_filter += " AND owner = ?"
+            params.append(owner)
+
+        # Get types from transactions
         types_query = f"""
-        SELECT 
+        SELECT
             type as name,
             COUNT(*) as transaction_count,
             SUM(amount) as total_amount,
             AVG(amount) as avg_amount,
             MAX(date) as last_used,
             MIN(date) as first_used
-        FROM transactions 
+        FROM transactions
         WHERE {date_filter}
         GROUP BY type
         ORDER BY total_amount DESC
         """
-        
+
         types_df = pd.read_sql_query(types_query, conn, params=params)
+        txn_type_names = set(types_df['name'].tolist())
+
+        # Also get custom types with no transactions in current filter
+        cursor.execute("SELECT name FROM custom_types")
+        custom_names = [row[0] for row in cursor.fetchall() if row[0] not in txn_type_names]
+
         conn.close()
-        
+
         result = []
         for _, row in types_df.iterrows():
             result.append({
@@ -744,13 +774,131 @@ def api_types():
                 'last_used': str(row['last_used']),
                 'first_used': str(row['first_used'])
             })
-        
+
+        # Append custom types with zeros
+        for name in custom_names:
+            result.append({
+                'name': name,
+                'transaction_count': 0,
+                'total_amount': 0.0,
+                'avg_amount': 0.0,
+                'last_used': '—',
+                'first_used': '—'
+            })
+
         print(f"🔖 Returning {len(result)} types")
         return jsonify(result)
-        
+
     except Exception as e:
         print(f"❌ Error getting types: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/categories/types', methods=['POST'])
+def add_type():
+    """Add a new custom type"""
+    try:
+        data = request.get_json()
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'Name is required'}), 400
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_types (
+                name TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Check if already in use
+        cursor.execute("SELECT COUNT(*) FROM transactions WHERE type = ?", (name,))
+        if cursor.fetchone()[0] > 0:
+            conn.close()
+            return jsonify({'success': False, 'error': f'Type "{name}" already exists in transactions'}), 400
+
+        try:
+            cursor.execute("INSERT INTO custom_types (name, created_at) VALUES (?, ?)",
+                           (name, datetime.utcnow().isoformat()))
+            conn.commit()
+        except Exception:
+            conn.close()
+            return jsonify({'success': False, 'error': f'Type "{name}" already exists'}), 400
+
+        conn.close()
+        return jsonify({'success': True, 'message': f'Type "{name}" created successfully'})
+
+    except Exception as e:
+        print(f"❌ Error adding type: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/categories/types/<type_name>', methods=['PUT'])
+def edit_type(type_name):
+    """Rename a type (updates all transactions and custom_types table)"""
+    try:
+        data = request.get_json()
+        new_name = (data.get('name') or '').strip()
+        if not new_name:
+            return jsonify({'success': False, 'error': 'Name is required'}), 400
+
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_types (
+                name TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("UPDATE transactions SET type = ?, updated_at = ? WHERE type = ?",
+                       (new_name, datetime.utcnow().isoformat(), type_name))
+        cursor.execute("UPDATE custom_types SET name = ? WHERE name = ?", (new_name, type_name))
+
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': f'Type renamed from "{type_name}" to "{new_name}"'})
+
+    except Exception as e:
+        print(f"❌ Error editing type: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/categories/types/<type_name>', methods=['DELETE'])
+def delete_type(type_name):
+    """Delete a custom type (only if no transactions use it)"""
+    try:
+        conn = sqlite3.connect('data/personal_finance.db')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_types (
+                name TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("SELECT COUNT(*) FROM transactions WHERE type = ?", (type_name,))
+        count = cursor.fetchone()[0]
+        if count > 0:
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': f'Cannot delete: {count} transactions use this type. Migrate first.',
+                'transaction_count': count
+            }), 400
+
+        cursor.execute("DELETE FROM custom_types WHERE name = ?", (type_name,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': f'Type "{type_name}" deleted'})
+
+    except Exception as e:
+        print(f"❌ Error deleting type: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_bp.route('/categories/migration_preview')
 def api_migration_preview():
@@ -770,9 +918,10 @@ def api_migration_preview():
             'category': 'category',
             'subcategory': 'sub_category',
             'owner': 'owner',
-            'account': 'account_name'
+            'account': 'account_name',
+            'type': 'type'
         }
-        
+
         field = field_map.get(item_type)
         if not field:
             return jsonify({'error': 'Invalid type'}), 400
@@ -969,13 +1118,14 @@ def migrate_categories():
             'category': 'category',
             'subcategory': 'sub_category',
             'owner': 'owner',
-            'account': 'account_name'
+            'account': 'account_name',
+            'type': 'type'
         }
-        
+
         field = field_map.get(item_type)
         if not field:
             return jsonify({'success': False, 'error': 'Invalid type'}), 400
-        
+
         # Get count of affected transactions
         cursor.execute(f"SELECT COUNT(*) FROM transactions WHERE {field} = ?", (source,))
         affected_count = cursor.fetchone()[0]
@@ -1235,9 +1385,17 @@ def api_categories_statistics():
     try:
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
+        owner = request.args.get('owner', 'all')
 
         conn = sqlite3.connect('data/personal_finance.db')
         cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_types (
+                name TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
 
         # Build date filter
         date_filter = "strftime('%Y', date) = ?"
@@ -1247,40 +1405,49 @@ def api_categories_statistics():
             date_filter += " AND strftime('%m', date) = ?"
             params.append(f"{int(month):02d}")
 
+        if owner != 'all':
+            date_filter += " AND owner = ?"
+            params.append(owner)
+
         # Get counts for each type
         stats = {}
 
-        # Categories count - FIX query
         cursor.execute(f"""
             SELECT COUNT(DISTINCT category) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['categories'] = cursor.fetchone()[0] or 0
 
-        # Subcategories count - FIX query
         cursor.execute(f"""
             SELECT COUNT(DISTINCT sub_category) FROM transactions
             WHERE {date_filter} AND sub_category IS NOT NULL AND sub_category != '' AND COALESCE(is_active, 1) = 1
         """, params)
         stats['subcategories'] = cursor.fetchone()[0] or 0
 
-        # Owners count - FIX query
         cursor.execute(f"""
             SELECT COUNT(DISTINCT owner) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['owners'] = cursor.fetchone()[0] or 0
 
-        # Accounts count - FIX query
         cursor.execute(f"""
             SELECT COUNT(DISTINCT account_name) FROM transactions
             WHERE {date_filter} AND COALESCE(is_active, 1) = 1
         """, params)
         stats['accounts'] = cursor.fetchone()[0] or 0
 
+        cursor.execute(f"""
+            SELECT COUNT(DISTINCT type) FROM transactions
+            WHERE {date_filter} AND COALESCE(is_active, 1) = 1
+        """, params)
+        txn_types = cursor.fetchone()[0] or 0
+        cursor.execute("SELECT COUNT(*) FROM custom_types")
+        custom_types = cursor.fetchone()[0] or 0
+        stats['types'] = max(txn_types, custom_types)
+
         conn.close()
 
-        print(f"📊 Statistics for {year}-{month}: {stats}")
+        print(f"📊 Statistics for {year}-{month} owner={owner}: {stats}")
         return jsonify(stats)
 
     except Exception as e:
