@@ -267,17 +267,18 @@ def update_unexpected_expense(expense_id):
         data = request.get_json()
         amount = float(data['amount'])
         description = data['description']
-        
-        print(f"💸 API: Updating unexpected expense ID {expense_id}: {description} - ${amount}")
-        
+        category = data['category']
+
+        print(f"💸 API: Updating unexpected expense ID {expense_id}: {description} - ${amount} [{category}]")
+
         conn = sqlite3.connect('data/personal_finance.db')
         cursor = conn.cursor()
-        
+
         cursor.execute("""
-            UPDATE unexpected_expenses 
-            SET amount = ?, description = ?, updated_at = ?
+            UPDATE unexpected_expenses
+            SET amount = ?, description = ?, category = ?, updated_at = ?
             WHERE id = ? AND is_active = 1
-        """, (amount, description, datetime.utcnow().isoformat(), expense_id))
+        """, (amount, description, category, datetime.utcnow().isoformat(), expense_id))
         
         if cursor.rowcount == 0:
             conn.close()
