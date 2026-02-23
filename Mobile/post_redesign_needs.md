@@ -82,7 +82,23 @@ Transactions with type = 'Unexpected' (or any custom type) were silently exclude
 
 ---
 
-## Task 8: Remove Record Tab — App is Read-Only ✅
+## Task 8: Budget — Month / Year Period Selector ✅
+- Added `budgetMonthProvider` and `budgetYearProvider` (StateProvider<int>) initialized
+  to current month/year — independent from the Overview's home period providers.
+- `budgetSubcategoriesProvider` now watches both providers instead of hardcoding
+  `DateTime.now()` — changing either triggers an automatic re-fetch.
+- Static `monthLabel` text in the summary card replaced with tappable
+  **[Month ▾] [Year ▾]** chips (same visual style as the Overview header).
+- Tapping a chip opens a `_PickerSheet` bottom-sheet list (added to `budgets_screen.dart`).
+- Refresh button resets period to current month/year before re-fetching.
+- Pull-to-refresh keeps the selected period intact.
+- `year` and `month` threaded down: `BudgetsScreen` → `_CategoryTile` → `_SubcategoryTile`.
+- `_SubcategoryTile._loadTransactions()` uses the selected period instead of
+  `DateTime.now()`, so drilled-down transactions always match the chosen month/year.
+
+---
+
+## Task 9: Remove Record Tab — App is Read-Only ✅
 - Removed `/add` route branch from `GoRouter`.
 - Removed `Record` `NavigationDestination` from bottom nav.
 - Removed `add_transaction_screen.dart` import from `main.dart`.
