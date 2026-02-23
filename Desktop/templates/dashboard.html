@@ -21,7 +21,7 @@
     <div class="col-md-3">
         <div class="card metric-card">
             <div class="metric-label">Monthly Spending</div>
-            <div class="metric-value negative">${{ "%.2f"|format(total_monthly_spending) }}</div>
+            <div class="metric-value negative">${{ total_monthly_spending|currency }}</div>
             <small class="text-muted">Current Month</small>
         </div>
     </div>
@@ -29,7 +29,7 @@
     <div class="col-md-3">
         <div class="card metric-card debt-card">
             <div class="metric-label">Total Debt</div>
-            <div class="metric-value negative">${{ "%.2f"|format(total_debt) }}</div>
+            <div class="metric-value negative">${{ total_debt|currency }}</div>
             <small class="text-muted">All Active Debts</small>
         </div>
     </div>
@@ -37,7 +37,7 @@
     <div class="col-md-3">
         <div class="card metric-card business-card">
             <div class="metric-label">Business Revenue</div>
-            <div class="metric-value positive">${{ "%.2f"|format(business_revenue) }}</div>
+            <div class="metric-value positive">${{ business_revenue|currency }}</div>
             <small class="text-muted">This Month</small>
         </div>
     </div>
@@ -46,7 +46,7 @@
         <div class="card metric-card">
             <div class="metric-label">Business Profit</div>
             <div class="metric-value {{ 'positive' if business_profit > 0 else 'negative' }}">
-                ${{ "%.2f"|format(business_profit) }}
+                ${{ business_profit|currency }}
             </div>
             <small class="text-muted">Revenue - Expenses</small>
         </div>

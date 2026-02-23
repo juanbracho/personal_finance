@@ -792,9 +792,9 @@ function displaySimilarTransactions(transactions) {
     html += '<h6 class="text-muted mb-2">Similar transactions:</h6>';
     
     transactions.forEach(transaction => {
-        const amountDisplay = transaction.amount < 0 ? 
-            `<span class="text-success">-${Math.abs(transaction.amount).toFixed(2)}</span>` :
-            `<span class="text-danger">${transaction.amount.toFixed(2)}</span>`;
+        const amountDisplay = transaction.amount < 0 ?
+            `<span class="text-success">-${Math.abs(transaction.amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>` :
+            `<span class="text-danger">${transaction.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
         
         html += `
             <div class="similar-transaction-item" onclick="applySimilarTransaction(${JSON.stringify(transaction).replace(/"/g, '&quot;')})">
@@ -833,7 +833,7 @@ function applySimilarTransaction(transaction) {
     if (accountSelect) accountSelect.value = transaction.account_name;
     if (ownerSelect) ownerSelect.value = transaction.owner;
     if (amountInput) {
-        amountInput.placeholder = `${Math.abs(transaction.amount).toFixed(2)}`;
+        amountInput.placeholder = `${Math.abs(transaction.amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         amountInput.focus();
     }
     
@@ -894,9 +894,9 @@ function debounce(func, wait) {
 
 function formatTransactionAmount(amount) {
     if (amount < 0) {
-        return `<span class="transaction-amount-income">-${Math.abs(amount).toFixed(2)}</span>`;
+        return `<span class="transaction-amount-income">-${Math.abs(amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
     } else {
-        return `<span class="transaction-amount-expense">${amount.toFixed(2)}</span>`;
+        return `<span class="transaction-amount-expense">${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
     }
 }
 

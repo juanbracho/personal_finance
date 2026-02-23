@@ -149,9 +149,9 @@ function createTopCategoriesChart(data) {
         type: 'bar',
         orientation: 'h',
         marker: { color: colors.primary, opacity: 0.85 },
-        text: data.map(item => `$${item.total.toFixed(2)}`),
+        text: data.map(item => `$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`),
         textposition: 'outside',
-        hovertemplate: '<b>%{y}</b><br>Amount: $%{x:.2f}<extra></extra>'
+        hovertemplate: '<b>%{y}</b><br>Amount: $%{x:,.2f}<extra></extra>'
     }];
 
     const layout = {
@@ -189,9 +189,9 @@ function createMonthlyTrendChart(trendData) {
         mode: 'lines+markers',
         line: { color: colors.primary, width: 3 },
         marker: { color: colors.primary, size: 8 },
-        text: trendData.map(item => `$${item.total.toFixed(2)}`),
+        text: trendData.map(item => `$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`),
         textposition: 'top center',
-        hovertemplate: '<b>%{x}</b><br>Spending: $%{y:.2f}<extra></extra>'
+        hovertemplate: '<b>%{x}</b><br>Spending: $%{y:,.2f}<extra></extra>'
     }];
 
     const layout = {
@@ -357,9 +357,9 @@ function renderCategoriesTable(categories) {
                 <td style="font-weight:600;">${category.name}</td>
                 <td>${getTypeBadgeHtml(category.type || '')}</td>
                 <td style="text-align:right;color:var(--text-muted);">${category.transaction_count || 0}</td>
-                <td style="text-align:right;font-weight:600;color:var(--danger);">$${(category.total_amount || 0).toFixed(2)}</td>
-                <td style="text-align:right;color:var(--text-muted);">$${(category.avg_amount || 0).toFixed(2)}</td>
-                <td style="text-align:right;color:var(--primary);">$${(category.budget_amount || 0).toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600;color:var(--danger);">$${(category.total_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${(category.avg_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="text-align:right;color:var(--primary);">$${(category.budget_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td style="text-align:center;">
                     <div style="display:inline-flex;gap:4px;">
                         <button class="debt-action-btn edit" onclick="editItem('category','${category.name}')" title="Edit">${_SVG_EDIT}</button>
@@ -427,8 +427,8 @@ function renderSubCategoriesTable(subcategories) {
                 <td style="font-weight:600;">${sub.name}</td>
                 <td><span class="kanso-badge" style="background:var(--primary-dim);color:var(--primary);">${sub.category}</span></td>
                 <td style="text-align:right;color:var(--text-muted);">${sub.transaction_count}</td>
-                <td style="text-align:right;font-weight:600;">$${sub.total_amount.toFixed(2)}</td>
-                <td style="text-align:right;color:var(--text-muted);">$${sub.avg_amount.toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600;">$${sub.total_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${sub.avg_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td style="text-align:center;">
                     <div style="display:inline-flex;gap:4px;">
                         <button class="debt-action-btn edit" onclick="editItem('subcategory','${sub.name}')" title="Edit">${_SVG_EDIT}</button>
@@ -478,8 +478,8 @@ function renderOwnersTable(owners) {
             <tr>
                 <td style="font-weight:600;">${owner.name}</td>
                 <td style="text-align:right;color:var(--text-muted);">${owner.transaction_count}</td>
-                <td style="text-align:right;font-weight:600;">$${owner.total_amount.toFixed(2)}</td>
-                <td style="text-align:right;color:var(--text-muted);">$${owner.avg_amount.toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600;">$${owner.total_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${owner.avg_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td style="text-align:center;">
                     <div style="display:inline-flex;gap:4px;">
                         <button class="debt-action-btn edit" onclick="editItem('owner','${owner.name}')" title="Edit">${_SVG_EDIT}</button>
@@ -529,8 +529,8 @@ function renderAccountsTable(accounts) {
             <tr>
                 <td style="font-weight:600;">${account.name}</td>
                 <td style="text-align:right;color:var(--text-muted);">${account.transaction_count}</td>
-                <td style="text-align:right;font-weight:600;">$${account.total_amount.toFixed(2)}</td>
-                <td style="text-align:right;color:var(--text-muted);">$${account.avg_amount.toFixed(2)}</td>
+                <td style="text-align:right;font-weight:600;">$${account.total_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="text-align:right;color:var(--text-muted);">$${account.avg_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td style="text-align:center;">
                     <div style="display:inline-flex;gap:4px;">
                         <button class="debt-action-btn edit" onclick="editItem('account','${account.name}')" title="Edit">${_SVG_EDIT}</button>
@@ -577,8 +577,8 @@ function renderTypesTable(types) {
 
     let html = '';
     types.forEach(t => {
-        const amtStr = t.total_amount > 0 ? `$${t.total_amount.toFixed(2)}` : '—';
-        const avgStr = t.avg_amount > 0 ? `$${t.avg_amount.toFixed(2)}` : '—';
+        const amtStr = t.total_amount > 0 ? `$${t.total_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
+        const avgStr = t.avg_amount > 0 ? `$${t.avg_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
         html += `
             <tr>
                 <td>${getTypeBadgeHtml(t.name)}</td>
@@ -941,7 +941,7 @@ function showMigrationModal(type, name, transactionCount) {
             transactions.slice(0, 10).forEach(transaction => {
                 html += `
                     <div class="border-bottom py-1">
-                        <small><strong>${transaction.date}</strong> - ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}</small>
+                        <small><strong>${transaction.date}</strong> - ${transaction.description} - $${Math.abs(transaction.amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small>
                     </div>
                 `;
             });

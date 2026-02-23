@@ -80,9 +80,9 @@
                     <!-- Amount: income=green / expense=red -->
                     <div class="txn-amount {% if t.amount < 0 %}income{% else %}expense{% endif %}">
                         {% if t.amount < 0 %}
-                            -${{ "%.2f"|format(t.amount|abs) }}
+                            -${{ t.amount|abs|currency }}
                         {% else %}
-                            ${{ "%.2f"|format(t.amount) }}
+                            ${{ t.amount|currency }}
                         {% endif %}
                     </div>
 

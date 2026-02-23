@@ -119,10 +119,10 @@ function updateTotals() {
 
     const totalElement = document.getElementById('totalAmount');
     if (total < 0) {
-        totalElement.textContent = `-$${Math.abs(total).toFixed(2)}`;
+        totalElement.textContent = `-$${Math.abs(total).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         totalElement.className = 'txn-amount income';
     } else {
-        totalElement.textContent = `$${total.toFixed(2)}`;
+        totalElement.textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         totalElement.className = 'txn-amount expense';
     }
 }

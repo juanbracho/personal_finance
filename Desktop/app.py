@@ -66,6 +66,21 @@ def create_app(config_class=None):
     app.register_blueprint(analytics_bp)
     app.register_blueprint(settings_bp)
     
+    # Custom Jinja2 filters for currency formatting
+    @app.template_filter('currency')
+    def currency_filter(value):
+        try:
+            return f"{float(value):,.2f}"
+        except (ValueError, TypeError):
+            return value
+
+    @app.template_filter('currency_whole')
+    def currency_whole_filter(value):
+        try:
+            return f"{float(value):,.0f}"
+        except (ValueError, TypeError):
+            return value
+
     # Error handlers
     @app.errorhandler(404)
     def not_found_error(error):
@@ -76,7 +91,7 @@ def create_app(config_class=None):
     def internal_error(error):
         from flask import render_template
         return render_template('500.html'), 500
-    
+
     return app
 
 def initialize_personal_finance_database():

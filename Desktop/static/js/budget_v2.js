@@ -220,7 +220,7 @@ function renderSubcategoryBudgets(budgets) {
                             <span class="collapse-icon">▼</span>
                         </button>
                         ${category}
-                        <span class="bgt-subcategory-group-total category-total">Total: $${categoryTotal.toFixed(2)}</span>
+                        <span class="bgt-subcategory-group-total category-total">Total: $${categoryTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                     <div class="bgt-subcategory-group-actions">
                         <button class="debt-action-btn delete"
@@ -264,7 +264,7 @@ function renderSubcategoryBudgets(budgets) {
                         <div class="bgt-subcategory-row ${budgetByCategory ? 'opacity-75' : ''}">
                             <span class="bgt-sub-name" title="${budget.sub_category}">
                                 ${budget.sub_category}
-                                ${budget.commitment_minimum > 0 ? `<small class="bgt-sub-min">Min: $${budget.commitment_minimum.toFixed(2)}</small>` : ''}
+                                ${budget.commitment_minimum > 0 ? `<small class="bgt-sub-min">Min: $${budget.commitment_minimum.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small>` : ''}
                             </span>
                             <div class="kanso-input-group" style="width:130px;">
                                 <span class="kanso-input-prefix">$</span>
@@ -276,7 +276,7 @@ function renderSubcategoryBudgets(budgets) {
                                        data-commitment-minimum="${budget.commitment_minimum || 0}"
                                        ${budgetByCategory ? 'readonly' : ''}
                                        onchange="updateSubcategoryBudgetInState(this)"
-                                       title="${budget.commitment_minimum > 0 ? 'Minimum: $' + budget.commitment_minimum.toFixed(2) + ' (based on commitments)' : 'No minimum'}">
+                                       title="${budget.commitment_minimum > 0 ? 'Minimum: $' + budget.commitment_minimum.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' (based on commitments)' : 'No minimum'}">
                             </div>
                             <input type="text" class="kanso-input bgt-notes-input"
                                    placeholder="Notes…"
@@ -338,7 +338,7 @@ function updateSubcategoryBudgetInState(input) {
 
     // Enforce minimum based on commitments
     if (value < commitmentMinimum) {
-        showToast(`Budget cannot be less than commitment total ($${commitmentMinimum.toFixed(2)})`, 'error');
+        showToast(`Budget cannot be less than commitment total ($${commitmentMinimum.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`, 'error');
         value = commitmentMinimum;
         input.value = commitmentMinimum.toFixed(2);
     }
@@ -366,7 +366,7 @@ function updateCategoryTotal(category) {
     if (categoryElement) {
         const totalElement = categoryElement.querySelector('.category-total');
         if (totalElement) {
-            totalElement.textContent = `Total: $${total.toFixed(2)}`;
+            totalElement.textContent = `Total: $${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
     }
 }
@@ -415,7 +415,7 @@ async function saveSubcategoryBudget(category, subcategory) {
             // Handle validation errors (e.g., budget below commitment minimum)
             if (result.error && result.minimum_budget !== undefined) {
                 // Budget validation error with minimum budget info
-                alert(`❌ ${result.error}\n\nMinimum required: $${result.minimum_budget.toFixed(2)}`);
+                alert(`❌ ${result.error}\n\nMinimum required: $${result.minimum_budget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
                 // Optionally restore the input to the minimum value
                 const input = document.querySelector(`input[data-category="${category}"][data-subcategory="${subcategory}"]`);
                 if (input) {
@@ -808,7 +808,7 @@ async function saveCategoryLevelBudget(category) {
             const validationErrors = failed.filter(r => r.data.minimum_budget !== undefined);
             if (validationErrors.length > 0) {
                 const errorMessages = validationErrors.map(r =>
-                    `  • ${r.subcategory}: Min $${r.data.minimum_budget.toFixed(2)}`
+                    `  • ${r.subcategory}: Min $${r.data.minimum_budget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
                 ).join('\n');
                 alert(`❌ Cannot set category budget below commitment minimums:\n\n${errorMessages}\n\nPlease increase the category budget or adjust commitments.`);
             } else {
@@ -896,14 +896,14 @@ function renderRecommendations(recommendations) {
                 </td>
                 <td>${rec.category}</td>
                 <td>${rec.sub_category}</td>
-                <td>$${currentAmount.toFixed(2)}</td>
+                <td>$${currentAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
-                    <strong>$${rec.recommended_budget.toFixed(2)}</strong>
-                    ${difference !== 0 ? `<br><small class="${diffClass}">${diffSign}$${Math.abs(difference).toFixed(2)}</small>` : ''}
+                    <strong>$${rec.recommended_budget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                    ${difference !== 0 ? `<br><small class="${diffClass}">${diffSign}$${Math.abs(difference).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</small>` : ''}
                 </td>
-                <td>$${rec.last_6mo_avg.toFixed(2)}</td>
-                <td>$${rec.last_3mo_avg.toFixed(2)}</td>
-                <td>$${rec.last_1mo_actual.toFixed(2)}</td>
+                <td>$${rec.last_6mo_avg.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>$${rec.last_3mo_avg.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>$${rec.last_1mo_actual.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
                     <span class="badge recommendation-badge ${confidenceClass}">
                         ${rec.confidence.toUpperCase()}
@@ -1036,7 +1036,7 @@ function renderCommitments(commitments) {
                     <span class="bgt-commitment-name">${commitment.name}</span>
                     <span class="bgt-commitment-meta">${commitment.category} › ${commitment.sub_category}</span>
                 </div>
-                <div class="bgt-commitment-amount">$${commitment.estimated_amount.toFixed(2)}</div>
+                <div class="bgt-commitment-amount">$${commitment.estimated_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                 <div class="bgt-badge-group">
                     <span class="bgt-badge ${commitment.is_fixed ? 'bgt-badge-fixed' : 'bgt-badge-variable'}">${typeLabel}</span>
                     <span class="bgt-badge bgt-badge-due">Day ${commitment.due_day_of_month}</span>
@@ -1200,7 +1200,7 @@ function renderCommitmentTimelineChart(commitments) {
                             }
 
                             return [
-                                `Total: $${amount.toFixed(2)}`,
+                                `Total: $${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
                                 `Commitments: ${count}`
                             ];
                         }
@@ -1459,7 +1459,7 @@ function renderUnexpectedExpenses(expenses) {
             <tr>
                 <td>${expense.category}</td>
                 <td>${expense.description}</td>
-                <td>$${expense.amount.toFixed(2)}</td>
+                <td>$${expense.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>${new Date(expense.created_at).toLocaleDateString()}</td>
                 <td>
                     <div style="display:flex; gap:4px;">
@@ -1599,21 +1599,21 @@ async function deleteUnexpectedExpense(id) {
 function updateSummaryCards() {
     // Total Budget
     const totalBudget = budgetState.subcategoryBudgets.reduce((sum, b) => sum + b.budget_amount, 0);
-    document.getElementById('totalBudget').textContent = '$' + totalBudget.toFixed(2);
+    document.getElementById('totalBudget').textContent = '$' + totalBudget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     // Total Commitments
     const totalCommitments = budgetState.commitments.reduce((sum, c) => sum + c.estimated_amount, 0);
     const commitmentCount = budgetState.commitments.filter(c => c.is_fixed).length;
-    document.getElementById('totalCommitments').textContent = '$' + totalCommitments.toFixed(2);
+    document.getElementById('totalCommitments').textContent = '$' + totalCommitments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('commitmentCount').textContent = commitmentCount;
 
     // Living Budget
     const livingBudget = totalBudget - totalCommitments;
-    document.getElementById('livingBudget').textContent = '$' + livingBudget.toFixed(2);
+    document.getElementById('livingBudget').textContent = '$' + livingBudget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     // Unexpected Expenses
     const totalUnexpected = budgetState.unexpectedExpenses.reduce((sum, e) => sum + e.amount, 0);
-    document.getElementById('totalUnexpectedExpenses').textContent = '$' + totalUnexpected.toFixed(2);
+    document.getElementById('totalUnexpectedExpenses').textContent = '$' + totalUnexpected.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 async function loadAllData() {
@@ -1730,7 +1730,7 @@ function sortAndRenderCategoryTable() {
             <tr>
                 <td><strong>${item.category}</strong></td>
                 <td style="text-align:right;">${item.count}</td>
-                <td style="text-align:right; color:var(--primary);"><strong>$${item.total.toFixed(2)}</strong></td>
+                <td style="text-align:right; color:var(--primary);"><strong>$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             </tr>
         `;
         grandTotal += item.total;
@@ -1741,7 +1741,7 @@ function sortAndRenderCategoryTable() {
         <tr class="bgt-table-total">
             <td><strong>Total</strong></td>
             <td style="text-align:right;"><strong>${grandCount}</strong></td>
-            <td style="text-align:right;"><strong>$${grandTotal.toFixed(2)}</strong></td>
+            <td style="text-align:right;"><strong>$${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
         </tr>
     `;
     categoryBody.innerHTML = categoryHtml;
@@ -1790,7 +1790,7 @@ function sortAndRenderSubcategoryTable() {
                 <td style="color:var(--text-faint); font-size:12px; white-space:nowrap;">${item.category}</td>
                 <td>${item.subcategory}</td>
                 <td style="text-align:right;">${item.count}</td>
-                <td style="text-align:right; color:var(--primary);">$${item.total.toFixed(2)}</td>
+                <td style="text-align:right; color:var(--primary);">$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
         `;
     });

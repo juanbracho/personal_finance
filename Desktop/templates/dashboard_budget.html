@@ -4,22 +4,22 @@
 <div class="kanso-info-strip" style="margin-bottom: 20px;">
   <div class="kanso-info-item">
     <div class="kanso-info-label">Initial Budget</div>
-    <div class="kanso-info-value">${{ "%.2f"|format(total_initial_budget) }}</div>
+    <div class="kanso-info-value">${{ total_initial_budget|currency }}</div>
   </div>
   <div class="kanso-info-item">
     <div class="kanso-info-label">Unexpected</div>
     <div class="kanso-info-value {{ 'anl-negative' if total_unexpected_expenses > 0 else 'muted' }}">
-      +${{ "%.2f"|format(total_unexpected_expenses) }}
+      +${{ total_unexpected_expenses|currency }}
     </div>
   </div>
   <div class="kanso-info-item">
     <div class="kanso-info-label">Effective Budget</div>
-    <div class="kanso-info-value">${{ "%.2f"|format(total_effective_budget) }}</div>
+    <div class="kanso-info-value">${{ total_effective_budget|currency }}</div>
   </div>
   <div class="kanso-info-item">
     <div class="kanso-info-label">Actual Spending</div>
     <div class="kanso-info-value {{ 'anl-negative' if total_actual_spending > total_effective_budget else 'anl-positive' }}">
-      ${{ "%.2f"|format(total_actual_spending) }}
+      ${{ total_actual_spending|currency }}
     </div>
   </div>
 </div>
@@ -33,7 +33,7 @@
       </div>
       {% set remaining = total_effective_budget - total_actual_spending %}
       <span style="font-size:13px; color:{{ 'var(--danger)' if remaining < 0 else 'var(--success)' }}; font-weight:600;">
-        {% if remaining >= 0 %}${{ "%.0f"|format(remaining) }} remaining{% else %}${{ "%.0f"|format(-remaining) }} over{% endif %}
+        {% if remaining >= 0 %}${{ remaining|currency_whole }} remaining{% else %}${{ (-remaining)|currency_whole }} over{% endif %}
       </span>
     </div>
     {% set pct = [(total_actual_spending / total_effective_budget * 100) if total_effective_budget > 0 else 0, 100] | min %}
@@ -42,7 +42,7 @@
     </div>
     <div class="dsh-budget-progress-sub">
       <span>$0</span>
-      <span style="color:var(--text-muted);">${{ "%.0f"|format(total_actual_spending) }} of ${{ "%.0f"|format(total_effective_budget) }}</span>
+      <span style="color:var(--text-muted);">${{ total_actual_spending|currency_whole }} of ${{ total_effective_budget|currency_whole }}</span>
     </div>
   </div>
 </div>
@@ -87,25 +87,25 @@
             <span class="kanso-badge" style="background:var(--primary-dim); color:var(--primary); margin-left:6px; font-size:10px;">Category Budget</span>
             {% endif %}
           </td>
-          <td style="text-align:right; color:var(--text-muted);">${{ "%.2f"|format(item.initial_budget) }}</td>
+          <td style="text-align:right; color:var(--text-muted);">${{ item.initial_budget|currency }}</td>
           <td style="text-align:right; color:var(--warning);">
-            {% if item.unexpected_expenses > 0 %}+${{ "%.2f"|format(item.unexpected_expenses) }}{% else %}&mdash;{% endif %}
+            {% if item.unexpected_expenses > 0 %}+${{ item.unexpected_expenses|currency }}{% else %}&mdash;{% endif %}
           </td>
-          <td style="text-align:right; font-weight:600;">${{ "%.2f"|format(item.effective_budget) }}</td>
+          <td style="text-align:right; font-weight:600;">${{ item.effective_budget|currency }}</td>
           <td class="{{ 'anl-positive' if item.actual_spending <= item.effective_budget else 'anl-negative' }}" style="text-align:right; font-weight:600;">
-            ${{ "%.2f"|format(item.actual_spending) }}
+            ${{ item.actual_spending|currency }}
           </td>
           <td>
             {% if item.status == 'over' %}
               <span class="kanso-badge" style="background:var(--danger-dim); color:var(--danger);">Over</span>
-              <span style="font-size:11px; color:var(--danger); display:block; margin-top:2px;">+${{ "%.0f"|format(item.variance) }}</span>
+              <span style="font-size:11px; color:var(--danger); display:block; margin-top:2px;">+${{ item.variance|currency_whole }}</span>
             {% elif item.status == 'under' %}
               <span class="kanso-badge" style="background:var(--success-dim); color:var(--success);">Under</span>
-              <span style="font-size:11px; color:var(--success); display:block; margin-top:2px;">-${{ "%.0f"|format(-item.variance) }}</span>
+              <span style="font-size:11px; color:var(--success); display:block; margin-top:2px;">-${{ (-item.variance)|currency_whole }}</span>
             {% elif item.status == 'on_track' %}
               <span class="kanso-badge" style="background:var(--primary-dim); color:var(--primary);">On Track</span>
               <span style="font-size:11px; color:var(--text-muted); display:block; margin-top:2px;">
-                {% if item.variance > 0 %}+{% endif %}${{ "%.0f"|format(item.variance) }}
+                {% if item.variance > 0 %}+{% endif %}${{ item.variance|currency_whole }}
               </span>
             {% elif item.status == 'no_budget' %}
               <span class="kanso-badge" style="background:var(--surface-raised); color:var(--text-muted); border:1px solid var(--border);">No Budget</span>
@@ -126,19 +126,19 @@
               <svg class="toggle-icon-trans" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" width="9" height="9" style="margin-right:6px; color:var(--text-faint);"><polyline points="3 4 6 7 9 4"/></svg>
               {{ subcat.sub_category }}
             </td>
-            <td style="text-align:right; font-size:13px; color:var(--text-muted);">${{ "%.2f"|format(subcat.budget_amount) }}</td>
+            <td style="text-align:right; font-size:13px; color:var(--text-muted);">${{ subcat.budget_amount|currency }}</td>
             <td style="text-align:right; font-size:13px; color:var(--text-muted);">&mdash;</td>
-            <td style="text-align:right; font-size:13px;">${{ "%.2f"|format(subcat.budget_amount) }}</td>
+            <td style="text-align:right; font-size:13px;">${{ subcat.budget_amount|currency }}</td>
             <td class="{{ 'anl-positive' if subcat.actual_spending <= subcat.budget_amount else 'anl-negative' }}" style="text-align:right; font-size:13px; font-weight:600;">
-              ${{ "%.2f"|format(subcat.actual_spending) }}
+              ${{ subcat.actual_spending|currency }}
             </td>
             <td style="font-size:13px;">
               {% if subcat.status == 'over' %}
                 <span class="kanso-badge" style="background:var(--danger-dim); color:var(--danger); font-size:10px;">Over</span>
-                <span style="font-size:11px; color:var(--danger); display:block; margin-top:2px;">+${{ "%.0f"|format(subcat.variance) }}</span>
+                <span style="font-size:11px; color:var(--danger); display:block; margin-top:2px;">+${{ subcat.variance|currency_whole }}</span>
               {% elif subcat.status == 'under' %}
                 <span class="kanso-badge" style="background:var(--success-dim); color:var(--success); font-size:10px;">Under</span>
-                <span style="font-size:11px; color:var(--success); display:block; margin-top:2px;">-${{ "%.0f"|format(-subcat.variance) }}</span>
+                <span style="font-size:11px; color:var(--success); display:block; margin-top:2px;">-${{ (-subcat.variance)|currency_whole }}</span>
               {% elif subcat.status == 'on_track' %}
                 <span class="kanso-badge" style="background:var(--primary-dim); color:var(--primary); font-size:10px;">On Track</span>
               {% elif subcat.status == 'no_budget' %}
@@ -193,7 +193,7 @@
       <ul style="margin:0; padding-left:14px; color:var(--text-muted); font-size:12.5px;">
         {% if over_budget_categories %}
           {% for item in over_budget_categories[:3] %}
-          <li>{{ item.category }}: ${{ "%.0f"|format(item.variance) }} over</li>
+          <li>{{ item.category }}: ${{ item.variance|currency_whole }} over</li>
           {% endfor %}
           {% if over_budget_categories|length > 3 %}
           <li><em>...and {{ over_budget_categories|length - 3 }} more</em></li>
@@ -210,7 +210,7 @@
       <div style="font-weight:600; font-size:12px; color:var(--text); margin-bottom:6px;">Unexpected Expenses Impact</div>
       <ul style="margin:0; padding-left:14px; color:var(--text-muted); font-size:12.5px;">
         {% if total_unexpected_expenses > 0 %}
-          <li>Added ${{ "%.0f"|format(total_unexpected_expenses) }} to budget</li>
+          <li>Added ${{ total_unexpected_expenses|currency_whole }} to budget</li>
           <li>{{ "%.1f"|format((total_unexpected_expenses / total_initial_budget * 100) if total_initial_budget > 0 else 0) }}% increase from initial</li>
           {% set cats_with_unexpected = budget_analysis | selectattr('unexpected_expenses', 'greaterthan', 0) | list %}
           <li>{{ cats_with_unexpected|length }} categories affected</li>
@@ -348,7 +348,7 @@ async function toggleTransactions(event, category, subcategory) {
                     </td>
                     <td colspan="3"></td>
                     <td style="text-align:right; font-weight:600; color:var(--text);">
-                        $${trans.amount.toFixed(2)}
+                        $${trans.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                     <td></td>
                 `;
@@ -432,7 +432,7 @@ async function toggleCategoryTransactions(event, category) {
                     </td>
                     <td colspan="3"></td>
                     <td style="text-align:right; font-weight:600; color:var(--text);">
-                        $${trans.amount.toFixed(2)}
+                        $${trans.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                     <td></td>
                 `;
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'bar',
                 orientation: 'h',
                 marker: { color: colors.grid || '#555', opacity: 0.6 },
-                hovertemplate: '<b>%{y}</b><br>Budget: $%{x:.2f}<extra></extra>'
+                hovertemplate: '<b>%{y}</b><br>Budget: $%{x:,.2f}<extra></extra>'
             },
             {
                 name: 'Actual Spending',
@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'bar',
                 orientation: 'h',
                 marker: { color: barColors },
-                hovertemplate: '<b>%{y}</b><br>Actual: $%{x:.2f}<extra></extra>'
+                hovertemplate: '<b>%{y}</b><br>Actual: $%{x:,.2f}<extra></extra>'
             }
         ], {
             barmode: 'overlay',
@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 y: initial,
                 type: 'bar',
                 marker: { color: colors.primary, opacity: 0.8 },
-                hovertemplate: '<b>%{x}</b><br>Initial: $%{y:.2f}<extra></extra>'
+                hovertemplate: '<b>%{x}</b><br>Initial: $%{y:,.2f}<extra></extra>'
             },
             {
                 name: 'Unexpected',
@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 y: unexpected,
                 type: 'bar',
                 marker: { color: colors.warning, opacity: 0.8 },
-                hovertemplate: '<b>%{x}</b><br>Unexpected: $%{y:.2f}<extra></extra>'
+                hovertemplate: '<b>%{x}</b><br>Unexpected: $%{y:,.2f}<extra></extra>'
             }
         ], {
             barmode: 'stack',

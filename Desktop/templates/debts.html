@@ -21,13 +21,13 @@
         <div class="kanso-info-item">
             <div class="kanso-info-label">Total Debt</div>
             <div class="kanso-info-value" id="totalDebtValue" style="color:var(--danger);">
-                ${{ "%.2f"|format(total_debt) }}
+                ${{ total_debt|currency }}
             </div>
         </div>
         <div class="kanso-info-item">
             <div class="kanso-info-label">Monthly Minimums</div>
             <div class="kanso-info-value" id="totalMinimumsValue">
-                ${{ "%.2f"|format(total_minimum_payments) }}
+                ${{ total_minimum_payments|currency }}
             </div>
         </div>
     </div>
@@ -86,7 +86,7 @@
                     <!-- Balance -->
                     <div class="debt-item-balance">
                         <div class="debt-balance-value {{ 'paid-off' if debt.is_active == 0 }}">
-                            ${{ "%.2f"|format(debt.current_balance) }}
+                            ${{ debt.current_balance|currency }}
                         </div>
                         <div class="debt-balance-label">balance</div>
                     </div>
@@ -103,7 +103,7 @@
                     <div class="debt-item-payment">
                         <div class="debt-min-payment">
                             {% if debt.minimum_payment %}
-                                ${{ "%.2f"|format(debt.minimum_payment) }}
+                                ${{ debt.minimum_payment|currency }}
                             {% else %}
                                 &mdash;
                             {% endif %}
@@ -169,7 +169,7 @@
                     <div class="debt-details-grid">
                         <div>
                             <div class="debt-detail-label">Original Balance</div>
-                            <div class="debt-detail-value">${{ "%.2f"|format(debt.original_balance) }}</div>
+                            <div class="debt-detail-value">${{ debt.original_balance|currency }}</div>
                         </div>
                         <div>
                             <div class="debt-detail-label">Interest Rate</div>
@@ -184,7 +184,7 @@
                         <div>
                             <div class="debt-detail-label">Amount Paid</div>
                             <div class="debt-detail-value positive debt-detail-paid">
-                                ${{ "%.2f"|format(debt.original_balance - debt.current_balance) }}
+                                ${{ (debt.original_balance - debt.current_balance)|currency }}
                             </div>
                         </div>
                     </div>
@@ -198,7 +198,7 @@
                     </div>
                     <div class="debt-progress-end-labels">
                         <span>$0</span>
-                        <span>${{ "%.2f"|format(debt.original_balance) }}</span>
+                        <span>${{ debt.original_balance|currency }}</span>
                     </div>
                 </div><!-- /.debt-item-details -->
 
@@ -252,7 +252,7 @@
             <div class="debt-insight-label">Highest Balance</div>
             {% if highest_debt %}
             <div class="debt-insight-name">{{ highest_debt.name }}</div>
-            <div class="debt-insight-value" style="color:var(--danger);">${{ "%.2f"|format(highest_debt.current_balance) }}</div>
+            <div class="debt-insight-value" style="color:var(--danger);">${{ highest_debt.current_balance|currency }}</div>
             {% else %}
             <div class="debt-insight-value">No debts found</div>
             {% endif %}
