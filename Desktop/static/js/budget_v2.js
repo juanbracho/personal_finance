@@ -1507,7 +1507,7 @@ async function saveUnexpectedExpense() {
         return;
     }
 
-    const data = id ? { amount, description } : {
+    const data = id ? { category, amount, description } : {
         category,
         description,
         amount,
