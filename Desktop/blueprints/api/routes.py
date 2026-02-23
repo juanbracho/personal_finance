@@ -148,11 +148,13 @@ def budget_analysis():
         """
         actual_spending_df = pd.read_sql_query(actual_spending_query, conn, params=spending_params)
         
-        # Get initial budgets
+        # Get initial budgets — use subcategory templates (the source the web
+        # Budget page writes to) so values match what the user actually set.
         initial_budgets_query = """
-        SELECT category, budget_amount, notes
-        FROM budget_templates 
+        SELECT category, SUM(budget_amount) AS budget_amount
+        FROM budget_subcategory_templates
         WHERE is_active = 1
+        GROUP BY category
         ORDER BY category
         """
         initial_budgets_df = pd.read_sql_query(initial_budgets_query, conn)
@@ -713,6 +715,9 @@ def api_types():
     """Get types with statistics (includes custom types with 0 transactions)"""
 
     try:
+        # all_years=1 → skip date filter entirely (used by the mobile form so
+        # every type ever recorded in the DB is available for selection)
+        all_years = request.args.get('all_years', '0') == '1'
         year = request.args.get('year', datetime.now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
@@ -729,12 +734,16 @@ def api_types():
         """)
 
         # Build date filter
-        date_filter = "strftime('%Y', date) = ?"
-        params = [str(year)]
+        if all_years:
+            date_filter = "1=1"
+            params = []
+        else:
+            date_filter = "strftime('%Y', date) = ?"
+            params = [str(year)]
 
-        if month != 'all':
-            date_filter += " AND strftime('%m', date) = ?"
-            params.append(f"{int(month):02d}")
+            if month != 'all':
+                date_filter += " AND strftime('%m', date) = ?"
+                params.append(f"{int(month):02d}")
 
         if owner != 'all':
             date_filter += " AND owner = ?"

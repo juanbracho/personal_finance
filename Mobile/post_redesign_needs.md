@@ -1,29 +1,115 @@
- Here's what I'm reading from your prompt + the screenshot:                                                                                                   
-                                                                                                                                                               
-  ---                                                                                                                                                          
-  1. Budget Health — double-counting bug                                                                                                                       
-  The bar shows Initial $10,710 + $2,000 unexpected = $12,710 effective budget, but actual spending shows $10,324. You said you manually set ~$9k budget and   
-  unexpected ~$11k total should give ~$11k effective, not $12,710. The mobile app is pulling budget data from the same API as the web app — need to trace      
-  whether the initial budget figure is being double-counted (e.g. summing budget_templates + unexpected_expenses incorrectly, or including inactive
-  categories).
+# Post-Redesign Fix Session — Feb 22 2026
 
-  2. Spending by Type — hide zero-value types
-  "Business $0" and "Savings $0" cards are showing. Filter the type cards to only render types where amount > 0. Also, if you've added a custom type (e.g.
-  "Unexpected") with actual transactions, it won't appear here at all since the type cards are hardcoded to the 4 defaults.
+## Overview
+Three bugs identified after the mobile redesign. All fixed sequentially in one session.
 
-  3. Spending by Type — dynamic types
-  The four cards (Needs / Wants / Business / Savings) are hardcoded in the mobile UI. Since the web app now supports custom types stored in custom_types table,
-   the mobile should fetch types dynamically from the same API endpoint and render cards for whatever types exist with data.
+---
 
-  4. Transactions / History — Type field
-  The Record and History screens need to reflect custom types in any type picker or type display — same dynamic fetch from the API instead of a hardcoded list
-  of 4.
+## Task 1: History — Infinite Scroll Pagination ✅ DONE
 
-  ---
-  Those are the four distinct things to address.
+### Problem
+`transactionsProvider` was a flat `FutureProvider` that fired one call (default
+`perPage=50`) with no "load more" trigger.
 
-  User extra issues:
+### Root Cause
+- `transactionsProvider` had no page tracking.
+- `TransactionsScreen` used a plain `ListView.builder` with no `ScrollController`.
+- `TransactionsFilter` lacked `==` / `hashCode`, needed for Riverpod `.family` key.
 
-  In development enviroment categories view in dashboard load all categories, sub, type, owners but on Railway live server does not load. 
+### Fix Applied
+**`app_providers.dart`**
+- Removed old `transactionsProvider` (flat FutureProvider).
+- Added `TransactionsPagination` state class (transactions, isInitialLoading,
+  isLoadingMore, hasMore, currentPage, error).
+- Added `TransactionsPaginationNotifier extends StateNotifier<TransactionsPagination>`
+  with `_loadPage(page)`, `loadNextPage()` (guarded by hasMore + 250-item cap),
+  and `refresh()`.
+- Added `transactionsPaginationProvider` as
+  `StateNotifierProvider.autoDispose.family<..., TransactionsFilter>`.
+- Added `==` and `hashCode` to `TransactionsFilter` so different filter states
+  map to different (auto-disposed) provider instances.
 
-  Add the same mobile signing screen design to webapp
+**`transactions_screen.dart`**
+- Converted to `ConsumerStatefulWidget` to hold `ScrollController`.
+- Scroll listener fires `loadNextPage()` when within 200 px of the bottom.
+- `ListView.builder` appends a spinner as the last item while loading more,
+  and a "Showing N transactions" caption when all pages are exhausted.
+- Refresh button calls `notifier.refresh()` directly.
+- Filter apply no longer calls `ref.invalidate` — changing the filter creates
+  a new family instance which loads page 1 automatically.
+
+**`add_transaction_screen.dart`**
+- `ref.invalidate(transactionsProvider)` → `ref.invalidate(transactionsPaginationProvider)`
+  (invalidates all family instances on save).
+
+### Behaviour
+- 50 transactions per page.
+- Loads next page automatically as user scrolls near the bottom.
+- Hard cap at 250 items (5 pages); shows end-of-list label after that.
+
+---
+
+## Task 2: Records (Add Transaction) — Dynamic Types Including Savings ✅ DONE
+
+### Problem
+The type-chip row showed only types that had transactions in the *current calendar
+year*. Types used only in prior years (e.g. Savings) were invisible in the form.
+
+### Root Cause
+`/api/categories/types` (backend) defaults `year = datetime.now().year` and always
+applies a year filter on the SQL query. The mobile `getTypes()` passes no year param,
+so the backend silently filtered to this year only.
+
+### Fix Applied
+**Backend `blueprints/api/routes.py` — `api_types()`**
+- Added `all_years = request.args.get('all_years', '0') == '1'` parameter.
+- When `all_years=1`, `date_filter` is set to `"1=1"` with no params (no year
+  restriction). All other filters (owner) still apply normally.
+- Existing web-dashboard callers that don't send `all_years` retain current-year
+  behaviour unchanged.
+
+**`services/api_service.dart` — `getTypes()`**
+- Now calls `_getList('/api/categories/types', {'all_years': '1'})`.
+- The form therefore always shows every type ever recorded in the DB, including
+  Savings and any future custom types.
+
+---
+
+## Task 3: Overview — Dynamic Budget Bar Segments & Legend ✅ DONE
+
+### Problem
+The Budget Health spending bar was hardcoded for exactly four types
+(Needs / Wants / Business / Savings):
+- Types with zero spending still appeared in the legend.
+- The "Unexpected" type introduced in the redesign was completely missing from
+  the bar and legend.
+
+### Root Cause
+`_BudgetCard` in `home_screen.dart` computed four named flex ints and rendered
+four hardcoded `_DotLabel` widgets regardless of actual spending data.
+
+### Fix Applied
+**`home_screen.dart` — `_BudgetCard._build()`**
+- Replaced four hardcoded flex variables with a `typeColorMap` (extended to
+  include `Unexpected → _kUnexpected`) and a dynamic loop over
+  `summary.spendingByType.entries`.
+- Loop filters to types with `value > 0`, sorts largest-first, clamps each
+  flex to remaining capacity, accumulates `_Seg` objects into `spendingSegments`
+  and `_DotLabel` widgets into `legendDots`.
+- `_SegmentedBar` receives `[...spendingSegments, remSptFlex-gray-seg]`.
+- `_BarRowLabel` receives `legendDots` — only types that actually appear in
+  the bar get a legend entry.
+- Unknown/future custom types automatically get the orange `_kUnexpected` colour
+  via the `typeColorMap[typeName] ?? _kUnexpected` fallback.
+
+---
+
+## Shared Color Map (reference)
+```
+Needs       #7BAF8E  (green)
+Wants       #D4956A  (orange-tan)
+Business    #6A8FBF  (blue)
+Savings     #A67FB5  (purple)
+Unexpected  #E8761F  (vivid orange)
+default     #E8761F  (same orange for unknown custom types)
+```
