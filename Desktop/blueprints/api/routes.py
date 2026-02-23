@@ -255,9 +255,12 @@ def budget_subcategories():
             ORDER BY category, sub_category
         """, conn, params=spending_params)
 
-        # Category-level initial budgets
+        # Category-level initial budgets — sum from subcategory templates
+        # (the source the web Budget page writes to, not the stale budget_templates)
         cat_budgets_df = pd.read_sql_query(
-            "SELECT category, budget_amount FROM budget_templates WHERE is_active = 1",
+            "SELECT category, SUM(budget_amount) AS budget_amount"
+            " FROM budget_subcategory_templates WHERE is_active = 1"
+            " GROUP BY category",
             conn
         )
 
