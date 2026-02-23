@@ -106,6 +106,112 @@ Transactions with type = 'Unexpected' (or any custom type) were silently exclude
 
 ---
 
+---
+
+# Settings Screen + Biometric Opt-In — Feb 23 2026
+
+## Overview
+Replaced per-screen theme toggle icon with a centralized Settings screen. Added biometric unlock (Face ID / Touch ID / fingerprint) as an opt-in feature. App still requires credentials on every cold start, but biometric-opted-in users are prompted automatically and skip the password form.
+
+---
+
+## Task 10: Settings Screen ✅
+**Route:** `/settings` — top-level `GoRoute` outside the `StatefulShellRoute`, pushed modally over any active tab with a native back arrow via `context.push('/settings')`.
+
+**Sections:**
+- **Appearance** — three `RadioListTile<KakeiboTheme>` entries (Warm Ink · Japanese Indigo · Washi Paper). Watches `themeNotifierProvider`; calls `setTheme()` on tap. Theme changes are instant and persist across restarts (existing `SharedPreferences` key `kakeibo_theme`).
+- **Security** — `SwitchListTile` for "Face ID / Touch ID". Only rendered when `BiometricService.isAvailable()` returns true (checked in `initState`). Toggles `biometricOptInProvider` which writes to `SharedPreferences` key `biometric_opt_in`.
+- **Account** — "Sign Out" `ListTile` with `colorScheme.error` text/icon. Shows a confirmation `AlertDialog` before calling `authNotifier.logout()`.
+
+**New file:** `lib/screens/settings_screen.dart`
+
+---
+
+## Task 11: Biometric Opt-In Infrastructure ✅
+
+### `lib/services/biometric_service.dart` (new)
+Static utility wrapping `local_auth`:
+- `isAvailable()` — calls `canCheckBiometrics` + `getAvailableBiometrics()`. Returns false on any exception (safe on simulators).
+- `authenticate()` — calls `authenticate()` with `biometricOnly: true`, `stickyAuth: true`. Returns false on exception or user cancellation.
+
+### `lib/providers/biometric_provider.dart` (new)
+```dart
+class BiometricOptInNotifier extends StateNotifier<bool>
+  - _load()         // reads SharedPrefs key 'biometric_opt_in' on init
+  - setOptIn(bool)  // writes to SharedPrefs + updates state
+  - toggle()        // calls setOptIn(!state)
+
+final biometricOptInProvider = StateNotifierProvider<BiometricOptInNotifier, bool>
+```
+
+### `lib/auth_notifier.dart` — biometric unlock flag
+Added to `AuthNotifier`:
+```dart
+bool _needsBiometricUnlock = false;
+bool get needsBiometricUnlock => _needsBiometricUnlock;
+```
+`init()` now reads `biometric_opt_in` from `SharedPreferences` and checks for a stored token via `ApiService.getApiKey()`. If both are true, sets `_needsBiometricUnlock = true` before notifying listeners.
+
+`clearBiometricUnlock()` resets the flag without calling `notifyListeners()` — callers handle state transition via `setLoggedIn()`.
+
+---
+
+## Task 12: Login Screen — Biometric Auto-Trigger ✅
+`lib/screens/login_screen.dart` changes:
+- Added `_showBiometricButton` state bool.
+- In `initState`: if `authNotifier.needsBiometricUnlock` is true, sets `_showBiometricButton = true` and schedules `_tryBiometric()` via `addPostFrameCallback` (ensures widget tree is mounted before the OS prompt appears).
+- `_tryBiometric()`: calls `BiometricService.authenticate()`. On success → `clearBiometricUnlock()` + `setLoggedIn(true)`. On failure/cancel → `clearBiometricUnlock()` + clears `_showBiometricButton` (falls back to password form).
+- A secondary `OutlinedButton.icon` (fingerprint icon, "Use Face ID / Touch ID") appears below the Sign In button when `_showBiometricButton` is true, allowing the user to re-trigger the prompt if they dismissed it.
+
+---
+
+## Task 13: Theme Toggle → Settings Gear (4 screens) ✅
+Replaced `const ThemeToggleButton()` in every tab's AppBar `actions` with:
+```dart
+IconButton(
+  icon: const Icon(Icons.settings_outlined),
+  tooltip: 'Settings',
+  onPressed: () => context.push('/settings'),
+)
+```
+Screens updated: `home_screen.dart`, `transactions_screen.dart`, `budgets_screen.dart`, `debts_screen.dart`.
+
+Each screen: removed `import '../widgets/theme_toggle_button.dart'`, added `import 'package:go_router/go_router.dart'`.
+
+`add_transaction_screen.dart`: removed the `ThemeToggleButton` import and usage (screen has no route; housekeeping only).
+
+`lib/widgets/theme_toggle_button.dart`: **deleted** — no longer referenced.
+
+---
+
+## Task 14: Platform Configuration ✅
+
+### iOS — `ios/Runner/Info.plist`
+Added inside root `<dict>`:
+```xml
+<key>NSFaceIDUsageDescription</key>
+<string>Use Face ID to unlock Kanso without entering your password</string>
+```
+Required by iOS for any app using Face ID. Without this the app crashes when `local_auth` is invoked.
+
+### Android — `android/app/src/main/AndroidManifest.xml`
+Two changes:
+1. Added permission before `<application>`:
+   ```xml
+   <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+   ```
+2. Changed `<activity android:name=".MainActivity"` → `android:name="io.flutter.embedding.android.FlutterFragmentActivity"` — required by `local_auth` on Android (the plugin uses `FragmentActivity` APIs for the biometric prompt).
+
+---
+
+## Dependency Added
+```yaml
+local_auth: ^2.3.0   # resolved to 2.3.0
+```
+Transitive additions: `local_auth_android`, `local_auth_darwin`, `local_auth_windows`, `local_auth_platform_interface`, `flutter_plugin_android_lifecycle`.
+
+---
+
 ## Shared Color Map
 ```
 Needs       #7BAF8E  (green)
