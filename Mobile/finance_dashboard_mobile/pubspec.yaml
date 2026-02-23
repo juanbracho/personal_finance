@@ -33,6 +33,9 @@ dependencies:
   # Charts
   fl_chart: ^0.69.0
 
+  # Biometric authentication
+  local_auth: ^2.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
