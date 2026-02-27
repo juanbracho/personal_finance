@@ -107,3 +107,17 @@ railway-dns.txt
 
 # Railway app credentials
 railway-credentials.txt
+
+# Internal project notes (personal data + infrastructure details)
+project_context.md
+
+# Mobile app (Railway-only, not part of local setup)
+Mobile/
+
+# Product screenshots (may contain real financial data)
+Product Images/
+
+# Root brand assets (not part of the Flask app)
+kanso_icon.png
+kanso_icon_cropped.png
+kansosvg.svg

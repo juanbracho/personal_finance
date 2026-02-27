@@ -1,3 +1,0 @@
-#include? "Pods/Target Support Files/Pods-Kanso/Pods-Kanso.release.xcconfig"
-#include? "Pods/Target Support Files/Pods-Kanso/Pods-Kanso.profile.xcconfig"
-#include "Generated.xcconfig"
