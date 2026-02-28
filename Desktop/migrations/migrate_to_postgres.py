@@ -34,7 +34,13 @@ def _bool(val, default=True):
 
 
 def _float(val):
-    return float(val) if val is not None else None
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        print(f'  ⚠  bad numeric value {val!r} — stored as 0.0')
+        return 0.0
 
 
 def _open_sqlite():

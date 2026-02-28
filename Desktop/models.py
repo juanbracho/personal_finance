@@ -50,7 +50,7 @@ class AuditLog(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     action = db.Column(db.String(100), nullable=False)
     ip_address = db.Column(db.String(45), nullable=True)
-    metadata = db.Column(db.JSON, nullable=True)
+    extra_data = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
