@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 from models import db
 from sqlalchemy import text
+from utils import uid_clause, current_user_id
 
 debts_bp = Blueprint('debts', __name__, url_prefix='/debts')
 
@@ -17,12 +18,19 @@ def list_debts():
     print("💳 Loading debts page...")
     try:
         show_paid_off = request.args.get('show_paid_off', 'false').lower() == 'true'
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             if show_paid_off:
-                debts_df = _df(conn, "SELECT * FROM debt_accounts ORDER BY is_active DESC, current_balance DESC")
+                debts_df = _df(conn, f"""
+                    SELECT * FROM debt_accounts WHERE 1=1 {uid_sql}
+                    ORDER BY is_active DESC, current_balance DESC
+                """, uid_p)
                 print("💳 Loading all debts (including paid-off)...")
             else:
-                debts_df = _df(conn, "SELECT * FROM debt_accounts WHERE is_active = true ORDER BY current_balance DESC")
+                debts_df = _df(conn, f"""
+                    SELECT * FROM debt_accounts WHERE is_active = true {uid_sql}
+                    ORDER BY current_balance DESC
+                """, uid_p)
                 print("💳 Loading active debts only...")
 
         debts = []
@@ -64,9 +72,9 @@ def add_debt():
                 conn.execute(text("""
                     INSERT INTO debt_accounts
                     (name, debt_type, original_balance, current_balance, interest_rate,
-                     minimum_payment, due_date, owner, category, account_number_last4, is_active)
+                     minimum_payment, due_date, owner, category, account_number_last4, is_active, user_id)
                     VALUES (:name, :debt_type, :original_balance, :current_balance, :interest_rate,
-                            :minimum_payment, :due_date, :owner, :category, :account_number_last4, true)
+                            :minimum_payment, :due_date, :owner, :category, :account_number_last4, true, :uid)
                 """), {
                     'name': request.form['name'],
                     'debt_type': request.form['debt_type'],
@@ -78,6 +86,7 @@ def add_debt():
                     'owner': request.form['owner'],
                     'category': request.form['category'],
                     'account_number_last4': request.form.get('account_number_last4'),
+                    'uid': current_user_id(),
                 })
 
             print(f"✅ Added debt account: {request.form['name']}")
@@ -111,11 +120,13 @@ def make_payment(debt_id):
 
         debt_charge_id = data.get('debt_charge_id')
 
+        uid = current_user_id()
+        uid_sql, uid_p = uid_clause(uid)
         with db.engine.begin() as conn:
-            debt_row = conn.execute(text("""
+            debt_row = conn.execute(text(f"""
                 SELECT name, current_balance, category, is_active
-                FROM debt_accounts WHERE id = :id
-            """), {'id': debt_id}).fetchone()
+                FROM debt_accounts WHERE id = :id {uid_sql}
+            """), {'id': debt_id, **uid_p}).fetchone()
 
             if not debt_row:
                 return jsonify({'success': False, 'error': 'Debt account not found'}), 404
@@ -149,8 +160,8 @@ def make_payment(debt_id):
             dp_result = conn.execute(text("""
                 INSERT INTO debt_payments
                 (debt_account_id, debt_charge_id, payment_amount, payment_date,
-                 balance_after_payment, payment_type, notes)
-                VALUES (:debt_id, :charge_id, :amount, :date, :balance, :ptype, :notes)
+                 balance_after_payment, payment_type, notes, user_id)
+                VALUES (:debt_id, :charge_id, :amount, :date, :balance, :ptype, :notes, :uid)
                 RETURNING id
             """), {
                 'debt_id': debt_id,
@@ -160,6 +171,7 @@ def make_payment(debt_id):
                 'balance': new_balance,
                 'ptype': 'Regular',
                 'notes': data.get('description', f'Payment to {debt_name}'),
+                'uid': uid,
             })
             debt_payment_id = dp_result.fetchone()[0]
             print(f"✅ Created debt payment record ID: {debt_payment_id}" +
@@ -168,9 +180,9 @@ def make_payment(debt_id):
             t_result = conn.execute(text("""
                 INSERT INTO transactions
                 (account_name, date, description, amount, sub_category, category,
-                 type, owner, is_business, debt_payment_id, is_active, created_at, updated_at)
+                 type, owner, is_business, debt_payment_id, is_active, user_id, created_at, updated_at)
                 VALUES (:account_name, :date, :description, :amount, :sub_category, :category,
-                        :type, :owner, :is_business, :debt_payment_id, true, :now, :now)
+                        :type, :owner, :is_business, :debt_payment_id, true, :uid, :now, :now)
                 RETURNING id
             """), {
                 'account_name': data['account_name'],
@@ -183,6 +195,7 @@ def make_payment(debt_id):
                 'owner': data['owner'],
                 'is_business': data.get('is_business', False),
                 'debt_payment_id': debt_payment_id,
+                'uid': uid,
                 'now': datetime.utcnow(),
             })
             transaction_id = t_result.fetchone()[0]
@@ -224,9 +237,10 @@ def get_debt(debt_id):
     """Get debt account details for editing"""
     try:
         print(f"📄 Getting debt account ID {debt_id}")
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, "SELECT * FROM debt_accounts WHERE id = :id AND is_active = true",
-                     {'id': debt_id})
+            df = _df(conn, f"SELECT * FROM debt_accounts WHERE id = :id AND is_active = true {uid_sql}",
+                     {'id': debt_id, **uid_p})
 
         if df.empty:
             return jsonify({'success': False, 'error': 'Debt account not found'}), 404
@@ -265,21 +279,22 @@ def update_debt(debt_id):
 
         print("✅ All required fields validated successfully")
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
             exists = conn.execute(text(
-                "SELECT id FROM debt_accounts WHERE id = :id AND is_active = true"
-            ), {'id': debt_id}).fetchone()
+                f"SELECT id FROM debt_accounts WHERE id = :id AND is_active = true {uid_sql}"
+            ), {'id': debt_id, **uid_p}).fetchone()
             if not exists:
                 return jsonify({'success': False, 'error': 'Debt account not found'}), 404
 
-            upd = conn.execute(text("""
+            upd = conn.execute(text(f"""
                 UPDATE debt_accounts
                 SET name = :name, debt_type = :debt_type, owner = :owner,
                     account_number_last4 = :account_number_last4,
                     original_balance = :original_balance, current_balance = :current_balance,
                     interest_rate = :interest_rate, minimum_payment = :minimum_payment,
                     due_date = :due_date, category = :category, updated_at = :now
-                WHERE id = :id
+                WHERE id = :id {uid_sql}
             """), {
                 'name': data['name'],
                 'debt_type': data['debt_type'],
@@ -293,6 +308,7 @@ def update_debt(debt_id):
                 'category': data['category'],
                 'now': datetime.utcnow(),
                 'id': debt_id,
+                **uid_p,
             })
             if upd.rowcount == 0:
                 return jsonify({'success': False, 'error': 'No changes made'}), 404
@@ -315,11 +331,12 @@ def get_payment_history(debt_id):
     try:
         print(f"📊 Getting payment history + charges for debt ID {debt_id}")
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            debt_row = conn.execute(text("""
+            debt_row = conn.execute(text(f"""
                 SELECT name, original_balance, current_balance
-                FROM debt_accounts WHERE id = :id
-            """), {'id': debt_id}).fetchone()
+                FROM debt_accounts WHERE id = :id {uid_sql}
+            """), {'id': debt_id, **uid_p}).fetchone()
 
             if not debt_row:
                 return jsonify({'success': False, 'error': 'Debt account not found'}), 404
@@ -444,10 +461,11 @@ def delete_debt(debt_id):
     try:
         print(f"🗑️ Deleting debt account ID {debt_id}")
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
             name_row = conn.execute(text(
-                "SELECT name FROM debt_accounts WHERE id = :id"
-            ), {'id': debt_id}).fetchone()
+                f"SELECT name FROM debt_accounts WHERE id = :id {uid_sql}"
+            ), {'id': debt_id, **uid_p}).fetchone()
 
             if not name_row:
                 return jsonify({'success': False, 'error': 'Debt account not found'}), 404
@@ -469,8 +487,8 @@ def delete_debt(debt_id):
             print(f"🗑️ Deleted {del_pay.rowcount} debt payment records")
 
             del_debt = conn.execute(text(
-                "DELETE FROM debt_accounts WHERE id = :id"
-            ), {'id': debt_id})
+                f"DELETE FROM debt_accounts WHERE id = :id {uid_sql}"
+            ), {'id': debt_id, **uid_p})
             if del_debt.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Failed to delete debt account'}), 500
 

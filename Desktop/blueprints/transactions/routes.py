@@ -3,6 +3,7 @@ from datetime import datetime
 from models import db
 from sqlalchemy import text
 import pandas as pd
+from utils import uid_clause, current_user_id
 
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
@@ -22,25 +23,26 @@ def list_transactions():
             per_page = 50
         offset = (page - 1) * per_page
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             total = conn.execute(text(
-                "SELECT COUNT(*) FROM transactions WHERE COALESCE(is_active, true) = true"
-            )).scalar() or 0
+                f"SELECT COUNT(*) FROM transactions WHERE COALESCE(is_active, true) = true {uid_sql}"
+            ), uid_p).scalar() or 0
 
-            rows = conn.execute(text("""
+            rows = conn.execute(text(f"""
                 SELECT id, account_name, date, description, amount, sub_category,
                        category, type, owner, is_business, debt_payment_id, is_active,
                        created_at, updated_at
                 FROM transactions
-                WHERE COALESCE(is_active, true) = true
+                WHERE COALESCE(is_active, true) = true {uid_sql}
                 ORDER BY date DESC, id DESC
                 LIMIT :limit OFFSET :offset
-            """), {"limit": per_page, "offset": offset}).fetchall()
+            """), {"limit": per_page, "offset": offset, **uid_p}).fetchall()
 
             # Build types list
             txn_types = [r[0] for r in conn.execute(text(
-                "SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type"
-            )).fetchall()]
+                f"SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' {uid_sql} ORDER BY type"
+            ), uid_p).fetchall()]
 
         _defaults = ['Needs', 'Wants', 'Savings', 'Business']
         seen = set(_defaults)
@@ -185,14 +187,15 @@ def add_transaction():
                     result = conn.execute(text("""
                         INSERT INTO transactions
                         (account_name, date, description, amount, sub_category, category, type, owner,
-                         is_business, is_active, created_at, updated_at)
+                         is_business, is_active, user_id, created_at, updated_at)
                         VALUES (:account, :date, :desc, :amount, :sub_cat, :cat, :type, :owner,
-                                :is_business, true, :now, :now)
+                                :is_business, true, :user_id, :now, :now)
                         RETURNING id
                     """), {
                         "account": account_name, "date": transaction_date, "desc": description,
                         "amount": amount, "sub_cat": sub_category or None, "cat": category,
-                        "type": transaction_type, "owner": owner, "is_business": is_business, "now": now
+                        "type": transaction_type, "owner": owner, "is_business": is_business,
+                        "user_id": current_user_id(), "now": now
                     })
                     transaction_id = result.fetchone()[0]
                     transaction_display = "Income" if amount < 0 else "Expense"
@@ -213,30 +216,31 @@ def add_transaction():
 
     # GET request
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            categories_df = _df(conn, """
+            categories_df = _df(conn, f"""
                 SELECT DISTINCT category FROM budget_templates
-                WHERE is_active = true AND category IS NOT NULL
+                WHERE is_active = true AND category IS NOT NULL {uid_sql}
                 UNION
-                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL
+                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL {uid_sql}
                 ORDER BY category
-            """)
-            sub_categories_df = _df(conn, """
+            """, uid_p)
+            sub_categories_df = _df(conn, f"""
                 SELECT DISTINCT sub_category FROM transactions
-                WHERE sub_category IS NOT NULL AND sub_category != ''
+                WHERE sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                 ORDER BY sub_category
-            """)
-            accounts_df = _df(conn, """
+            """, uid_p)
+            accounts_df = _df(conn, f"""
                 SELECT DISTINCT account_name FROM transactions
-                WHERE account_name IS NOT NULL ORDER BY account_name
-            """)
-            owners_df = _df(conn, """
+                WHERE account_name IS NOT NULL {uid_sql} ORDER BY account_name
+            """, uid_p)
+            owners_df = _df(conn, f"""
                 SELECT DISTINCT owner FROM transactions
-                WHERE owner IS NOT NULL ORDER BY owner
-            """)
+                WHERE owner IS NOT NULL {uid_sql} ORDER BY owner
+            """, uid_p)
             txn_types = [r[0] for r in conn.execute(text(
-                "SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type"
-            )).fetchall()]
+                f"SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' {uid_sql} ORDER BY type"
+            ), uid_p).fetchall()]
 
         categories_list = categories_df['category'].tolist()
         sub_categories_list = sub_categories_df['sub_category'].tolist()
@@ -321,14 +325,15 @@ def bulk_transaction():
                         conn.execute(text("""
                             INSERT INTO transactions
                             (account_name, date, description, amount, sub_category, category,
-                             type, owner, is_business, is_active, created_at, updated_at)
+                             type, owner, is_business, is_active, user_id, created_at, updated_at)
                             VALUES (:account, :date, :desc, :amount, :sub_cat, :cat,
-                                    :type, :owner, false, true, :now, :now)
+                                    :type, :owner, false, true, :user_id, :now, :now)
                         """), {
                             "account": account_name, "date": transaction_date,
                             "desc": item_description, "amount": item_amount,
                             "sub_cat": sub_category or None, "cat": category,
-                            "type": transaction_type, "owner": owner, "now": now
+                            "type": transaction_type, "owner": owner,
+                            "user_id": current_user_id(), "now": now
                         })
                         success_count += 1
                     except Exception:
@@ -353,30 +358,31 @@ def bulk_transaction():
 
     # GET request
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            categories_df = _df(conn, """
+            categories_df = _df(conn, f"""
                 SELECT DISTINCT category FROM budget_templates
-                WHERE is_active = true AND category IS NOT NULL
+                WHERE is_active = true AND category IS NOT NULL {uid_sql}
                 UNION
-                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL
+                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL {uid_sql}
                 ORDER BY category
-            """)
-            sub_categories_df = _df(conn, """
+            """, uid_p)
+            sub_categories_df = _df(conn, f"""
                 SELECT DISTINCT sub_category FROM transactions
-                WHERE sub_category IS NOT NULL AND sub_category != ''
+                WHERE sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                 ORDER BY sub_category
-            """)
-            accounts_df = _df(conn, """
+            """, uid_p)
+            accounts_df = _df(conn, f"""
                 SELECT DISTINCT account_name FROM transactions
-                WHERE account_name IS NOT NULL ORDER BY account_name
-            """)
-            owners_df = _df(conn, """
+                WHERE account_name IS NOT NULL {uid_sql} ORDER BY account_name
+            """, uid_p)
+            owners_df = _df(conn, f"""
                 SELECT DISTINCT owner FROM transactions
-                WHERE owner IS NOT NULL ORDER BY owner
-            """)
+                WHERE owner IS NOT NULL {uid_sql} ORDER BY owner
+            """, uid_p)
             txn_types = [r[0] for r in conn.execute(text(
-                "SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' ORDER BY type"
-            )).fetchall()]
+                f"SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL AND type != '' {uid_sql} ORDER BY type"
+            ), uid_p).fetchall()]
 
         categories_list = categories_df['category'].tolist()
         sub_categories_list = sub_categories_df['sub_category'].tolist()
@@ -412,12 +418,13 @@ def bulk_transaction():
 def get_transaction(transaction_id):
     """Get transaction details for editing"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT id, account_name, date, description, amount, sub_category,
                        category, type, owner, is_business, debt_payment_id, created_at, updated_at
-                FROM transactions WHERE id = :id
-            """, {"id": transaction_id})
+                FROM transactions WHERE id = :id {uid_sql}
+            """, {"id": transaction_id, **uid_p})
 
         if df.empty:
             return jsonify({'success': False, 'error': 'Transaction not found'}), 404
@@ -462,10 +469,11 @@ def update_transaction(transaction_id):
 
         now = datetime.utcnow()
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
             exists = conn.execute(text(
-                "SELECT id FROM transactions WHERE id = :id"
-            ), {"id": transaction_id}).fetchone()
+                f"SELECT id FROM transactions WHERE id = :id {uid_sql}"
+            ), {"id": transaction_id, **uid_p}).fetchone()
             if not exists:
                 return jsonify({'success': False, 'error': 'Transaction not found'}), 404
 
@@ -477,17 +485,18 @@ def update_transaction(transaction_id):
                     ON CONFLICT DO NOTHING
                 """), {"cat": category, "now": now})
 
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE transactions
                 SET account_name = :account, date = :date, description = :desc, amount = :amount,
                     sub_category = :sub_cat, category = :cat, type = :type, owner = :owner,
                     is_business = :is_business, updated_at = :now
-                WHERE id = :id
+                WHERE id = :id {uid_sql}
             """), {
                 "account": data['account_name'], "date": transaction_date, "desc": data['description'],
                 "amount": amount, "sub_cat": data.get('sub_category') or None,
                 "cat": category, "type": data['type'], "owner": data['owner'],
-                "is_business": bool(data.get('is_business', False)), "now": now, "id": transaction_id
+                "is_business": bool(data.get('is_business', False)), "now": now, "id": transaction_id,
+                **uid_p
             })
 
             if result.rowcount == 0:
@@ -510,18 +519,19 @@ def update_transaction(transaction_id):
 def delete_transaction(transaction_id):
     """Mark transaction as inactive (soft delete)"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
             row = conn.execute(text(
-                "SELECT description, amount FROM transactions WHERE id = :id"
-            ), {"id": transaction_id}).fetchone()
+                f"SELECT description, amount FROM transactions WHERE id = :id {uid_sql}"
+            ), {"id": transaction_id, **uid_p}).fetchone()
             if not row:
                 return jsonify({'success': False, 'error': 'Transaction not found'}), 404
 
             description, amount = row[0], row[1]
 
-            result = conn.execute(text("""
-                UPDATE transactions SET is_active = false, updated_at = :now WHERE id = :id
-            """), {"now": datetime.utcnow(), "id": transaction_id})
+            result = conn.execute(text(f"""
+                UPDATE transactions SET is_active = false, updated_at = :now WHERE id = :id {uid_sql}
+            """), {"now": datetime.utcnow(), "id": transaction_id, **uid_p})
 
             if result.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Transaction not found'}), 404
@@ -605,13 +615,14 @@ def search_similar_transactions():
         if len(search_term) < 3:
             return jsonify([])
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT description, category, sub_category, amount, account_name, owner, type
                 FROM transactions
-                WHERE description ILIKE :term
+                WHERE description ILIKE :term {uid_sql}
                 ORDER BY date DESC LIMIT 5
-            """, {"term": f'%{search_term}%'})
+            """, {"term": f'%{search_term}%', **uid_p})
 
         result = [{
             'description': row['description'],
@@ -634,27 +645,28 @@ def search_similar_transactions():
 def get_form_data():
     """Get current form data for dropdowns"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            categories_df = _df(conn, """
+            categories_df = _df(conn, f"""
                 SELECT DISTINCT category FROM budget_templates
-                WHERE is_active = true AND category IS NOT NULL
+                WHERE is_active = true AND category IS NOT NULL {uid_sql}
                 UNION
-                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL
+                SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL {uid_sql}
                 ORDER BY category
-            """)
-            sub_categories_df = _df(conn, """
+            """, uid_p)
+            sub_categories_df = _df(conn, f"""
                 SELECT DISTINCT sub_category FROM transactions
-                WHERE sub_category IS NOT NULL AND sub_category != ''
+                WHERE sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                 ORDER BY sub_category
-            """)
-            accounts_df = _df(conn, """
+            """, uid_p)
+            accounts_df = _df(conn, f"""
                 SELECT DISTINCT account_name FROM transactions
-                WHERE account_name IS NOT NULL ORDER BY account_name
-            """)
-            owners_df = _df(conn, """
+                WHERE account_name IS NOT NULL {uid_sql} ORDER BY account_name
+            """, uid_p)
+            owners_df = _df(conn, f"""
                 SELECT DISTINCT owner FROM transactions
-                WHERE owner IS NOT NULL ORDER BY owner
-            """)
+                WHERE owner IS NOT NULL {uid_sql} ORDER BY owner
+            """, uid_p)
 
         form_data = {
             'categories': categories_df['category'].tolist(),
@@ -680,16 +692,17 @@ def get_form_data():
 def api_common_transaction_patterns():
     """Return the most common transaction patterns for Quick Actions"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT category, sub_category, type, COUNT(*) as freq
                 FROM transactions
                 WHERE category IS NOT NULL AND category != ''
-                  AND date >= CURRENT_DATE - INTERVAL '90 days'
+                  AND date >= CURRENT_DATE - INTERVAL '90 days' {uid_sql}
                 GROUP BY category, sub_category, type
                 ORDER BY freq DESC
                 LIMIT 10
-            """)
+            """, uid_p)
         return jsonify(df.to_dict(orient='records'))
     except Exception as e:
         print(f"Error in common transaction patterns API: {e}")
@@ -706,12 +719,13 @@ def api_get_subcategories():
         return jsonify({'error': 'Category parameter required'}), 400
 
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            rows = conn.execute(text("""
+            rows = conn.execute(text(f"""
                 SELECT DISTINCT sub_category FROM transactions
-                WHERE category = :cat AND sub_category IS NOT NULL AND sub_category != ''
+                WHERE category = :cat AND sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                 ORDER BY sub_category
-            """), {"cat": category}).fetchall()
+            """), {"cat": category, **uid_p}).fetchall()
         return jsonify([row[0] for row in rows])
     except Exception as e:
         print(f"Error getting subcategories: {e}")

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from models import db
 from sqlalchemy import text
+from utils import uid_clause
 
 analytics_bp = Blueprint('analytics', __name__, url_prefix='/analytics')
 
@@ -55,6 +56,10 @@ def _build_analytics_filters(args):
         params['max_amount'] = max_amount
 
     filters.append("COALESCE(is_active, true) = true")
+    uid_sql, uid_p = uid_clause()
+    if uid_sql:
+        filters.append("user_id = :_uid")
+        params.update(uid_p)
     return "WHERE " + " AND ".join(filters), params
 
 
@@ -63,47 +68,48 @@ def analytics_dashboard():
     """Main analytics dashboard page"""
     print("📊 Loading analytics dashboard...")
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            years_df = _df(conn, """
+            years_df = _df(conn, f"""
                 SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
-                FROM transactions WHERE COALESCE(is_active, true) = true ORDER BY year DESC
-            """)
+                FROM transactions WHERE COALESCE(is_active, true) = true {uid_sql} ORDER BY year DESC
+            """, uid_p)
             available_years = [int(y) for y in years_df['year'].tolist() if y is not None]
 
-            owners_df = _df(conn, """
+            owners_df = _df(conn, f"""
                 SELECT DISTINCT owner FROM transactions
-                WHERE COALESCE(is_active, true) = true ORDER BY owner
-            """)
+                WHERE COALESCE(is_active, true) = true {uid_sql} ORDER BY owner
+            """, uid_p)
             available_owners = [o for o in owners_df['owner'].tolist() if o is not None]
 
-            categories_df = _df(conn, """
+            categories_df = _df(conn, f"""
                 SELECT DISTINCT category FROM transactions
-                WHERE COALESCE(is_active, true) = true ORDER BY category
-            """)
+                WHERE COALESCE(is_active, true) = true {uid_sql} ORDER BY category
+            """, uid_p)
             available_categories = [c for c in categories_df['category'].tolist() if c is not None]
 
-            accounts_df = _df(conn, """
+            accounts_df = _df(conn, f"""
                 SELECT DISTINCT account_name FROM transactions
-                WHERE COALESCE(is_active, true) = true ORDER BY account_name
-            """)
+                WHERE COALESCE(is_active, true) = true {uid_sql} ORDER BY account_name
+            """, uid_p)
             available_accounts = [a for a in accounts_df['account_name'].tolist() if a is not None]
 
-            subcategories_df = _df(conn, """
+            subcategories_df = _df(conn, f"""
                 SELECT DISTINCT sub_category, category FROM transactions
-                WHERE COALESCE(is_active, true) = true
+                WHERE COALESCE(is_active, true) = true {uid_sql}
                 AND sub_category IS NOT NULL AND sub_category != ''
                 ORDER BY category, sub_category
-            """)
+            """, uid_p)
             available_subcategories = [
                 {'subcategory': row['sub_category'], 'category': row['category']}
                 for _, row in subcategories_df.iterrows()
             ]
 
-            types_df = _df(conn, """
+            types_df = _df(conn, f"""
                 SELECT DISTINCT type FROM transactions
-                WHERE COALESCE(is_active, true) = true AND type IS NOT NULL AND type != ''
+                WHERE COALESCE(is_active, true) = true {uid_sql} AND type IS NOT NULL AND type != ''
                 ORDER BY type
-            """)
+            """, uid_p)
             txn_types = types_df['type'].tolist()
 
         _defaults = ['Needs', 'Wants', 'Savings', 'Business']
@@ -148,24 +154,25 @@ def api_subcategories():
     """Get subcategories for selected categories"""
     try:
         categories = request.args.getlist('categories')
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             if categories and 'all' not in categories:
                 cat_params = {f'cat_{i}': v for i, v in enumerate(categories)}
                 placeholders = ', '.join(f':{k}' for k in cat_params)
                 df = _df(conn, f"""
                     SELECT DISTINCT sub_category, category FROM transactions
-                    WHERE COALESCE(is_active, true) = true
+                    WHERE COALESCE(is_active, true) = true {uid_sql}
                     AND sub_category IS NOT NULL AND sub_category != ''
                     AND category IN ({placeholders})
                     ORDER BY category, sub_category
-                """, cat_params)
+                """, {**cat_params, **uid_p})
             else:
-                df = _df(conn, """
+                df = _df(conn, f"""
                     SELECT DISTINCT sub_category, category FROM transactions
-                    WHERE COALESCE(is_active, true) = true
+                    WHERE COALESCE(is_active, true) = true {uid_sql}
                     AND sub_category IS NOT NULL AND sub_category != ''
                     ORDER BY category, sub_category
-                """)
+                """, uid_p)
         result = [{'subcategory': row['sub_category'], 'category': row['category']}
                   for _, row in df.iterrows()]
         return jsonify(result)
@@ -393,13 +400,15 @@ def get_monthly_spending_matrix(conn, filter_type=None, filter_value=None):
     elif filter_type == 'owner' and filter_value:
         extra = ' AND owner = :filter_val'
         params['filter_val'] = filter_value
+    uid_sql, uid_p = uid_clause()
+    params.update(uid_p)
 
     df = pd.read_sql_query(text(f"""
         SELECT EXTRACT(YEAR FROM date)::integer AS year,
                EXTRACT(MONTH FROM date)::integer AS month,
                SUM(amount) AS total
         FROM transactions
-        WHERE COALESCE(is_active, true) = true{extra}
+        WHERE COALESCE(is_active, true) = true{extra} {uid_sql}
         GROUP BY year, month
         ORDER BY year, month
     """), conn, params=params)
@@ -471,12 +480,14 @@ def api_bulk_update_transactions():
         id_params = {f'id_{i}': v for i, v in enumerate(transaction_ids)}
         params.update(id_params)
         id_placeholders = ', '.join(f':{k}' for k in id_params)
+        uid_sql, uid_p = uid_clause()
+        params.update(uid_p)
 
         with db.engine.begin() as conn:
             result = conn.execute(text(f"""
                 UPDATE transactions
                 SET {', '.join(set_clauses)}
-                WHERE id IN ({id_placeholders})
+                WHERE id IN ({id_placeholders}) {uid_sql}
             """), params)
             rows_updated = result.rowcount
 

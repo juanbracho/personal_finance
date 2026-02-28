@@ -2,10 +2,51 @@ from datetime import datetime
 from sqlalchemy import text, inspect
 
 
+def current_user_id():
+    """Return the authenticated user's ID from session or Bearer JWT, or None."""
+    from flask import session, request, current_app
+    uid = session.get('user_id')
+    if uid:
+        return int(uid)
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        import jwt
+        try:
+            payload = jwt.decode(
+                auth_header[7:],
+                current_app.config['JWT_SECRET_KEY'],
+                algorithms=['HS256'],
+            )
+            return payload['user_id']
+        except Exception:
+            return None
+    return None
+
+
+def uid_clause(uid=None):
+    """
+    Returns (sql_fragment, params_dict) to scope a query to the current user.
+    If user_id is None (dev/auth-bypass mode) returns ('', {}) — no filter.
+
+    Usage:
+        uid_sql, uid_p = uid_clause()
+        conn.execute(
+            text(f"SELECT * FROM transactions WHERE is_active = true {uid_sql}"),
+            {**other_params, **uid_p}
+        )
+    """
+    if uid is None:
+        uid = current_user_id()
+    if uid is None:
+        return '', {}
+    return 'AND user_id = :_uid', {'_uid': uid}
+
+
 def get_available_years_and_owners():
-    """Get available years and owners from transactions using SQLAlchemy."""
+    """Get available years and owners for the current user."""
     from models import db
     try:
+        uid = current_user_id()
         with db.engine.connect() as conn:
             years_result = conn.execute(text("""
                 SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
@@ -14,11 +55,17 @@ def get_available_years_and_owners():
             """))
             available_years = [row[0] for row in years_result if row[0] is not None]
 
-            owners_result = conn.execute(text("""
-                SELECT DISTINCT owner
-                FROM transactions
-                ORDER BY owner
-            """))
+            if uid is not None:
+                owners_result = conn.execute(
+                    text("SELECT name FROM user_owners WHERE user_id = :uid AND is_active = true ORDER BY name"),
+                    {"uid": uid},
+                )
+            else:
+                owners_result = conn.execute(text("""
+                    SELECT DISTINCT owner
+                    FROM transactions
+                    ORDER BY owner
+                """))
             available_owners = [row[0] for row in owners_result if row[0] is not None]
 
         if not available_years:

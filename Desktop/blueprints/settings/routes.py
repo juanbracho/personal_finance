@@ -10,6 +10,8 @@ from datetime import datetime
 from config import get_app_version
 from models import db
 from sqlalchemy import text
+from utils import current_user_id
+from auth import require_admin, _log_audit
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -28,9 +30,52 @@ def index():
                          build_number=version_info['build_number'])
 
 
+@settings_bp.route('/export-my-data')
+def export_my_data():
+    """Export the current user's own data as JSON."""
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        data = {}
+        tables = [
+            'transactions', 'budget_templates', 'budget_subcategory_templates',
+            'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
+            'debt_payments', 'budget_commitments'
+        ]
+        uid = current_user_id()
+        uid_where = "WHERE user_id = :uid" if uid is not None else ""
+        uid_p = {"uid": uid} if uid is not None else {}
+        with db.engine.connect() as conn:
+            for table in tables:
+                try:
+                    rows = conn.execute(text(f"SELECT * FROM {table} {uid_where}"), uid_p).mappings().all()
+                    data[table] = [dict(row) for row in rows]
+                except Exception:
+                    data[table] = []
+
+        def _serial(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return str(obj)
+
+        _log_audit('export_personal_data', current_user_id())
+        json_str = json.dumps(data, default=_serial, indent=2)
+        return Response(
+            json_str,
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment;filename=my_data_{timestamp}.json'}
+        )
+    except Exception as e:
+        flash(f'Error exporting data: {str(e)}', 'error')
+        return redirect(url_for('settings.index'))
+
+
 @settings_bp.route('/download-database')
 def download_database():
-    """Export all data as JSON"""
+    """Full unscoped database export — admin only."""
+    guard = require_admin()
+    if guard is not None:
+        return guard
+
     try:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         data = {}
@@ -52,11 +97,12 @@ def download_database():
                 return obj.isoformat()
             return str(obj)
 
+        _log_audit('download_database_admin', current_user_id())
         json_str = json.dumps(data, default=_serial, indent=2)
         return Response(
             json_str,
             mimetype='application/json',
-            headers={'Content-Disposition': f'attachment;filename=finance_export_{timestamp}.json'}
+            headers={'Content-Disposition': f'attachment;filename=finance_full_export_{timestamp}.json'}
         )
     except Exception as e:
         flash(f'Error exporting data: {str(e)}', 'error')
@@ -85,11 +131,14 @@ def delete_all_data():
             'budget_subcategory_templates', 'monthly_budgets', 'unexpected_expenses',
             'budget_templates', 'transactions'
         ]
+        uid = current_user_id()
+        uid_where = "WHERE user_id = :uid" if uid is not None else ""
+        uid_p = {"uid": uid} if uid is not None else {}
         with db.engine.begin() as conn:
             for table in tables:
-                conn.execute(text(f"DELETE FROM {table}"))
+                conn.execute(text(f"DELETE FROM {table} {uid_where}"), uid_p)
 
-        flash('All data has been deleted successfully!', 'warning')
+        flash('Your data has been deleted successfully!', 'warning')
         flash('The database schema is preserved — you can start adding data again.', 'info')
     except Exception as e:
         flash(f'Error deleting data: {str(e)}', 'error')

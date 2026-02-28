@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs — Kanso{% endblock %}
+
+{% block content %}
+<div class="kanso-page">
+
+    <!-- Page header -->
+    <div class="kanso-page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+            <h1 class="kanso-page-title">Audit Logs</h1>
+            <p class="kanso-page-subtitle">Last 200 events — most recent first</p>
+        </div>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn-kanso btn-kanso-ghost btn-kanso-sm" style="margin-top:6px;">
+            <i class="fas fa-arrow-left" style="font-size:11px;"></i> Back to Admin
+        </a>
+    </div>
+
+    <!-- ── Filter bar ── -->
+    <div class="kanso-section">
+        <div class="kanso-section-label">Filter</div>
+        <div class="kanso-card">
+            <form method="GET" action="{{ url_for('admin.audit_logs') }}"
+                  style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">User ID</label>
+                    <input type="text"
+                           name="user_id"
+                           class="kanso-input"
+                           value="{{ filter_user_id }}"
+                           placeholder="e.g. 1"
+                           style="width:100px;">
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">Action</label>
+                    <input type="text"
+                           name="action"
+                           class="kanso-input"
+                           value="{{ filter_action }}"
+                           placeholder="e.g. login"
+                           style="width:180px;">
+                </div>
+                <button type="submit" class="btn-kanso btn-kanso-ghost">
+                    <i class="fas fa-filter" style="font-size:11px;"></i> Filter
+                </button>
+                {% if filter_user_id or filter_action %}
+                <a href="{{ url_for('admin.audit_logs') }}" class="btn-kanso btn-kanso-ghost" style="color:var(--text-muted);">
+                    Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Logs table ── -->
+    <div class="kanso-section">
+        <div class="kanso-card" style="padding:0; overflow:hidden;">
+            <table class="kanso-table" style="margin:0;">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Username</th>
+                        <th>Action</th>
+                        <th>IP Address</th>
+                        <th>Extra Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="font-size:12px; color:var(--text-muted); white-space:nowrap;">
+                            {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
+                        </td>
+                        <td style="font-weight:600;">{{ log.username or '—' }}</td>
+                        <td>
+                            <span style="font-family:monospace; font-size:12px;">{{ log.action }}</span>
+                        </td>
+                        <td style="color:var(--text-muted); font-size:12px;">{{ log.ip_address or '—' }}</td>
+                        <td style="font-size:11.5px; color:var(--text-muted); font-family:monospace; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            {% if log.extra_data %}
+                                {{ log.extra_data | tojson }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:var(--text-faint); padding:24px;">
+                            No audit log entries found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div><!-- /kanso-page -->
+{% endblock %}

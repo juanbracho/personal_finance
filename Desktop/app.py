@@ -1,7 +1,12 @@
 from flask import Flask
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from config import Config
 from models import db
 import os
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
+
 
 def create_app(config_class=None):
     """Application factory pattern"""
@@ -11,8 +16,9 @@ def create_app(config_class=None):
         config_class = Config
     app.config.from_object(config_class)
 
-    # Initialize database with app
+    # Initialize extensions
     db.init_app(app)
+    limiter.init_app(app)
 
     # Create all tables if they don't exist
     with app.app_context():
@@ -52,9 +58,10 @@ def create_app(config_class=None):
     from blueprints.api.routes import api_bp
     from blueprints.analytics.routes import analytics_bp
     from blueprints.settings.routes import settings_bp
+    from blueprints.admin.routes import admin_bp
 
-    from auth import check_api_key, check_web_session, auth_bp
-    api_bp.before_request(check_api_key)
+    from auth import check_jwt, check_web_session, auth_bp
+    api_bp.before_request(check_jwt)
     app.before_request(check_web_session)
     app.register_blueprint(auth_bp)
 
@@ -65,6 +72,7 @@ def create_app(config_class=None):
     app.register_blueprint(api_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(admin_bp)
 
     @app.template_filter('currency')
     def currency_filter(value):

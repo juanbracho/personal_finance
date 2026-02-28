@@ -3,6 +3,7 @@ from datetime import datetime
 from models import db
 from sqlalchemy import text
 import pandas as pd
+from utils import uid_clause
 
 
 def _df(conn, sql, params=None):
@@ -14,6 +15,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
     """Dashboard Overview - Enhanced with additional metrics"""
 
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             # Build filter conditions
             date_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
@@ -22,6 +24,8 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             if owner != 'all':
                 date_filter += " AND owner = :owner"
                 params["owner"] = owner
+            date_filter += f" {uid_sql}"
+            params.update(uid_p)
 
             # Monthly spending by type
             monthly_spending_df = _df(conn, f"""
@@ -47,6 +51,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             prev_params = {"month": month, "year": year - 1}
             if owner != 'all':
                 prev_params["owner"] = owner
+            prev_params.update(uid_p)
             prev_year_df = _df(conn, f"""
                 SELECT SUM(amount) as total FROM transactions
                 WHERE {date_filter} AND COALESCE(is_active, true) = true
@@ -61,6 +66,8 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             if owner != 'all':
                 ytd_filter += " AND owner = :owner"
                 ytd_params["owner"] = owner
+            ytd_filter += f" {uid_sql}"
+            ytd_params.update(uid_p)
 
             ytd_df = _df(conn, f"""
                 SELECT SUM(amount) as total FROM transactions
@@ -71,6 +78,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             prev_ytd_params = {"year": year - 1, "month": month}
             if owner != 'all':
                 prev_ytd_params["owner"] = owner
+            prev_ytd_params.update(uid_p)
             prev_ytd_df = _df(conn, f"""
                 SELECT SUM(amount) as total FROM transactions
                 WHERE {ytd_filter} AND COALESCE(is_active, true) = true
@@ -88,7 +96,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                 LEFT JOIN (
                     SELECT category, SUM(amount) as total_unexpected
                     FROM unexpected_expenses
-                    WHERE month = :month AND year = :year AND is_active = true
+                    WHERE month = :month AND year = :year AND is_active = true {uid_sql}
                     GROUP BY category
                 ) ue ON bt.category = ue.category
                 LEFT JOIN (
@@ -97,7 +105,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                     WHERE {date_filter} AND COALESCE(is_active, true) = true
                     GROUP BY category
                 ) actual ON bt.category = actual.category
-                WHERE bt.is_active = true
+                WHERE bt.is_active = true {uid_sql}
             """, params)
 
             over_budget_count = under_budget_count = on_track_count = 0
@@ -114,13 +122,13 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                         on_track_count += 1
 
             # Recent transactions
-            recent_df = _df(conn, """
+            recent_df = _df(conn, f"""
                 SELECT date, description, amount, category, owner, account_name
                 FROM transactions
-                WHERE COALESCE(is_active, true) = true
+                WHERE COALESCE(is_active, true) = true {uid_sql}
                 ORDER BY date DESC, created_at DESC
                 LIMIT 10
-            """)
+            """, uid_p)
             recent_transactions = [{
                 'date': str(row['date']),
                 'description': row['description'],
@@ -133,12 +141,13 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             # 3-month spending trend
             trend_params = {"owner": owner} if owner != 'all' else {}
             owner_clause = "AND owner = :owner" if owner != 'all' else ""
+            trend_params.update(uid_p)
             trend_df = _df(conn, f"""
                 SELECT TO_CHAR(date, 'YYYY-MM') as month_year, SUM(amount) as total
                 FROM transactions
                 WHERE date >= CURRENT_DATE - INTERVAL '3 months'
                 AND COALESCE(is_active, true) = true
-                {owner_clause}
+                {owner_clause} {uid_sql}
                 GROUP BY TO_CHAR(date, 'YYYY-MM')
                 ORDER BY month_year DESC
                 LIMIT 3
@@ -149,10 +158,10 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
 
             # Total debt
             try:
-                debt_df = _df(conn, """
+                debt_df = _df(conn, f"""
                     SELECT COALESCE(SUM(current_balance), 0) as total_debt
-                    FROM debt_accounts WHERE is_active = true
-                """)
+                    FROM debt_accounts WHERE is_active = true {uid_sql}
+                """, uid_p)
                 total_debt = float(debt_df['total_debt'].iloc[0]) if not debt_df.empty else 0
             except Exception:
                 total_debt = 0
@@ -160,17 +169,17 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             # Owner comparison
             current_month_str = f"{year}-{month:02d}"
             prev_month_str = f"{year-1}-12" if month == 1 else f"{year}-{month-1:02d}"
-            owner_df = _df(conn, """
+            owner_df = _df(conn, f"""
                 SELECT owner,
                     SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :current_month THEN amount ELSE 0 END) as current_month,
                     SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :prev_month THEN amount ELSE 0 END) as previous_month
                 FROM transactions
-                WHERE COALESCE(is_active, true) = true
+                WHERE COALESCE(is_active, true) = true {uid_sql}
                 GROUP BY owner
                 HAVING SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :current_month THEN amount ELSE 0 END) > 0
                     OR SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :prev_month THEN amount ELSE 0 END) > 0
                 ORDER BY current_month DESC
-            """, {"current_month": current_month_str, "prev_month": prev_month_str})
+            """, {"current_month": current_month_str, "prev_month": prev_month_str, **uid_p})
             owner_comparison = []
             for _, row in owner_df.iterrows():
                 current = float(row['current_month'])
@@ -236,12 +245,15 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
     """Dashboard Budget Management"""
 
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             spending_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
             spending_params = {"month": month, "year": year}
             if owner != 'all':
                 spending_filter += " AND owner = :owner"
                 spending_params["owner"] = owner
+            spending_filter += f" {uid_sql}"
+            spending_params.update(uid_p)
 
             actual_spending_df = _df(conn, f"""
                 SELECT category, sub_category, SUM(amount) as actual_amount, COUNT(*) as transaction_count
@@ -254,32 +266,32 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                 ORDER BY category, sub_category
             """, spending_params)
 
-            subcategory_budgets_df = _df(conn, """
+            subcategory_budgets_df = _df(conn, f"""
                 SELECT category, sub_category, budget_amount, notes, budget_by_category
                 FROM budget_subcategory_templates
-                WHERE is_active = true AND budget_amount > 0
+                WHERE is_active = true AND budget_amount > 0 {uid_sql}
                 ORDER BY category, sub_category
-            """)
+            """, uid_p)
 
             category_budget_mode = {}
             for _, row in subcategory_budgets_df.iterrows():
                 if row['category'] not in category_budget_mode:
                     category_budget_mode[row['category']] = bool(row['budget_by_category'])
 
-            commitments_df = _df(conn, """
+            commitments_df = _df(conn, f"""
                 SELECT COALESCE(SUM(estimated_amount), 0) as total_commitments,
                        COALESCE(SUM(CASE WHEN is_fixed = true THEN estimated_amount ELSE 0 END), 0) as total_fixed,
                        COALESCE(SUM(CASE WHEN is_fixed = false THEN estimated_amount ELSE 0 END), 0) as total_variable,
                        COUNT(*) as count
-                FROM budget_commitments WHERE is_active = true
-            """)
+                FROM budget_commitments WHERE is_active = true {uid_sql}
+            """, uid_p)
 
-            unexpected_expenses_df = _df(conn, """
+            unexpected_expenses_df = _df(conn, f"""
                 SELECT category, SUM(amount) as total_unexpected
                 FROM unexpected_expenses
-                WHERE month = :month AND year = :year AND is_active = true
+                WHERE month = :month AND year = :year AND is_active = true {uid_sql}
                 GROUP BY category ORDER BY category
-            """, {"month": month, "year": year})
+            """, {"month": month, "year": year, **uid_p})
 
         # Build budget analysis
         subcategory_budget_dict = {}
@@ -428,33 +440,34 @@ def dashboard_categories_view(available_years, available_owners):
     try:
         current_year = request.args.get('year', datetime.now().year, type=int)
         current_month = request.args.get('month', 'all')
+        uid_sql, uid_p = uid_clause()
 
         with db.engine.connect() as conn:
-            categories_rows = conn.execute(text("""
+            categories_rows = conn.execute(text(f"""
                 SELECT id, category, notes, budget_amount, is_active
                 FROM budget_templates
-                WHERE is_active = true AND category IS NOT NULL
+                WHERE is_active = true AND category IS NOT NULL {uid_sql}
                 ORDER BY category
-            """)).fetchall()
+            """), uid_p).fetchall()
 
             categories_data = []
             for cat_row in categories_rows:
                 cat_id, category_name, notes, budget_amount, is_active = cat_row
                 if current_month == 'all':
-                    stats = conn.execute(text("""
+                    stats = conn.execute(text(f"""
                         SELECT COUNT(*) as count, SUM(amount) as total, AVG(amount) as avg
                         FROM transactions
                         WHERE category = :category
-                        AND EXTRACT(YEAR FROM date)::integer = :year
-                    """), {"category": category_name, "year": current_year}).fetchone()
+                        AND EXTRACT(YEAR FROM date)::integer = :year {uid_sql}
+                    """), {"category": category_name, "year": current_year, **uid_p}).fetchone()
                 else:
-                    stats = conn.execute(text("""
+                    stats = conn.execute(text(f"""
                         SELECT COUNT(*) as count, SUM(amount) as total, AVG(amount) as avg
                         FROM transactions
                         WHERE category = :category
                         AND EXTRACT(YEAR FROM date)::integer = :year
-                        AND EXTRACT(MONTH FROM date)::integer = :month
-                    """), {"category": category_name, "year": current_year, "month": int(current_month)}).fetchone()
+                        AND EXTRACT(MONTH FROM date)::integer = :month {uid_sql}
+                    """), {"category": category_name, "year": current_year, "month": int(current_month), **uid_p}).fetchone()
 
                 categories_data.append({
                     'category': category_name,

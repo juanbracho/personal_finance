@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify
 from datetime import datetime
 from models import db
 from sqlalchemy import text
-from utils import ensure_budget_tables
+from utils import ensure_budget_tables, uid_clause, current_user_id
 import pandas as pd
 from budget_recommender import (
     calculate_subcategory_recommendations,
@@ -17,39 +17,42 @@ def _df(conn, sql, params=None):
     return pd.read_sql_query(text(sql), conn, params=params or {})
 
 
-def sync_budgets_from_commitments(conn):
+def sync_budgets_from_commitments(conn, uid=None):
     """Automatically update subcategory budgets to match total commitments."""
     try:
-        commitments = conn.execute(text("""
+        uid_sql = "AND user_id = :_uid" if uid is not None else ""
+        uid_p = {"_uid": uid} if uid is not None else {}
+
+        commitments = conn.execute(text(f"""
             SELECT category, sub_category, SUM(estimated_amount) as total_commitment
-            FROM budget_commitments WHERE is_active = true
+            FROM budget_commitments WHERE is_active = true {uid_sql}
             GROUP BY category, sub_category
-        """)).fetchall()
+        """), uid_p).fetchall()
 
         now = datetime.utcnow()
         for category, sub_category, total_commitment in commitments:
             total_commitment = float(total_commitment)
 
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 SELECT budget_amount FROM budget_subcategory_templates
-                WHERE category = :cat AND sub_category = :sub AND is_active = true
-            """), {"cat": category, "sub": sub_category}).fetchone()
+                WHERE category = :cat AND sub_category = :sub AND is_active = true {uid_sql}
+            """), {"cat": category, "sub": sub_category, **uid_p}).fetchone()
 
             if result:
                 current_budget = float(result[0]) if result[0] else 0.0
                 if total_commitment > current_budget:
-                    conn.execute(text("""
+                    conn.execute(text(f"""
                         UPDATE budget_subcategory_templates
                         SET budget_amount = :amount, updated_at = :now
-                        WHERE category = :cat AND sub_category = :sub AND is_active = true
-                    """), {"amount": total_commitment, "now": now, "cat": category, "sub": sub_category})
+                        WHERE category = :cat AND sub_category = :sub AND is_active = true {uid_sql}
+                    """), {"amount": total_commitment, "now": now, "cat": category, "sub": sub_category, **uid_p})
             else:
                 conn.execute(text("""
                     INSERT INTO budget_subcategory_templates
-                    (category, sub_category, budget_amount, is_active, created_at, updated_at)
-                    VALUES (:cat, :sub, :amount, true, :now, :now)
+                    (category, sub_category, budget_amount, is_active, user_id, created_at, updated_at)
+                    VALUES (:cat, :sub, :amount, true, :uid, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {"cat": category, "sub": sub_category, "amount": total_commitment, "now": now})
+                """), {"cat": category, "sub": sub_category, "amount": total_commitment, "uid": uid, "now": now})
 
     except Exception as e:
         print(f"Error syncing budgets from commitments: {e}")
@@ -65,10 +68,11 @@ def budget_management():
 
     try:
         with db.engine.connect() as conn:
-            years_df = _df(conn, """
+            uid_sql, uid_p = uid_clause()
+            years_df = _df(conn, f"""
                 SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
-                FROM transactions ORDER BY year DESC
-            """)
+                FROM transactions WHERE 1=1 {uid_sql} ORDER BY year DESC
+            """, uid_p)
             available_years = [int(y) for y in years_df['year'].tolist()]
     except Exception:
         available_years = [2022, 2023, 2024, 2025]
@@ -86,32 +90,34 @@ def budget_management():
 def api_budget_templates():
     """Get all budget templates (initial budgets)"""
     try:
+        uid_sql, uid_p = uid_clause()
+        uid_val = current_user_id()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT category, budget_amount, notes, is_active
-                FROM budget_templates WHERE is_active = true ORDER BY category
-            """)
+                FROM budget_templates WHERE is_active = true {uid_sql} ORDER BY category
+            """, uid_p)
 
             if df.empty:
                 # Create from transaction categories
-                cats_df = _df(conn, """
+                cats_df = _df(conn, f"""
                     SELECT DISTINCT category FROM transactions
-                    WHERE category IS NOT NULL AND category != '' ORDER BY category
-                """)
+                    WHERE category IS NOT NULL AND category != '' {uid_sql} ORDER BY category
+                """, uid_p)
                 now = datetime.utcnow()
                 with db.engine.begin() as write_conn:
                     for _, row in cats_df.iterrows():
                         write_conn.execute(text("""
-                            INSERT INTO budget_templates (category, budget_amount, notes, is_active, created_at, updated_at)
-                            VALUES (:cat, 0.00, '', true, :now, :now)
+                            INSERT INTO budget_templates (category, budget_amount, notes, is_active, user_id, created_at, updated_at)
+                            VALUES (:cat, 0.00, '', true, :uid, :now, :now)
                             ON CONFLICT DO NOTHING
-                        """), {"cat": row['category'], "now": now})
+                        """), {"cat": row['category'], "uid": uid_val, "now": now})
 
                 with db.engine.connect() as conn2:
-                    df = _df(conn2, """
+                    df = _df(conn2, f"""
                         SELECT category, budget_amount, notes, is_active
-                        FROM budget_templates WHERE is_active = true ORDER BY category
-                    """)
+                        FROM budget_templates WHERE is_active = true {uid_sql} ORDER BY category
+                    """, uid_p)
 
         result = [{
             'category': str(row['category']),
@@ -139,13 +145,14 @@ def api_unexpected_expenses():
         if not month or not year:
             return jsonify({'error': 'Month and year required'}), 400
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT id, category, amount, description, is_active, created_at
                 FROM unexpected_expenses
-                WHERE month = :month AND year = :year AND is_active = true
+                WHERE month = :month AND year = :year AND is_active = true {uid_sql}
                 ORDER BY category, description
-            """, {"month": month, "year": year})
+            """, {"month": month, "year": year, **uid_p})
 
         result = [{
             'id': int(row['id']),
@@ -175,12 +182,13 @@ def add_unexpected_expense():
         with db.engine.begin() as conn:
             result = conn.execute(text("""
                 INSERT INTO unexpected_expenses
-                (category, month, year, amount, description, is_active, created_at, updated_at)
-                VALUES (:cat, :month, :year, :amount, :desc, true, :now, :now)
+                (category, month, year, amount, description, is_active, user_id, created_at, updated_at)
+                VALUES (:cat, :month, :year, :amount, :desc, true, :uid, :now, :now)
                 RETURNING id
             """), {
                 "cat": data['category'], "month": data['month'], "year": data['year'],
-                "amount": float(data['amount']), "desc": data['description'], "now": now
+                "amount": float(data['amount']), "desc": data['description'],
+                "uid": current_user_id(), "now": now
             })
             expense_id = result.fetchone()[0]
 
@@ -199,14 +207,15 @@ def update_unexpected_expense(expense_id):
     try:
         data = request.get_json()
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE unexpected_expenses
                 SET amount = :amount, description = :desc, category = :cat, updated_at = :now
-                WHERE id = :id AND is_active = true
+                WHERE id = :id AND is_active = true {uid_sql}
             """), {
                 "amount": float(data['amount']), "desc": data['description'],
-                "cat": data['category'], "now": datetime.utcnow(), "id": expense_id
+                "cat": data['category'], "now": datetime.utcnow(), "id": expense_id, **uid_p
             })
             if result.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Unexpected expense not found'}), 404
@@ -224,11 +233,12 @@ def update_unexpected_expense(expense_id):
 def delete_unexpected_expense(expense_id):
     """Delete (deactivate) an unexpected expense"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE unexpected_expenses SET is_active = false, updated_at = :now
-                WHERE id = :id AND is_active = true
-            """), {"now": datetime.utcnow(), "id": expense_id})
+                WHERE id = :id AND is_active = true {uid_sql}
+            """), {"now": datetime.utcnow(), "id": expense_id, **uid_p})
             if result.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Unexpected expense not found'}), 404
 
@@ -258,6 +268,11 @@ def api_actual_spending():
         if owner != 'all':
             date_filter += " AND owner = :owner"
             params["owner"] = owner
+
+        uid_sql, uid_p = uid_clause()
+        if uid_sql:
+            date_filter += f" {uid_sql}"
+            params.update(uid_p)
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
@@ -292,15 +307,16 @@ def update_budget_template():
         notes = data.get('notes', '')
         now = datetime.utcnow()
 
+        uid = current_user_id()
         with db.engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO budget_templates (category, budget_amount, notes, is_active, created_at, updated_at)
-                VALUES (:cat, :amount, :notes, true, :now, :now)
+                INSERT INTO budget_templates (category, budget_amount, notes, is_active, user_id, created_at, updated_at)
+                VALUES (:cat, :amount, :notes, true, :uid, :now, :now)
                 ON CONFLICT (category, user_id) DO UPDATE
                 SET budget_amount = EXCLUDED.budget_amount,
                     notes = EXCLUDED.notes,
                     updated_at = EXCLUDED.updated_at
-            """), {"cat": category, "amount": budget_amount, "notes": notes, "now": now})
+            """), {"cat": category, "amount": budget_amount, "notes": notes, "uid": uid, "now": now})
 
         return jsonify({'success': True, 'message': 'Budget template updated successfully'})
 
@@ -319,41 +335,44 @@ def update_budget_template():
 def api_subcategory_templates():
     """Get all subcategory budget templates with commitment minimums enforced"""
     try:
+        uid_sql, uid_p = uid_clause()
+        uid_val = current_user_id()
         with db.engine.connect() as conn:
-            templates_df = _df(conn, """
+            templates_df = _df(conn, f"""
                 SELECT category, sub_category, budget_amount, notes, budget_by_category, is_active
-                FROM budget_subcategory_templates ORDER BY category, sub_category
-            """)
+                FROM budget_subcategory_templates WHERE is_active = true {uid_sql}
+                ORDER BY category, sub_category
+            """, uid_p)
 
             if templates_df.empty:
                 # Auto-create from transaction subcategories
-                subcats_df = _df(conn, """
+                subcats_df = _df(conn, f"""
                     SELECT DISTINCT category, sub_category FROM transactions
-                    WHERE sub_category IS NOT NULL AND sub_category != ''
+                    WHERE sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                     ORDER BY category, sub_category
-                """)
+                """, uid_p)
                 now = datetime.utcnow()
                 with db.engine.begin() as write_conn:
                     for _, row in subcats_df.iterrows():
                         write_conn.execute(text("""
                             INSERT INTO budget_subcategory_templates
-                            (category, sub_category, budget_amount, notes, is_active, created_at, updated_at)
-                            VALUES (:cat, :sub, 0.00, '', true, :now, :now)
+                            (category, sub_category, budget_amount, notes, is_active, user_id, created_at, updated_at)
+                            VALUES (:cat, :sub, 0.00, '', true, :uid, :now, :now)
                             ON CONFLICT DO NOTHING
-                        """), {"cat": row['category'], "sub": row['sub_category'], "now": now})
+                        """), {"cat": row['category'], "sub": row['sub_category'], "uid": uid_val, "now": now})
 
                 with db.engine.connect() as conn2:
-                    templates_df = _df(conn2, """
+                    templates_df = _df(conn2, f"""
                         SELECT category, sub_category, budget_amount, notes, is_active
-                        FROM budget_subcategory_templates WHERE is_active = true
+                        FROM budget_subcategory_templates WHERE is_active = true {uid_sql}
                         ORDER BY category, sub_category
-                    """)
+                    """, uid_p)
 
-            commitments_df = _df(conn, """
+            commitments_df = _df(conn, f"""
                 SELECT category, sub_category, COALESCE(SUM(estimated_amount), 0) as total_commitment
-                FROM budget_commitments WHERE is_active = true
+                FROM budget_commitments WHERE is_active = true {uid_sql}
                 GROUP BY category, sub_category
-            """)
+            """, uid_p)
 
         result = []
         for _, row in templates_df.iterrows():
@@ -391,15 +410,18 @@ def api_subcategory_templates():
 def sync_subcategory_templates():
     """Sync budget templates with current transaction subcategories"""
     try:
+        uid_sql, uid_p = uid_clause()
+        uid_val = current_user_id()
         with db.engine.connect() as conn:
-            subcats_df = _df(conn, """
+            subcats_df = _df(conn, f"""
                 SELECT DISTINCT category, sub_category FROM transactions
-                WHERE sub_category IS NOT NULL AND sub_category != ''
+                WHERE sub_category IS NOT NULL AND sub_category != '' {uid_sql}
                 ORDER BY category, sub_category
-            """)
-            existing_df = _df(conn, """
+            """, uid_p)
+            existing_df = _df(conn, f"""
                 SELECT category, sub_category FROM budget_subcategory_templates
-            """)
+                WHERE 1=1 {uid_sql}
+            """, uid_p)
 
         transaction_pairs = set(
             (row['category'], row['sub_category']) for _, row in subcats_df.iterrows()
@@ -418,17 +440,17 @@ def sync_subcategory_templates():
             for category, sub_category in to_add:
                 conn.execute(text("""
                     INSERT INTO budget_subcategory_templates
-                    (category, sub_category, budget_amount, notes, budget_by_category, is_active, created_at, updated_at)
-                    VALUES (:cat, :sub, 0.00, '', false, true, :now, :now)
+                    (category, sub_category, budget_amount, notes, budget_by_category, is_active, user_id, created_at, updated_at)
+                    VALUES (:cat, :sub, 0.00, '', false, true, :uid, :now, :now)
                     ON CONFLICT DO NOTHING
-                """), {"cat": category, "sub": sub_category, "now": now})
+                """), {"cat": category, "sub": sub_category, "uid": uid_val, "now": now})
                 added_count += 1
 
             for category, sub_category in to_remove:
-                conn.execute(text("""
+                conn.execute(text(f"""
                     DELETE FROM budget_subcategory_templates
-                    WHERE category = :cat AND sub_category = :sub
-                """), {"cat": category, "sub": sub_category})
+                    WHERE category = :cat AND sub_category = :sub {uid_sql}
+                """), {"cat": category, "sub": sub_category, **uid_p})
                 removed_count += 1
 
         message = f'Sync complete: {added_count} added, {removed_count} removed'
@@ -454,12 +476,14 @@ def update_subcategory_template():
         is_active = data.get('is_active', True)
         now = datetime.utcnow()
 
+        uid_sql, uid_p = uid_clause()
+        uid_val = current_user_id()
         with db.engine.begin() as conn:
             # Check commitment minimum
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 SELECT COALESCE(SUM(estimated_amount), 0) as total_commitment
-                FROM budget_commitments WHERE category = :cat AND sub_category = :sub AND is_active = true
-            """), {"cat": category, "sub": sub_category}).fetchone()
+                FROM budget_commitments WHERE category = :cat AND sub_category = :sub AND is_active = true {uid_sql}
+            """), {"cat": category, "sub": sub_category, **uid_p}).fetchone()
             total_commitment = float(result[0]) if result else 0.0
 
             if budget_amount < total_commitment:
@@ -471,8 +495,8 @@ def update_subcategory_template():
 
             conn.execute(text("""
                 INSERT INTO budget_subcategory_templates
-                (category, sub_category, budget_amount, notes, budget_by_category, is_active, created_at, updated_at)
-                VALUES (:cat, :sub, :amount, :notes, :by_cat, :active, :now, :now)
+                (category, sub_category, budget_amount, notes, budget_by_category, is_active, user_id, created_at, updated_at)
+                VALUES (:cat, :sub, :amount, :notes, :by_cat, :active, :uid, :now, :now)
                 ON CONFLICT (category, sub_category, user_id) DO UPDATE SET
                     budget_amount = EXCLUDED.budget_amount,
                     notes = EXCLUDED.notes,
@@ -481,7 +505,8 @@ def update_subcategory_template():
                     updated_at = EXCLUDED.updated_at
             """), {
                 "cat": category, "sub": sub_category, "amount": budget_amount,
-                "notes": notes, "by_cat": budget_by_category, "active": is_active, "now": now
+                "notes": notes, "by_cat": budget_by_category, "active": is_active,
+                "uid": uid_val, "now": now
             })
 
         return jsonify({'success': True, 'message': 'Subcategory budget updated successfully'})
@@ -501,12 +526,13 @@ def batch_update_subcategory_templates():
         budgets = data.get('budgets', [])
         now = datetime.utcnow()
 
+        uid_val = current_user_id()
         with db.engine.begin() as conn:
             for budget in budgets:
                 conn.execute(text("""
                     INSERT INTO budget_subcategory_templates
-                    (category, sub_category, budget_amount, notes, is_active, created_at, updated_at)
-                    VALUES (:cat, :sub, :amount, :notes, true, :now, :now)
+                    (category, sub_category, budget_amount, notes, is_active, user_id, created_at, updated_at)
+                    VALUES (:cat, :sub, :amount, :notes, true, :uid, :now, :now)
                     ON CONFLICT (category, sub_category, user_id) DO UPDATE SET
                         budget_amount = EXCLUDED.budget_amount,
                         notes = EXCLUDED.notes,
@@ -514,7 +540,7 @@ def batch_update_subcategory_templates():
                 """), {
                     "cat": budget['category'], "sub": budget['sub_category'],
                     "amount": float(budget['budget_amount']), "notes": budget.get('notes', ''),
-                    "now": now
+                    "uid": uid_val, "now": now
                 })
 
         return jsonify({'success': True, 'message': f'{len(budgets)} budgets updated successfully'})
@@ -534,12 +560,13 @@ def toggle_category_granularity():
         category = data['category']
         budget_by_category = data['budget_by_category']
 
+        uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE budget_subcategory_templates
                 SET budget_by_category = :by_cat, updated_at = :now
-                WHERE category = :cat AND is_active = true
-            """), {"by_cat": budget_by_category, "now": datetime.utcnow(), "cat": category})
+                WHERE category = :cat AND is_active = true {uid_sql}
+            """), {"by_cat": budget_by_category, "now": datetime.utcnow(), "cat": category, **uid_p})
             rows_updated = result.rowcount
 
         return jsonify({'success': True, 'message': f'Updated {rows_updated} subcategories', 'rows_updated': rows_updated})
@@ -595,13 +622,14 @@ def api_migrate_budgets():
 def api_get_commitments():
     """Get all active budget commitments"""
     try:
+        uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            df = _df(conn, """
+            df = _df(conn, f"""
                 SELECT id, name, category, sub_category, estimated_amount,
                        due_day_of_month, is_fixed, created_at
-                FROM budget_commitments WHERE is_active = true
+                FROM budget_commitments WHERE is_active = true {uid_sql}
                 ORDER BY due_day_of_month, name
-            """)
+            """, uid_p)
 
         result = [{
             'id': int(row['id']),
@@ -635,20 +663,21 @@ def api_add_commitment():
 
         now = datetime.utcnow()
 
+        uid = current_user_id()
         with db.engine.begin() as conn:
             result = conn.execute(text("""
                 INSERT INTO budget_commitments
                 (name, category, sub_category, estimated_amount, due_day_of_month,
-                 is_fixed, is_active, created_at, updated_at)
-                VALUES (:name, :cat, :sub, :amount, :due_day, :is_fixed, true, :now, :now)
+                 is_fixed, is_active, user_id, created_at, updated_at)
+                VALUES (:name, :cat, :sub, :amount, :due_day, :is_fixed, true, :uid, :now, :now)
                 RETURNING id
             """), {
                 "name": data['name'], "cat": data['category'], "sub": data['sub_category'],
                 "amount": float(data['estimated_amount']), "due_day": due_day_of_month,
-                "is_fixed": data.get('is_fixed', True), "now": now
+                "is_fixed": data.get('is_fixed', True), "uid": uid, "now": now
             })
             commitment_id = result.fetchone()[0]
-            sync_budgets_from_commitments(conn)
+            sync_budgets_from_commitments(conn, uid=uid)
 
         return jsonify({'success': True, 'id': commitment_id, 'message': 'Commitment added successfully'})
 
@@ -669,22 +698,25 @@ def api_update_commitment(commitment_id):
         if due_day_of_month < 1 or due_day_of_month > 31:
             return jsonify({'success': False, 'error': 'Due day must be between 1 and 31'}), 400
 
+        uid = current_user_id()
+        uid_sql, uid_p = uid_clause(uid)
         with db.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE budget_commitments
                 SET name = :name, category = :cat, sub_category = :sub, estimated_amount = :amount,
                     due_day_of_month = :due_day, is_fixed = :is_fixed, updated_at = :now
-                WHERE id = :id AND is_active = true
+                WHERE id = :id AND is_active = true {uid_sql}
             """), {
                 "name": data['name'], "cat": data['category'], "sub": data['sub_category'],
                 "amount": float(data['estimated_amount']), "due_day": due_day_of_month,
-                "is_fixed": data.get('is_fixed', True), "now": datetime.utcnow(), "id": commitment_id
+                "is_fixed": data.get('is_fixed', True), "now": datetime.utcnow(),
+                "id": commitment_id, **uid_p
             })
 
             if result.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Commitment not found'}), 404
 
-            sync_budgets_from_commitments(conn)
+            sync_budgets_from_commitments(conn, uid=uid)
 
         return jsonify({'success': True, 'message': 'Commitment updated successfully'})
 
@@ -699,16 +731,18 @@ def api_update_commitment(commitment_id):
 def api_delete_commitment(commitment_id):
     """Delete (deactivate) a budget commitment"""
     try:
+        uid = current_user_id()
+        uid_sql, uid_p = uid_clause(uid)
         with db.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(text(f"""
                 UPDATE budget_commitments SET is_active = false, updated_at = :now
-                WHERE id = :id AND is_active = true
-            """), {"now": datetime.utcnow(), "id": commitment_id})
+                WHERE id = :id AND is_active = true {uid_sql}
+            """), {"now": datetime.utcnow(), "id": commitment_id, **uid_p})
 
             if result.rowcount == 0:
                 return jsonify({'success': False, 'error': 'Commitment not found'}), 404
 
-            sync_budgets_from_commitments(conn)
+            sync_budgets_from_commitments(conn, uid=uid)
 
         return jsonify({'success': True, 'message': 'Commitment deleted successfully'})
 
@@ -753,6 +787,11 @@ def api_actual_spending_subcategory():
         if owner != 'all':
             date_filter += " AND owner = :owner"
             params["owner"] = owner
+
+        uid_sql, uid_p = uid_clause()
+        if uid_sql:
+            date_filter += f" {uid_sql}"
+            params.update(uid_p)
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
