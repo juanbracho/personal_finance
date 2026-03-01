@@ -69,16 +69,22 @@ def budget_management():
     try:
         with db.engine.connect() as conn:
             uid_sql, uid_p = uid_clause()
+            year_expr = ("CAST(strftime('%Y', date) AS INTEGER)"
+                         if db.engine.dialect.name == 'sqlite'
+                         else "EXTRACT(YEAR FROM date)::integer")
             years_df = _df(conn, f"""
-                SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
+                SELECT DISTINCT {year_expr} AS year
                 FROM transactions WHERE 1=1 {uid_sql} ORDER BY year DESC
             """, uid_p)
-            available_years = [int(y) for y in years_df['year'].tolist()]
+            available_years = [int(y) for y in years_df['year'].tolist() if y is not None]
     except Exception:
-        available_years = [2022, 2023, 2024, 2025]
+        available_years = []
 
+    current_year = local_now().year
     if not available_years:
-        available_years = [2022, 2023, 2024, 2025]
+        available_years = [current_year - 1, current_year]
+    elif current_year not in available_years:
+        available_years.insert(0, current_year)
 
     return render_template('budget_management.html',
                          selected_year=selected_year,
@@ -262,7 +268,12 @@ def api_actual_spending():
         if not month or not year:
             return jsonify({'error': 'Month and year required'}), 400
 
-        date_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
+        if db.engine.dialect.name == 'sqlite':
+            date_filter = ("CAST(strftime('%m', date) AS INTEGER) = :month"
+                           " AND CAST(strftime('%Y', date) AS INTEGER) = :year")
+        else:
+            date_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
+                           " AND EXTRACT(YEAR FROM date)::integer = :year")
         params = {"month": month, "year": year}
 
         if owner != 'all':
@@ -781,7 +792,12 @@ def api_actual_spending_subcategory():
         if not month or not year:
             return jsonify({'error': 'Month and year required'}), 400
 
-        date_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
+        if db.engine.dialect.name == 'sqlite':
+            date_filter = ("CAST(strftime('%m', date) AS INTEGER) = :month"
+                           " AND CAST(strftime('%Y', date) AS INTEGER) = :year")
+        else:
+            date_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
+                           " AND EXTRACT(YEAR FROM date)::integer = :year")
         params = {"month": month, "year": year}
 
         if owner != 'all':

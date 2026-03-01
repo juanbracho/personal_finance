@@ -203,13 +203,13 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             prev_month_str = f"{year-1}-12" if month == 1 else f"{year}-{month-1:02d}"
             owner_df = _df(conn, f"""
                 SELECT owner,
-                    SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :current_month THEN amount ELSE 0 END) as current_month,
-                    SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :prev_month THEN amount ELSE 0 END) as previous_month
+                    SUM(CASE WHEN {_ym_str()} = :current_month THEN amount ELSE 0 END) as current_month,
+                    SUM(CASE WHEN {_ym_str()} = :prev_month THEN amount ELSE 0 END) as previous_month
                 FROM transactions
                 WHERE COALESCE(is_active, true) = true {uid_sql}
                 GROUP BY owner
-                HAVING SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :current_month THEN amount ELSE 0 END) > 0
-                    OR SUM(CASE WHEN TO_CHAR(date, 'YYYY-MM') = :prev_month THEN amount ELSE 0 END) > 0
+                HAVING SUM(CASE WHEN {_ym_str()} = :current_month THEN amount ELSE 0 END) > 0
+                    OR SUM(CASE WHEN {_ym_str()} = :prev_month THEN amount ELSE 0 END) > 0
                 ORDER BY current_month DESC
             """, {"current_month": current_month_str, "prev_month": prev_month_str, **uid_p})
             owner_comparison = []

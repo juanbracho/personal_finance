@@ -872,6 +872,32 @@ function fetchFilteredTransactions() {
         });
 }
 
+function _fmtTxDate(d) {
+    if (!d) return '';
+    const s = String(d);
+    // Fast path: already YYYY-MM-DD
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${months[parseInt(iso[2], 10) - 1]} ${parseInt(iso[3], 10)}, ${iso[1]}`;
+    }
+    // Fall back for other formats (e.g. "Sun, 01 Mar 2026 00:00:00 GMT")
+    const dt = new Date(s);
+    if (isNaN(dt.getTime())) return s;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
+}
+
+function _toDateInputVal(d) {
+    if (!d) return '';
+    const s = String(d);
+    const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const dt = new Date(s);
+    if (isNaN(dt.getTime())) return s;
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+}
+
 function renderFilteredTransactionsTable(transactions) {
     const tbody = document.getElementById('filteredTransactionsBody');
     if (!tbody) return;
@@ -886,7 +912,7 @@ function renderFilteredTransactionsTable(transactions) {
             <td style="text-align: center;">
                 <input type="checkbox" class="transaction-checkbox" data-transaction-id="${tx.id}" onchange="window.Analytics.handleTransactionCheckboxChange(this)">
             </td>
-            <td>${tx.date}</td>
+            <td>${_fmtTxDate(tx.date)}</td>
             <td>${tx.description || ''}</td>
             <td class="text-end">$${parseFloat(tx.amount).toFixed(2)}</td>
             <td>${tx.category || ''}</td>
@@ -931,7 +957,7 @@ async function editTransactionFromAnalytics(transactionId) {
 
         // Populate form fields
         document.getElementById('editTransactionId').value = tx.id;
-        document.getElementById('editDate').value = tx.date;
+        document.getElementById('editDate').value = _toDateInputVal(tx.date);
         document.getElementById('editDescription').value = tx.description;
         document.getElementById('editAmount').value = tx.amount;
         document.getElementById('editType').value = tx.type;

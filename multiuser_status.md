@@ -6,8 +6,8 @@
 ## Current State
 
 **Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
-**Overall Progress:** Phase 6 complete ✅
-**Last Session:** March 2026 — Session 15 (JSON backup import/restore + SQLite compatibility fixes)
+**Overall Progress:** Phase 6 complete ✅ · Session 15 fully verified ✅
+**Last Session:** March 2026 — Session 15 (JSON backup import/restore + SQLite compatibility fixes — all tested and confirmed working on live + local)
 
 ---
 
@@ -404,3 +404,29 @@ Phase 7 continued — JSON backup import/restore + post-testing bug fixes:
 | — | Settings / Data | **Feature:** JSON backup import/restore with two-phase safety modal |
 | 22 | Dashboard / local SQLite | `EXTRACT` / `TO_CHAR` / `INTERVAL` Postgres syntax failed on SQLite → blank dashboard |
 | 23 | Settings / Import | Cloud import PK conflict when backup IDs clash with other users' rows; raw SQL exposed in flash |
+| 23b | Dashboard / SQLite | Missed `TO_CHAR(date, 'YYYY-MM')` in owner comparison query (4 occurrences in SELECT + HAVING) |
+
+**Session 15 end-to-end verified:** import/restore works on live (multi-user, all instances tested) ✅ · dashboard loads on local SQLite ✅ · delete all data does not affect other users ✅
+
+### March 2026 — Session 16
+
+**Bug 24: Budget page + Unexpected Expenses year dropdown missing 2026 (local)**
+- Root cause: `budget_management()` in `budgets/routes.py` used `EXTRACT(YEAR FROM date)::integer` (Postgres-only); on SQLite → exception → hardcoded `[2022, 2023, 2024, 2025]` fallback (no 2026)
+- Fix: dialect-aware `strftime`/`EXTRACT` expression; fallback replaced with dynamic `local_now().year`; current year now always inserted if missing
+- Also fixed: `api_actual_spending()` + `api_actual_spending_subcategory()` in same file had same Postgres-only syntax
+
+**Bug 25: Dashboard > Categories view loading nothing (local)**
+- Root cause: `api_categories()` + `api_categories_statistics()` in `blueprints/api/routes.py` built date filters with raw `EXTRACT(YEAR/MONTH FROM t.date)::integer` (Postgres-only); on SQLite → exception → JS receives error → spinner never resolves
+- Fix: added 4 dialect-aware helpers `_yr()` `_mo()` `_ym()` `_ago_12m()` to `api/routes.py`; updated `_year_month_owner_filter()`, `monthly_trends()`, `budget_analysis()`, `budget_subcategories()`, `dashboard_summary()`, `api_categories()`, `api_categories_statistics()`
+
+**Bug 26: Analytics transactions table showing "Sun, 01 Mar 2026 00:00:00 GMT" (live)**
+- Root cause: `renderFilteredTransactionsTable()` in `analytics.js` rendered `${tx.date}` raw; Postgres returns date as full datetime string; SQLite returns plain "YYYY-MM-DD" (no issue locally)
+- Fix: added `_fmtTxDate()` (renders "Mar 1, 2026") and `_toDateInputVal()` (strips to YYYY-MM-DD for edit form) helpers in `analytics.js`
+
+### Session 16 — Full Bug Summary
+
+| # | Area | Description |
+|---|------|-------------|
+| 24 | Budget / local SQLite | Year dropdown missing 2026 — `EXTRACT` syntax + hardcoded fallback |
+| 25 | Categories view / local SQLite | `api_categories()` `EXTRACT` syntax → spinner never resolves |
+| 26 | Analytics transactions / live | Raw date string from Postgres showed full datetime with time |

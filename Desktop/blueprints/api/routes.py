@@ -13,14 +13,40 @@ def _df(conn, sql, params=None):
     return pd.read_sql_query(text(sql), conn, params=params or {})
 
 
+# ── Dialect-aware date helpers (Postgres vs SQLite) ───────────────────────────
+
+def _yr(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"CAST(strftime('%Y', {col}) AS INTEGER)"
+    return f"EXTRACT(YEAR FROM {col})::integer"
+
+
+def _mo(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"CAST(strftime('%m', {col}) AS INTEGER)"
+    return f"EXTRACT(MONTH FROM {col})::integer"
+
+
+def _ym(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"strftime('%Y-%m', {col})"
+    return f"TO_CHAR({col}, 'YYYY-MM')"
+
+
+def _ago_12m():
+    if db.engine.dialect.name == 'sqlite':
+        return "date('now', '-12 months')"
+    return "CURRENT_DATE - INTERVAL '12 months'"
+
+
 def _year_month_owner_filter(year, month, owner='all', month_str=False):
     """Build a WHERE fragment and params dict for year/month/owner filters."""
     filters = []
     params = {}
-    filters.append("EXTRACT(YEAR FROM date)::integer = :year")
+    filters.append(f"{_yr()} = :year")
     params['year'] = year
     if month and month != 'all':
-        filters.append("EXTRACT(MONTH FROM date)::integer = :month")
+        filters.append(f"{_mo()} = :month")
         params['month'] = int(month)
     if owner and owner != 'all':
         filters.append("owner = :owner")
@@ -53,12 +79,12 @@ def monthly_trends():
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
-                SELECT TO_CHAR(date, 'YYYY-MM') as month, SUM(amount) as total
+                SELECT {_ym()} as month, SUM(amount) as total
                 FROM transactions
-                WHERE date >= CURRENT_DATE - INTERVAL '12 months'
+                WHERE date >= {_ago_12m()}
                 AND COALESCE(is_active, true) = true
                 {extra_filters}
-                GROUP BY TO_CHAR(date, 'YYYY-MM')
+                GROUP BY {_ym()}
                 ORDER BY month DESC
             """, params)
 
@@ -134,8 +160,8 @@ def budget_analysis():
         year = request.args.get('year', local_now().year, type=int)
         owner = request.args.get('owner', 'all')
 
-        spending_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
-                           " AND EXTRACT(YEAR FROM date)::integer = :year"
+        spending_filter = (f"{_mo()} = :month"
+                           f" AND {_yr()} = :year"
                            " AND COALESCE(is_active, true) = true")
         spending_params = {'month': month, 'year': year}
         if owner != 'all':
@@ -221,8 +247,8 @@ def budget_subcategories():
         year = request.args.get('year', local_now().year, type=int)
         owner = request.args.get('owner', 'all')
 
-        spending_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
-                           " AND EXTRACT(YEAR FROM date)::integer = :year"
+        spending_filter = (f"{_mo()} = :month"
+                           f" AND {_yr()} = :year"
                            " AND COALESCE(is_active, true) = true")
         spending_params = {'month': month, 'year': year}
         if owner != 'all':
@@ -344,8 +370,8 @@ def dashboard_summary():
         month = request.args.get('month', local_now().month, type=int)
         owner = request.args.get('owner', 'all')
 
-        date_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
-                       " AND EXTRACT(YEAR FROM date)::integer = :year"
+        date_filter = (f"{_mo()} = :month"
+                       f" AND {_yr()} = :year"
                        " AND COALESCE(is_active, true) = true")
         params = {'month': month, 'year': year}
         if owner != 'all':
@@ -424,10 +450,10 @@ def api_categories():
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
-        date_filter = "EXTRACT(YEAR FROM t.date)::integer = :year"
+        date_filter = f"{_yr('t.date')} = :year"
         params = {'year': year}
         if month != 'all':
-            date_filter += " AND EXTRACT(MONTH FROM t.date)::integer = :month"
+            date_filter += f" AND {_mo('t.date')} = :month"
             params['month'] = int(month)
         if owner != 'all':
             date_filter += " AND t.owner = :owner"
@@ -470,7 +496,7 @@ def api_categories():
             type_df = _df(conn, f"""
                 SELECT category, type, COUNT(*) AS type_count
                 FROM transactions t
-                WHERE EXTRACT(YEAR FROM t.date)::integer = :year {t_uid_cond}
+                WHERE {_yr('t.date')} = :year {t_uid_cond}
                 GROUP BY category, type
                 ORDER BY category, type_count DESC
             """, params)
@@ -1466,10 +1492,10 @@ def api_categories_statistics():
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
-        date_filter = "EXTRACT(YEAR FROM date)::integer = :year"
+        date_filter = f"{_yr()} = :year"
         params = {'year': year}
         if month != 'all':
-            date_filter += " AND EXTRACT(MONTH FROM date)::integer = :month"
+            date_filter += f" AND {_mo()} = :month"
             params['month'] = int(month)
         if owner != 'all':
             date_filter += " AND owner = :owner"
