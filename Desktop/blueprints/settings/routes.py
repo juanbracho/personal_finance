@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, Response
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, Response, session
 import os
 import sys
 import shutil
@@ -8,7 +8,7 @@ import tempfile
 import subprocess
 from datetime import datetime
 from config import get_app_version
-from models import db
+from models import db, User
 from sqlalchemy import text
 from utils import current_user_id
 from auth import require_admin, _log_audit
@@ -20,6 +20,9 @@ settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 def index():
     """Settings page"""
     version_info = get_app_version()
+    users = None
+    if session.get('role') == 'admin':
+        users = db.session.query(User).order_by(User.created_at).all()
     return render_template('settings.html',
                          db_exists=True,
                          db_size=None,
@@ -27,7 +30,8 @@ def index():
                          backups=[],
                          version=version_info['version'],
                          build_date=version_info['build_date'],
-                         build_number=version_info['build_number'])
+                         build_number=version_info['build_number'],
+                         users=users)
 
 
 @settings_bp.route('/export-my-data')

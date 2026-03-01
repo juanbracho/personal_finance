@@ -18,8 +18,7 @@ def gate():
 
 @admin_bp.route('/')
 def admin_dashboard():
-    users = db.session.query(User).order_by(User.created_at).all()
-    return render_template('admin.html', users=users)
+    return redirect(url_for('settings.index'))
 
 
 @admin_bp.route('/users/create', methods=['POST'])
@@ -31,7 +30,7 @@ def create_user():
 
     if not username or not password:
         flash('Username and password are required.', 'error')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('settings.index'))
 
     if role not in ('member', 'admin'):
         role = 'member'
@@ -49,11 +48,11 @@ def create_user():
     except IntegrityError:
         db.session.rollback()
         flash(f'Username "{username}" is already taken.', 'error')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('settings.index'))
 
     _log_audit('user_created', current_user_id(), extra={'new_username': username})
     flash(f'User "{username}" created successfully.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('settings.index'))
 
 
 @admin_bp.route('/users/<int:user_id>/deactivate', methods=['POST'])
@@ -61,17 +60,17 @@ def deactivate_user(user_id):
     user = db.session.get(User, user_id)
     if not user:
         flash('User not found.', 'error')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('settings.index'))
 
     if user.id == current_user_id():
         flash('You cannot deactivate your own account.', 'error')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('settings.index'))
 
     user.is_active = False
     db.session.commit()
     _log_audit('user_deactivated', current_user_id(), extra={'target_user_id': user_id})
     flash(f'User "{user.username}" has been deactivated.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('settings.index'))
 
 
 @admin_bp.route('/users/<int:user_id>/activate', methods=['POST'])
@@ -79,13 +78,13 @@ def activate_user(user_id):
     user = db.session.get(User, user_id)
     if not user:
         flash('User not found.', 'error')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('settings.index'))
 
     user.is_active = True
     db.session.commit()
     _log_audit('user_activated', current_user_id(), extra={'target_user_id': user_id})
     flash(f'User "{user.username}" has been activated.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('settings.index'))
 
 
 @admin_bp.route('/audit-logs')

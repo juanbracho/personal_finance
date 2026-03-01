@@ -89,7 +89,7 @@
         <li>
             <a href="{{ url_for('dashboards.dashboard') }}"
                class="{{ 'active' if request.endpoint in ['dashboards.dashboard', 'dashboards.overview'] }}">
-                Overview
+                Dashboard
             </a>
         </li>
         <li>
@@ -116,14 +116,6 @@
                 Analytics
             </a>
         </li>
-        {% if session.get('role') == 'admin' %}
-        <li>
-            <a href="{{ url_for('admin.admin_dashboard') }}"
-               class="{{ 'active' if request.endpoint and request.endpoint.startswith('admin.') }}">
-                Admin
-            </a>
-        </li>
-        {% endif %}
     </ul>
 
     <!-- Right actions -->
