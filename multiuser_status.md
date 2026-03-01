@@ -7,7 +7,7 @@
 
 **Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
 **Overall Progress:** Phase 6 complete ✅
-**Last Session:** February 2026 — Session 13 (Bugs 14–19 + admin user management + password policy)
+**Last Session:** March 2026 — Session 14 (Analytics page — collapsible panels + YoY matrix fixes)
 
 ---
 
@@ -324,6 +324,33 @@ Phase 7 continued — Settings page overhaul + cross-user data leak in Flutter:
 - Root cause: Filter `.kanso-card` had no padding; content was flush to card edges. Table card had redundant `padding:0; overflow:hidden` and table had `margin:0` (both already provided by `.kanso-card` and `.kanso-table`)
 - Fix: Added `padding: 16px 18px` to filter card; cleaned up redundant inline styles on table card and table element
 - File changed: `templates/admin_audit_logs.html`
+
+### March 2026 — Session 14
+Phase 7 continued — Analytics page UI improvements + local dev bug fixes:
+
+**Feature: Collapsible filter panel (analytics)**
+- Filter panel header now acts as a toggle: clicking anywhere on the "Filter Options" row collapses/expands the filter body with a rotating chevron
+- External `Filters` header button still works as an alias for the same toggle
+- Old CSS rule `.#filterPanel.collapsed { display:none }` (hid the entire card) replaced with `.anl-panel-body.collapsed { display:none }` + `.anl-chevron.rotated` (transforms the chevron)
+- Files changed: `templates/analytics.html`, `static/css/analytics.css`, `static/js/analytics.js`
+
+**Feature: Collapsible Year-over-Year matrix card**
+- YoY card header now acts as a toggle with the same chevron pattern
+- View-toggle radios and category selector inside the header have `onclick="event.stopPropagation()"` so they don't trigger the collapse
+- New `setupYoYCollapse()` function wired from `initializeAnalytics()`
+- Files changed: `templates/analytics.html`, `static/js/analytics.js`
+
+**Bug 20: YoY matrix always showed $0 for all cells**
+- Root cause: JS used `'01'`…`'12'` (zero-padded strings) as month keys, but pandas `EXTRACT(MONTH FROM date)::integer` produces integers which JSON serialises as `"1"`…`"12"` — key mismatch meant every cell returned `undefined` → `$0`
+- Fix: `matrix[year][String(parseInt(m, 10))]` strips the leading zero before lookup
+- File changed: `static/js/analytics.js` — `renderMonthlySpendingMatrixTable()`
+
+**Bug 21: Analytics page → 500 Internal Server Error on local dev (SQLite)**
+- Root cause 1: All year/month extraction queries used `EXTRACT(YEAR FROM date)::integer` and `EXTRACT(MONTH FROM date)::integer` — PostgreSQL-only syntax; SQLite raises `OperationalError: near "FROM": syntax error`
+- Root cause 2: The `except` handler tried `render_template('analytics/analytics.html', ...)` (wrong path); since the template doesn't exist, the fallback also raised `TemplateNotFound`, producing a silent 500 with no useful console output
+- Fix 1: Added `_year_expr()` / `_month_expr()` helpers in `analytics/routes.py` — return SQLite-compatible `CAST(strftime(...) AS INTEGER)` or Postgres `EXTRACT(...)::integer` based on `db.engine.dialect.name`
+- Fix 2: Corrected fallback template path to `analytics.html`
+- File changed: `blueprints/analytics/routes.py`
 
 ---
 
