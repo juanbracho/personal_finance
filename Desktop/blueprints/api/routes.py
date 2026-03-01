@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime, date, timedelta
-from utils import ensure_budget_tables, uid_clause, local_now
+from utils import ensure_budget_tables, uid_clause, local_now, current_user_id
 import pandas as pd
 from models import db
 from sqlalchemy import text
@@ -638,7 +638,8 @@ def api_accounts():
 
 @api_bp.route('/categories/types')
 def api_types():
-    """Get types with statistics"""
+    """Get types. UNIONs transaction-derived types with custom_types rows (0 transactions)
+    so newly created types appear in the list immediately."""
     try:
         all_years = request.args.get('all_years', '0') == '1'
         year = request.args.get('year', local_now().year, type=int)
@@ -660,20 +661,38 @@ def api_types():
         uid_sql, uid_p = uid_clause()
         date_filter += f" {uid_sql}"
         params.update(uid_p)
+        uid = uid_p.get('_uid')
 
         with db.engine.connect() as conn:
-            df = _df(conn, f"""
-                SELECT type as name,
-                       COUNT(*) as transaction_count,
-                       SUM(amount) as total_amount,
-                       AVG(amount) as avg_amount,
-                       MAX(date) as last_used,
-                       MIN(date) as first_used
+            df_txn = _df(conn, f"""
+                SELECT type AS name,
+                       COUNT(*) AS transaction_count,
+                       SUM(amount) AS total_amount,
+                       AVG(amount) AS avg_amount,
+                       MAX(date) AS last_used,
+                       MIN(date) AS first_used
                 FROM transactions
                 WHERE {date_filter}
                 GROUP BY type
-                ORDER BY total_amount DESC
             """, params)
+
+            # Custom types that have no transactions yet (avoid duplicates)
+            if uid is not None:
+                ct_rows = conn.execute(text("""
+                    SELECT name FROM custom_types
+                    WHERE user_id = :uid
+                    AND name NOT IN (
+                        SELECT DISTINCT type FROM transactions
+                        WHERE user_id = :uid AND type IS NOT NULL
+                    )
+                """), {'uid': uid}).fetchall()
+            else:
+                ct_rows = conn.execute(text("""
+                    SELECT name FROM custom_types WHERE user_id IS NULL
+                    AND name NOT IN (
+                        SELECT DISTINCT type FROM transactions WHERE type IS NOT NULL
+                    )
+                """)).fetchall()
 
         result = [{
             'name': str(row['name']),
@@ -682,8 +701,19 @@ def api_types():
             'avg_amount': float(row['avg_amount']),
             'last_used': str(row['last_used']),
             'first_used': str(row['first_used'])
-        } for _, row in df.iterrows()]
+        } for _, row in df_txn.iterrows()]
 
+        for row in ct_rows:
+            result.append({
+                'name': str(row[0]),
+                'transaction_count': 0,
+                'total_amount': 0.0,
+                'avg_amount': 0.0,
+                'last_used': '—',
+                'first_used': '—',
+            })
+
+        result.sort(key=lambda x: -x['total_amount'])
         print(f"🔖 Returning {len(result)} types")
         return jsonify(result)
     except Exception as e:
@@ -693,22 +723,33 @@ def api_types():
 
 @api_bp.route('/categories/types', methods=['POST'])
 def add_type():
-    """Validate that a new custom type name is not already in use."""
+    """Insert a new type into custom_types so it appears in the list immediately."""
     try:
         data = request.get_json()
         name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'success': False, 'error': 'Name is required'}), 400
 
-        uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
-            count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE type = :name {uid_sql}"
-            ), {'name': name, **uid_p}).scalar()
+        uid = current_user_id()
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
+            txn_count = conn.execute(text(
+                f"SELECT COUNT(*) FROM transactions WHERE type = :name"
+                + (f" AND user_id = :uid" if uid else "")
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
-        if count > 0:
-            return jsonify({'success': False, 'error': f'Type "{name}" already exists in transactions'}), 400
+            ct_count = conn.execute(text(
+                f"SELECT COUNT(*) FROM custom_types WHERE name = :name AND {uid_cond}"
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
+            if txn_count > 0 or ct_count > 0:
+                return jsonify({'success': False, 'error': f'Type "{name}" already exists'}), 400
+
+            conn.execute(text(
+                "INSERT INTO custom_types (user_id, name) VALUES (:uid, :name)"
+            ), {'uid': uid, 'name': name})
+
+        print(f"✅ Custom type '{name}' created for user {uid}")
         return jsonify({'success': True, 'message': f'Type "{name}" created successfully'})
     except Exception as e:
         print(f"❌ Error adding type: {e}")
@@ -717,7 +758,7 @@ def add_type():
 
 @api_bp.route('/categories/types/<type_name>', methods=['PUT'])
 def edit_type(type_name):
-    """Rename a type (updates all transactions that use it)"""
+    """Rename a type — updates both transactions and the custom_types row."""
     try:
         data = request.get_json()
         new_name = (data.get('name') or '').strip()
@@ -725,11 +766,17 @@ def edit_type(type_name):
             return jsonify({'success': False, 'error': 'Name is required'}), 400
 
         uid_sql, uid_p = uid_clause()
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
         with db.engine.begin() as conn:
             conn.execute(text(f"""
                 UPDATE transactions SET type = :new_name, updated_at = :now
                 WHERE type = :old_name {uid_sql}
             """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': type_name, **uid_p})
+
+            conn.execute(text(
+                f"UPDATE custom_types SET name = :new_name WHERE name = :old_name AND {uid_cond}"
+            ), {'new_name': new_name, 'old_name': type_name, **({'uid': uid} if uid else {})})
 
         return jsonify({'success': True, 'message': f'Type renamed from "{type_name}" to "{new_name}"'})
     except Exception as e:
@@ -739,20 +786,26 @@ def edit_type(type_name):
 
 @api_bp.route('/categories/types/<type_name>', methods=['DELETE'])
 def delete_type(type_name):
-    """Delete a type only if no transactions use it."""
+    """Delete a type — blocks if transactions still use it; removes from custom_types."""
     try:
         uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
             count = conn.execute(text(
                 f"SELECT COUNT(*) FROM transactions WHERE type = :name {uid_sql}"
             ), {'name': type_name, **uid_p}).scalar()
 
-        if count > 0:
-            return jsonify({
-                'success': False,
-                'error': f'Cannot delete: {count} transactions use this type. Migrate first.',
-                'transaction_count': count
-            }), 400
+            if count > 0:
+                return jsonify({
+                    'success': False,
+                    'error': f'Cannot delete: {count} transactions use this type. Migrate first.',
+                    'transaction_count': count
+                }), 400
+
+            conn.execute(text(
+                f"DELETE FROM custom_types WHERE name = :name AND {uid_cond}"
+            ), {'name': type_name, **({'uid': uid} if uid else {})})
 
         return jsonify({'success': True, 'message': f'Type "{type_name}" deleted'})
     except Exception as e:
@@ -1486,7 +1539,6 @@ def api_add_transaction():
         except ValueError:
             return jsonify({'success': False, 'error': 'Invalid date format, expected YYYY-MM-DD'}), 400
 
-        from utils import current_user_id
         with db.engine.begin() as conn:
             result = conn.execute(text("""
                 INSERT INTO transactions
