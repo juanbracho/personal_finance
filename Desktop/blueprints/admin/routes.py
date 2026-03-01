@@ -5,6 +5,20 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from auth import require_admin, _log_audit
 from utils import current_user_id
+import re
+
+
+def _validate_password(password):
+    """Return an error string if password doesn't meet policy, else None."""
+    if len(password) < 8:
+        return 'Password must be at least 8 characters.'
+    if not re.search(r'[A-Z]', password):
+        return 'Password must contain at least one uppercase letter.'
+    if not re.search(r'[0-9]', password):
+        return 'Password must contain at least one number.'
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return 'Password must contain at least one special character.'
+    return None
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -30,6 +44,11 @@ def create_user():
 
     if not username or not password:
         flash('Username and password are required.', 'error')
+        return redirect(url_for('settings.index'))
+
+    pwd_error = _validate_password(password)
+    if pwd_error:
+        flash(pwd_error, 'error')
         return redirect(url_for('settings.index'))
 
     if role not in ('member', 'admin'):
@@ -95,8 +114,9 @@ def change_password(user_id):
         return redirect(url_for('settings.index'))
 
     new_password = request.form.get('new_password', '')
-    if len(new_password) < 8:
-        flash('Password must be at least 8 characters.', 'error')
+    pwd_error = _validate_password(new_password)
+    if pwd_error:
+        flash(pwd_error, 'error')
         return redirect(url_for('settings.index'))
 
     user.password_hash = generate_password_hash(new_password)

@@ -291,10 +291,17 @@
                                 <span style="font-size:13px; color:var(--text-muted);">
                                     New password for <strong style="color:var(--text);">{{ u.username }}</strong>:
                                 </span>
-                                <input type="password" name="new_password"
-                                       class="kanso-input" placeholder="Min 8 characters"
-                                       required minlength="8"
-                                       style="max-width:220px;">
+                                <div style="display:flex; flex-direction:column;">
+                                    <input type="password" name="new_password"
+                                           class="kanso-input pwd-strength-input" placeholder="Min 8 chars"
+                                           required style="max-width:220px;">
+                                    <ul class="pwd-req-list" style="display:none;">
+                                        <li data-r="len">8 characters minimum</li>
+                                        <li data-r="upper">1 uppercase letter</li>
+                                        <li data-r="num">1 number</li>
+                                        <li data-r="special">1 special character</li>
+                                    </ul>
+                                </div>
                                 <button type="submit" class="btn-kanso btn-kanso-primary btn-kanso-sm">Set Password</button>
                                 <button type="button" class="btn-kanso btn-kanso-ghost btn-kanso-sm"
                                         onclick="togglePwdForm({{ u.id }})">Cancel</button>
@@ -311,7 +318,7 @@
         </div>
 
         <!-- Create user form -->
-        <div class="kanso-card" style="padding:20px;">
+        <div class="kanso-card" style="padding:20px; margin-top:10px;">
             <div style="font-size:12px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;">Create New User</div>
             <form action="{{ url_for('admin.create_user') }}" method="POST">
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:12px; align-items:end;">
@@ -321,7 +328,13 @@
                     </div>
                     <div>
                         <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">Password <span style="color:var(--danger);">*</span></label>
-                        <input type="password" name="password" class="kanso-input" placeholder="••••••••" required autocomplete="new-password" style="width:100%;">
+                        <input type="password" name="password" class="kanso-input pwd-strength-input" placeholder="••••••••" required autocomplete="new-password" style="width:100%;">
+                        <ul class="pwd-req-list" style="display:none;">
+                            <li data-r="len">8 characters minimum</li>
+                            <li data-r="upper">1 uppercase letter</li>
+                            <li data-r="num">1 number</li>
+                            <li data-r="special">1 special character</li>
+                        </ul>
                     </div>
                     <div>
                         <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">Email <span style="color:var(--text-faint);">(optional)</span></label>
@@ -535,6 +548,30 @@ function checkAppReconnection() {
             });
     }, 1000);
 }
+
+// ── Password strength checker ─────────────────────────────
+(function () {
+    const checks = [
+        ['len',     v => v.length >= 8],
+        ['upper',   v => /[A-Z]/.test(v)],
+        ['num',     v => /[0-9]/.test(v)],
+        ['special', v => /[^A-Za-z0-9]/.test(v)],
+    ];
+
+    function attach(input) {
+        const list = input.nextElementSibling;
+        if (!list || !list.classList.contains('pwd-req-list')) return;
+        input.addEventListener('input', () => {
+            const v = input.value;
+            list.style.display = v ? 'block' : 'none';
+            checks.forEach(([key, fn]) => {
+                list.querySelector('[data-r="' + key + '"]').className = fn(v) ? 'met' : '';
+            });
+        });
+    }
+
+    document.querySelectorAll('.pwd-strength-input').forEach(attach);
+})();
 
 // ── Admin — inline password form toggle ───────────────────
 function togglePwdForm(userId) {

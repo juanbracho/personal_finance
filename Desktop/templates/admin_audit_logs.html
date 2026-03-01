@@ -18,7 +18,7 @@
     <!-- ── Filter bar ── -->
     <div class="kanso-section">
         <div class="kanso-section-label">Filter</div>
-        <div class="kanso-card">
+        <div class="kanso-card" style="padding:16px 18px;">
             <form method="GET" action="{{ url_for('admin.audit_logs') }}"
                   style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                 <div>
@@ -53,8 +53,8 @@
 
     <!-- ── Logs table ── -->
     <div class="kanso-section">
-        <div class="kanso-card" style="padding:0; overflow:hidden;">
-            <table class="kanso-table" style="margin:0;">
+        <div class="kanso-card">
+            <table class="kanso-table">
                 <thead>
                     <tr>
                         <th>Timestamp</th>

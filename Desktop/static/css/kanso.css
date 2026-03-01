@@ -418,6 +418,20 @@ body {
     gap: 8px;
 }
 
+/* ── Password strength requirements list ────────────────── */
+
+.pwd-req-list {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    font-size: 11.5px;
+    line-height: 1.8;
+}
+.pwd-req-list li { color: var(--text-faint); }
+.pwd-req-list li::before { content: '○  '; }
+.pwd-req-list li.met { color: var(--success); }
+.pwd-req-list li.met::before { content: '✓  '; }
+
 /* ── Table (used inside kanso-card) ─────────────────────── */
 
 .kanso-table {
