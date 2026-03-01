@@ -1798,16 +1798,17 @@ def api_debts_list():
     """Debt accounts list for the Flutter mobile app."""
     try:
         show_paid_off = request.args.get('show_paid_off', 'false').lower() == 'true'
+        uid_sql, uid_p = uid_clause()
 
         with db.engine.connect() as conn:
             if show_paid_off:
                 rows = conn.execute(text(
-                    "SELECT * FROM debt_accounts ORDER BY is_active DESC, current_balance DESC"
-                )).mappings().all()
+                    f"SELECT * FROM debt_accounts WHERE 1=1 {uid_sql} ORDER BY is_active DESC, current_balance DESC"
+                ), uid_p).mappings().all()
             else:
                 rows = conn.execute(text(
-                    "SELECT * FROM debt_accounts WHERE is_active = true ORDER BY current_balance DESC"
-                )).mappings().all()
+                    f"SELECT * FROM debt_accounts WHERE is_active = true {uid_sql} ORDER BY current_balance DESC"
+                ), uid_p).mappings().all()
 
         debts = []
         for row in rows:

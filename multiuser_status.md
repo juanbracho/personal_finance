@@ -270,5 +270,17 @@ Phase 7 continued — Bug fixes from end-to-end Railway testing:
 - `base.html` — removed standalone "Admin" nav link (admins reach admin tools via Settings)
 - `admin.html` — still exists but unreachable; audit logs page at `/admin/audit-logs` still works
 
-**Pending:**
-- Data Management redesign (cloud vs local mode with appropriate export options per deployment context)
+**Bug 14: Data Management section broken / misleading after SQLite → PostgreSQL migration**
+- Root cause: The entire Data Management UI was designed around SQLite local files. When migrating to PostgreSQL (Neon), backup/restore routes were stubbed out (`flash("not available")`) but the template still rendered the old layout — "Export Database" button calling dead `downloadDatabase()` JS, "Import Database" row with a `.db` file picker, orange "Cloud Hosting Notice" that referenced the old SQLite backup flow, and "Create Local Backup" that flashedand redirected on both local and cloud. The feature was never rethought for the new stack.
+- Fix: Full Data Management redesign split into two modes based on `_auth_disabled()`:
+  - **Cloud mode** (Railway, real JWT): single "Export My Data" row (user-scoped JSON); neutral info note; no backup history, no import
+  - **Local mode** (dev JWT, local Neon/Postgres): "Export My Data" + "Create Local Backup" rows; Backup History section with per-file Download (anchor → GET `restore_backup`) + Delete (POST form) buttons; backups saved to `Desktop/data/backups/` as timestamped JSON
+- New helpers in `settings/routes.py`: `_is_local_mode()`, `_backups_dir()`, `_serial()`, `_export_all_data(uid)` (DRY; used by both `export_my_data` and `create_backup`)
+- `download_database()` simplified to redirect → `export_my_data` (admin gate removed)
+- Dead JS `downloadDatabase()` function removed from template
+- Files changed: `blueprints/settings/routes.py`, `templates/settings.html`
+
+**Bug 15: Flutter debt tab shows all users' debts instead of the logged-in user's**
+- Root cause: `api_debts_list()` (`GET /api/debts`) was missing `uid_clause()` entirely — both query branches (normal and show_paid_off) selected from `debt_accounts` with no `user_id` filter, so every authenticated user saw the full table
+- Fix: Added `uid_sql, uid_p = uid_clause()` and injected into both queries (`WHERE 1=1 {uid_sql}` for the all-statuses branch; `WHERE is_active = true {uid_sql}` for the active-only branch); params dict passed to `conn.execute()`
+- File changed: `blueprints/api/routes.py` — `api_debts_list()` only
