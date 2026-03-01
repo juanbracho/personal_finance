@@ -432,8 +432,12 @@ def api_categories():
             date_filter += " AND owner = :owner"
             params['owner'] = owner
         uid_sql, uid_p = uid_clause()
+        # date_filter is used in the plain transactions query (no JOIN).
         date_filter += f" {uid_sql}"
         params.update(uid_p)
+        # For the LEFT JOIN query, budget_templates also has user_id, making the
+        # bare reference ambiguous in PostgreSQL. Use a table-qualified variant.
+        joined_filter = date_filter.replace('AND user_id', 'AND t.user_id')
 
         with db.engine.connect() as conn:
             categories_df = _df(conn, f"""
@@ -445,8 +449,11 @@ def api_categories():
                        MAX(t.date) as last_used,
                        MIN(t.date) as first_used
                 FROM transactions t
-                LEFT JOIN budget_templates bt ON t.category = bt.category AND bt.is_active = true
-                WHERE {date_filter}
+                LEFT JOIN budget_templates bt
+                       ON t.category = bt.category
+                      AND bt.is_active = true
+                      AND bt.user_id = t.user_id
+                WHERE {joined_filter}
                 GROUP BY t.category, bt.budget_amount
                 ORDER BY total_amount DESC
             """, params)
