@@ -817,25 +817,22 @@ def add_category():
         name = data['name'].strip()
         if not name:
             return jsonify({'success': False, 'error': 'Category name required'}), 400
+        item_type = (data.get('type') or '').strip()  # Kakeibo type stored in notes column
 
         uid_sql, uid_p = uid_clause()
         uid = uid_p.get('_uid')
         with db.engine.begin() as conn:
-            count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE category = :name {uid_sql}"
-            ), {'name': name, **uid_p}).scalar()
-            if count > 0:
-                return jsonify({'success': False, 'error': 'Category already exists in transactions'}), 400
-
-            # Only insert if not already in budget_templates for this user
+            # Only reject if already in budget_templates (transactions may predate the template)
             existing = conn.execute(text(
                 f"SELECT COUNT(*) FROM budget_templates WHERE category = :name {uid_sql}"
             ), {'name': name, **uid_p}).scalar()
-            if existing == 0:
-                conn.execute(text("""
-                    INSERT INTO budget_templates (category, budget_amount, notes, is_active, user_id, created_at, updated_at)
-                    VALUES (:name, 0.00, :notes, true, :uid, :now, :now)
-                """), {'name': name, 'notes': 'Added via categories management', 'uid': uid, 'now': datetime.utcnow()})
+            if existing > 0:
+                return jsonify({'success': False, 'error': 'Category already exists'}), 400
+
+            conn.execute(text("""
+                INSERT INTO budget_templates (category, budget_amount, notes, is_active, user_id, created_at, updated_at)
+                VALUES (:name, 0.00, :notes, true, :uid, :now, :now)
+            """), {'name': name, 'notes': item_type or None, 'uid': uid, 'now': datetime.utcnow()})
 
         print(f"✅ Added category: {name}")
         return jsonify({'success': True, 'message': f'Category "{name}" added successfully'})
@@ -1032,35 +1029,54 @@ def delete_subcategory(subcategory_name):
 
 @api_bp.route('/categories/categories/<category_name>', methods=['PUT'])
 def edit_category(category_name):
-    """Edit an existing category"""
+    """Edit an existing category: rename and/or change its type."""
     try:
         data = request.get_json()
-        new_name = data['name'].strip()
+        new_name = (data.get('name') or '').strip()
+        # type key present (even if '') means the user explicitly set it
+        new_type = data.get('type', None)
+
         if not new_name:
             return jsonify({'success': False, 'error': 'Category name required'}), 400
-        if new_name == category_name:
+
+        name_changed = new_name != category_name
+        type_changed = new_type is not None
+
+        if not name_changed and not type_changed:
             return jsonify({'success': True, 'message': 'No changes needed'})
 
         uid_sql, uid_p = uid_clause()
         with db.engine.begin() as conn:
-            exists = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE category = :name {uid_sql}"
-            ), {'name': new_name, **uid_p}).scalar()
-            if exists > 0:
-                return jsonify({'success': False, 'error': 'Category name already exists'}), 400
+            if name_changed:
+                exists = conn.execute(text(
+                    f"SELECT COUNT(*) FROM transactions WHERE category = :name {uid_sql}"
+                ), {'name': new_name, **uid_p}).scalar()
+                if exists > 0:
+                    return jsonify({'success': False, 'error': 'Category name already exists'}), 400
 
-            conn.execute(text(f"""
-                UPDATE transactions SET category = :new_name, updated_at = :now
-                WHERE category = :old_name {uid_sql}
-            """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': category_name, **uid_p})
+                conn.execute(text(f"""
+                    UPDATE transactions SET category = :new_name, updated_at = :now
+                    WHERE category = :old_name {uid_sql}
+                """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': category_name, **uid_p})
 
-            conn.execute(text(f"""
-                UPDATE budget_templates SET category = :new_name, updated_at = :now
-                WHERE category = :old_name {uid_sql}
-            """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': category_name, **uid_p})
+                conn.execute(text(f"""
+                    UPDATE budget_templates SET category = :new_name, updated_at = :now
+                    WHERE category = :old_name {uid_sql}
+                """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': category_name, **uid_p})
 
-        print(f"✅ Renamed category from {category_name} to {new_name}")
-        return jsonify({'success': True, 'message': 'Category renamed successfully'})
+            if type_changed:
+                target_name = new_name if name_changed else category_name
+                conn.execute(text(f"""
+                    UPDATE budget_templates SET notes = :notes, updated_at = :now
+                    WHERE category = :cat_name {uid_sql}
+                """), {'notes': new_type.strip() or None, 'now': datetime.utcnow(),
+                       'cat_name': target_name, **uid_p})
+
+        parts = []
+        if name_changed: parts.append(f'renamed to "{new_name}"')
+        if type_changed: parts.append('type updated')
+        print(f"✅ Category {category_name}: {', '.join(parts)}")
+        return jsonify({'success': True, 'message': f'Category {" and ".join(parts)} successfully'})
     except Exception as e:
         print(f"❌ Error editing category: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1146,6 +1162,60 @@ def edit_account(account_name):
         return jsonify({'success': True, 'message': 'Account renamed successfully'})
     except Exception as e:
         print(f"❌ Error editing account: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/categories/owners/<owner_name>', methods=['DELETE'])
+def delete_owner(owner_name):
+    """Delete an owner (only if no transactions use it; also removes from user_owners)."""
+    try:
+        uid_sql, uid_p = uid_clause()
+        uid = uid_p.get('_uid')
+        with db.engine.begin() as conn:
+            count = conn.execute(text(
+                f"SELECT COUNT(*) FROM transactions WHERE owner = :name {uid_sql}"
+            ), {'name': owner_name, **uid_p}).scalar()
+
+            if count > 0:
+                return jsonify({
+                    'success': False,
+                    'error': f'Cannot delete: {count} transactions use this owner. Migrate them first.',
+                    'transaction_count': count
+                }), 400
+
+            if uid is not None:
+                conn.execute(text(
+                    "DELETE FROM user_owners WHERE name = :name AND user_id = :uid"
+                ), {'name': owner_name, 'uid': uid})
+
+        print(f"✅ Deleted owner: {owner_name}")
+        return jsonify({'success': True, 'message': f'Owner "{owner_name}" deleted'})
+    except Exception as e:
+        print(f"❌ Error deleting owner: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/categories/accounts/<account_name>', methods=['DELETE'])
+def delete_account(account_name):
+    """Delete an account (only if no transactions use it)."""
+    try:
+        uid_sql, uid_p = uid_clause()
+        with db.engine.connect() as conn:
+            count = conn.execute(text(
+                f"SELECT COUNT(*) FROM transactions WHERE account_name = :name {uid_sql}"
+            ), {'name': account_name, **uid_p}).scalar()
+
+        if count > 0:
+            return jsonify({
+                'success': False,
+                'error': f'Cannot delete: {count} transactions use this account. Migrate them first.',
+                'transaction_count': count
+            }), 400
+
+        print(f"✅ Deleted account: {account_name}")
+        return jsonify({'success': True, 'message': f'Account "{account_name}" deleted'})
+    except Exception as e:
+        print(f"❌ Error deleting account: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

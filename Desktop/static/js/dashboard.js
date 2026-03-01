@@ -10,6 +10,9 @@ let dashboardState = {
     chartData: {}
 };
 
+// Set when a delete is deferred pending migration; auto-deleted after migrate succeeds.
+let _pendingDeleteAfterMigration = null;
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Loading enhanced dashboard...');
@@ -854,9 +857,10 @@ function deleteItem(type, name, transactionCount) {
     console.log(`🗑️ Deleting ${type}: ${name}`);
     
     if (transactionCount > 0) {
-        if (!confirm(`This ${type} has ${transactionCount} transactions. Deleting it will require migrating these transactions. Do you want to proceed?`)) {
+        if (!confirm(`"${name}" has ${transactionCount} transaction(s). You must reassign them before deleting. Click OK to choose a new ${type} for those transactions.`)) {
             return;
         }
+        _pendingDeleteAfterMigration = { type, name };
         showMigrationModal(type, name, transactionCount);
         return;
     }
@@ -953,10 +957,14 @@ function showMigrationModal(type, name, transactionCount) {
         .catch(error => {
             previewEl.innerHTML = '<div class="text-danger">Error loading preview</div>';
         });
-    
-    // Show modal
+
+    // Show modal; reset pending delete flag if user dismisses without migrating
     if (typeof bootstrap !== 'undefined' && modal) {
         const bsModal = new bootstrap.Modal(modal);
+        modal.addEventListener('hidden.bs.modal', function onHide() {
+            _pendingDeleteAfterMigration = null;
+            modal.removeEventListener('hidden.bs.modal', onHide);
+        });
         bsModal.show();
     }
 }
@@ -983,25 +991,38 @@ function executeMigration() {
     })
     .then(result => {
         if (result.success) {
-            FinanceUtils.showAlert(result.message, 'success');
-            
-            // Hide migration modal
+            // Hide migration modal first
             const migrationModal = document.getElementById('migrationModal');
             if (typeof bootstrap !== 'undefined' && migrationModal) {
                 const bsModal = bootstrap.Modal.getInstance(migrationModal);
                 if (bsModal) bsModal.hide();
             }
-            
-            // Reload current tab data
-            const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
-            if (activeTab) {
-                const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
-                loadTabData(targetTab);
+
+            // Auto-delete the now-empty item if migration was triggered from deleteItem()
+            const pending = _pendingDeleteAfterMigration;
+            _pendingDeleteAfterMigration = null;
+
+            if (pending) {
+                const delUrl = `/api/categories/${pending.type === 'category' ? 'categories' : pending.type + 's'}/${encodeURIComponent(pending.name)}`;
+                FinanceUtils.apiCall(delUrl, { method: 'DELETE' })
+                    .then(delResult => {
+                        if (delResult.success) {
+                            FinanceUtils.showAlert(`Migrated and deleted "${pending.name}" successfully.`, 'success');
+                        } else {
+                            // Migration succeeded but delete failed — show both outcomes
+                            FinanceUtils.showAlert(`Transactions migrated. Could not delete "${pending.name}": ${delResult.error}`, 'warning');
+                        }
+                        reloadAfterMigration();
+                    })
+                    .catch(() => {
+                        FinanceUtils.showAlert('Transactions migrated. Delete step failed — please retry.', 'warning');
+                        reloadAfterMigration();
+                    });
+            } else {
+                FinanceUtils.showAlert(result.message, 'success');
+                reloadAfterMigration();
             }
-            
-            // Update statistics
-            updateStatistics();
-            
+
         } else {
             FinanceUtils.showAlert(`Error: ${result.error}`, 'danger');
         }
@@ -1010,6 +1031,15 @@ function executeMigration() {
         console.error('Error executing migration:', error);
         FinanceUtils.showAlert('Error executing migration', 'danger');
     });
+}
+
+function reloadAfterMigration() {
+    const activeTab = document.querySelector('#managementTabs [data-bs-toggle="tab"].active');
+    if (activeTab) {
+        const targetTab = activeTab.getAttribute('data-bs-target').replace('#', '');
+        loadTabData(targetTab);
+    }
+    updateStatistics();
 }
 
 function updateStatistics() {

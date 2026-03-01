@@ -5,8 +5,8 @@
 
 ## Current State
 
-**Active Phase:** Phase 5 — New User Onboarding Flow
-**Overall Progress:** Phase 4 complete ✅
+**Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
+**Overall Progress:** Phase 6 complete ✅
 **Last Session:** February 2026
 
 ---
@@ -176,4 +176,23 @@ Phase 6 (Flutter JWT + 401 handling) implemented:
 - `main.dart` — `import 'services/api_service.dart'` added; `ApiService.onUnauthorized` wired to `_authNotifier.logout(expired: true)` after `_authNotifier.init()`
 - `screens/login_screen.dart` — conditional banner rendered at top of login card when `authNotifier.sessionExpiredRemotely` is true; disappears automatically on next successful login
 
-**Phase 6 complete.** Next: Phase 7 (Debug: end-to-end test of Phases 4 + 5 + 6 together).
+**Phase 6 complete.** Next: Phase 7 (Bug fixes + end-to-end test of Phases 4 + 5 + 6 together).
+
+### February 2026 — Session 10
+Phase 7 — Bug fixes discovered after deploying to Railway + Neon:
+
+**Bug 1: Web app defaulting to wrong month (UTC vs local time)**
+- Root cause: Railway runs in UTC; `datetime.now()` returned March 1 for US timezones late in the evening
+- Fix (part 1): Added `local_now()` to `utils.py` — reads `kanso_tz` cookie (set by browser JS) first, falls back to `APP_TIMEZONE` env var, then UTC; used as drop-in replacement for `datetime.now()` across all blueprints
+- Fix (part 2): Added JS snippet to `base.html` `<head>` — (a) writes `kanso_tz=<IANA timezone>` cookie on every page load; (b) on first-ever visit (cookie not yet set), redirects date-sensitive pages (`/dashboard/*`, `/budget`) with explicit `?month=&year=` from `new Date()` before body renders — no flash of wrong content
+- Files changed: `utils.py`, `config.py`, `templates/base.html`, all 5 blueprint files (`dashboards/routes.py`, `dashboards/views.py`, `budgets/routes.py`, `api/routes.py`, `analytics/routes.py`)
+
+**Bug 2: Flutter mobile app showing wrong month (same root cause, different path)**
+- Root cause: `app_providers.dart` was parsing the `period` field from the API response (UTC server time) and using it to display the month label, overriding the correct device-local month/year already stored in providers
+- Fix: Removed the `period` string parsing; `monthName` and `yearStr` now derived directly from `month`/`year` provider values (device-local time)
+- File changed: `Mobile/finance_dashboard_mobile/lib/providers/app_providers.dart`
+
+**Bug 3: Categories tab showing "No categories found" despite data existing**
+- Root cause: `api_categories()` in `blueprints/api/routes.py` uses a LEFT JOIN between `transactions` and `budget_templates`; both tables have a `user_id` column; PostgreSQL threw "column reference 'user_id' is ambiguous"; exception was silently caught and returned `{error: ...}`; JS received a non-array and displayed empty state
+- Fix: Introduced `joined_filter` (same as `date_filter` but with `AND t.user_id` instead of `AND user_id`) for the LEFT JOIN query; also added `AND bt.user_id = t.user_id` to the JOIN condition for proper multi-user scoping
+- File changed: `blueprints/api/routes.py` — `api_categories()` function only
