@@ -418,6 +418,36 @@ body {
     gap: 8px;
 }
 
+/* ── Table (used inside kanso-card) ─────────────────────── */
+
+.kanso-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    color: var(--text);
+}
+
+.kanso-table thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.kanso-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+}
+
+.kanso-table tbody tr:last-child td { border-bottom: none; }
+.kanso-table tbody tr:hover td { background: var(--surface-raised); }
+
 /* ── Info strip (top status bar) ─────────────────────────── */
 
 .kanso-info-strip {
