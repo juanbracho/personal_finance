@@ -172,7 +172,8 @@ def delete_all_data():
         tables = [
             'debt_payments', 'debt_accounts', 'budget_commitments',
             'budget_subcategory_templates', 'monthly_budgets', 'unexpected_expenses',
-            'budget_templates', 'transactions'
+            'budget_templates', 'transactions',
+            'custom_types', 'custom_subcategories', 'custom_accounts', 'user_owners'
         ]
         uid = current_user_id()
         uid_where = "WHERE user_id = :uid" if uid is not None else ""

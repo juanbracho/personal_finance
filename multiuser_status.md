@@ -284,3 +284,11 @@ Phase 7 continued — Bug fixes from end-to-end Railway testing:
 - Root cause: `api_debts_list()` (`GET /api/debts`) was missing `uid_clause()` entirely — both query branches (normal and show_paid_off) selected from `debt_accounts` with no `user_id` filter, so every authenticated user saw the full table
 - Fix: Added `uid_sql, uid_p = uid_clause()` and injected into both queries (`WHERE 1=1 {uid_sql}` for the all-statuses branch; `WHERE is_active = true {uid_sql}` for the active-only branch); params dict passed to `conn.execute()`
 - File changed: `blueprints/api/routes.py` — `api_debts_list()` only
+
+**Bug 16: Danger Zone — stale description and incomplete delete scope**
+- Root cause 1: Description said "A backup is created automatically before deletion" — true in the SQLite era (file copy), false with PostgreSQL. No auto-backup exists.
+- Root cause 2: `delete_all_data()` table list was missing `custom_types`, `custom_subcategories`, `custom_accounts`, `user_owners` (all added in Session 11); deleting a user's data left those rows behind.
+- Root cause 3: Description was not mode-aware — always said "all financial data" regardless of whether cloud scoping meant only the user's rows would be deleted.
+- Fix (backend): Added the four missing tables to the FK-safe delete list in `delete_all_data()`
+- Fix (template): Removed false auto-backup claim; description now conditional (`local_mode`: "all financial data" / cloud: "all your financial data"); added "Download backup →" link pointing to `export_my_data` so users can save a copy before wiping
+- Files changed: `blueprints/settings/routes.py` (`delete_all_data()` table list), `templates/settings.html` (danger zone description)

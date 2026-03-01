@@ -319,10 +319,20 @@
                 Delete All Data
             </div>
             <div class="kanso-danger-body">
-                <p style="font-size:13.5px; color:var(--text-muted); margin:0 0 14px;">
+                <p style="font-size:13.5px; color:var(--text-muted); margin:0 0 8px;">
+                    {% if local_mode %}
                     Permanently deletes all financial data from the database.
-                    A backup is created automatically before deletion.
-                    <strong style="color:var(--text);">This cannot be easily undone.</strong>
+                    {% else %}
+                    Permanently deletes all your financial data.
+                    {% endif %}
+                    <strong style="color:var(--text);">This cannot be undone.</strong>
+                </p>
+                <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px;">
+                    We recommend downloading a backup before continuing. &nbsp;
+                    <a href="{{ url_for('settings.export_my_data') }}"
+                       style="color:var(--primary); text-decoration:none; font-weight:500;">
+                        Download backup →
+                    </a>
                 </p>
                 <form action="{{ url_for('settings.delete_all_data') }}" method="POST" id="deleteForm">
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
