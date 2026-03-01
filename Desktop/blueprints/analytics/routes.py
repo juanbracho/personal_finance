@@ -12,6 +12,20 @@ def _df(conn, sql, params=None):
     return pd.read_sql_query(text(sql), conn, params=params or {})
 
 
+def _year_expr():
+    """Return a SQL fragment that extracts the year as an integer, compatible with both Postgres and SQLite."""
+    if db.engine.dialect.name == 'sqlite':
+        return "CAST(strftime('%Y', date) AS INTEGER)"
+    return "EXTRACT(YEAR FROM date)::integer"
+
+
+def _month_expr():
+    """Return a SQL fragment that extracts the month as an integer, compatible with both Postgres and SQLite."""
+    if db.engine.dialect.name == 'sqlite':
+        return "CAST(strftime('%m', date) AS INTEGER)"
+    return "EXTRACT(MONTH FROM date)::integer"
+
+
 def _build_analytics_filters(args):
     """Build WHERE clause and named params dict from analytics request args."""
     filters = []
@@ -71,7 +85,7 @@ def analytics_dashboard():
         uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             years_df = _df(conn, f"""
-                SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
+                SELECT DISTINCT {_year_expr()} AS year
                 FROM transactions WHERE COALESCE(is_active, true) = true {uid_sql} ORDER BY year DESC
             """, uid_p)
             available_years = [int(y) for y in years_df['year'].tolist() if y is not None]
@@ -137,7 +151,7 @@ def analytics_dashboard():
         print(f"❌ Error loading analytics dashboard: {e}")
         import traceback
         traceback.print_exc()
-        return render_template('analytics/analytics.html',
+        return render_template('analytics.html',
                              available_years=[local_now().year - 1, local_now().year],
                              available_owners=[],
                              available_categories=[],
@@ -404,8 +418,8 @@ def get_monthly_spending_matrix(conn, filter_type=None, filter_value=None):
     params.update(uid_p)
 
     df = pd.read_sql_query(text(f"""
-        SELECT EXTRACT(YEAR FROM date)::integer AS year,
-               EXTRACT(MONTH FROM date)::integer AS month,
+        SELECT {_year_expr()} AS year,
+               {_month_expr()} AS month,
                SUM(amount) AS total
         FROM transactions
         WHERE COALESCE(is_active, true) = true{extra} {uid_sql}

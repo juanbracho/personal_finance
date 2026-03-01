@@ -24,6 +24,7 @@ function initializeAnalytics() {
     setupPresetButtons();
     setupToggleFilters();
     setupYoYControls();
+    setupYoYCollapse();
 
     // Load initial data
     loadInitialCharts();
@@ -91,24 +92,29 @@ function setupPresetButtons() {
 }
 
 function setupToggleFilters() {
-    const toggleBtn = document.getElementById('toggleFilters');
-    const filterPanel = document.getElementById('filterPanel');
-    
-    if (toggleBtn && filterPanel) {
-        toggleBtn.addEventListener('click', function() {
-            filterPanel.classList.toggle('collapsed');
-            const icon = this.querySelector('i');
-            if (filterPanel.classList.contains('collapsed')) {
-                icon.className = 'fas fa-filter-circle-xmark';
-                this.textContent = ' Show Filters';
-                this.prepend(icon);
-            } else {
-                icon.className = 'fas fa-filter';
-                this.textContent = ' Filters';
-                this.prepend(icon);
-            }
-        });
+    const header  = document.getElementById('filterPanelHeader');
+    const body    = document.getElementById('filterPanelBody');
+    const chevron = document.getElementById('filterChevron');
+    const extBtn  = document.getElementById('toggleFilters');
+
+    function toggleFilter() {
+        const isCollapsed = body.classList.toggle('collapsed');
+        chevron.classList.toggle('rotated', isCollapsed);
     }
+
+    if (header && body) header.addEventListener('click', toggleFilter);
+    if (extBtn)         extBtn.addEventListener('click', toggleFilter);
+}
+
+function setupYoYCollapse() {
+    const header  = document.getElementById('yoyPanelHeader');
+    const body    = document.getElementById('yoyPanelBody');
+    const chevron = document.getElementById('yoyChevron');
+    if (!header || !body) return;
+    header.addEventListener('click', function() {
+        const isCollapsed = body.classList.toggle('collapsed');
+        chevron.classList.toggle('rotated', isCollapsed);
+    });
 }
 
 function applyDatePreset(preset) {
@@ -1218,7 +1224,7 @@ function renderMonthlySpendingMatrixTable(matrix) {
     years.forEach((year, yIdx) => {
         html += `<tr><th>${year}</th>`;
         months.forEach(m => {
-            const cell = matrix[year][m] || {total: 0, pct_change: null};
+            const cell = matrix[year][String(parseInt(m, 10))] || {total: 0, pct_change: null};
             html += `<td>$${cell.total.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>`;
             if (yIdx === 0) {
                 html += '<td>-</td>';

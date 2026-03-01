@@ -27,10 +27,13 @@
 
     <!-- Filter Panel -->
     <div class="kanso-card" id="filterPanel" style="margin-bottom:16px; padding:0; overflow:hidden;">
-        <div style="padding:12px 18px; border-bottom:1px solid var(--border-subtle);">
+        <div id="filterPanelHeader" style="padding:12px 18px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;">
             <span style="font-size:13px; font-weight:600; color:var(--text);">Filter Options</span>
+            <svg id="filterChevron" class="anl-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:var(--text-muted); transition:transform 0.2s ease; flex-shrink:0;">
+                <path d="M5 7.5l5 5 5-5"/>
+            </svg>
         </div>
-        <div style="padding:16px 18px;">
+        <div id="filterPanelBody" class="anl-panel-body" style="padding:16px 18px;">
             <form id="analyticsFilters">
 
                 <!-- Row 1 — Date + Presets -->
@@ -141,9 +144,14 @@
 
     <!-- Monthly Spending Matrix -->
     <div class="kanso-card" style="padding:0; overflow:hidden; margin-bottom:16px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--border-subtle); flex-wrap:wrap; gap:10px;">
-            <span style="font-size:13px; font-weight:600; color:var(--text);">Year-Over-Year Monthly Spending</span>
-            <div style="display:flex; align-items:center; gap:10px;">
+        <div id="yoyPanelHeader" style="display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--border-subtle); flex-wrap:wrap; gap:10px; cursor:pointer; user-select:none;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; font-weight:600; color:var(--text);">Year-Over-Year Monthly Spending</span>
+                <svg id="yoyChevron" class="anl-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:var(--text-muted); transition:transform 0.2s ease; flex-shrink:0;">
+                    <path d="M5 7.5l5 5 5-5"/>
+                </svg>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;" onclick="event.stopPropagation();">
                 <div class="anl-view-toggle">
                     <input type="radio" id="yoyViewYearly" name="yoyViewType" value="yearly" checked
                            style="position:absolute;opacity:0;width:0;height:0;">
@@ -159,7 +167,7 @@
                 </div>
             </div>
         </div>
-        <div style="padding:16px 18px;">
+        <div id="yoyPanelBody" class="anl-panel-body" style="padding:16px 18px;">
             <div id="monthlySpendingMatrixContainer">
                 <div style="text-align:center; color:var(--text-muted); font-size:13.5px;">Loading table…</div>
             </div>

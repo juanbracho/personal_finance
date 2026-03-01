@@ -7,7 +7,7 @@
 
 **Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
 **Overall Progress:** Phase 6 complete ✅
-**Last Session:** February 2026 — Session 13 (Bugs 14–17 + admin user management: Change Password, Delete User)
+**Last Session:** February 2026 — Session 13 (Bugs 14–19 + admin user management + password policy)
 
 ---
 
@@ -307,3 +307,35 @@ Phase 7 continued — Settings page overhaul + cross-user data leak in Flutter:
 - Added `POST /admin/users/<id>/delete` — deletes all user data (same FK-safe table order as `delete_all_data` + `revoked_tokens`), then removes the `User` record; blocked for self; audit logs `user_deleted` with username
 - Template: Actions column replaced with a flex button group (Deactivate/Activate, Change Pwd, Delete); Deactivate and Delete hidden for the currently logged-in admin (`session.get('user_id')`); "Change Pwd" toggles an inline `<tr>` form row beneath the user row with a password input + Set/Cancel buttons; `togglePwdForm(userId)` JS added
 - Files changed: `blueprints/admin/routes.py`, `templates/settings.html`
+
+**Feature: Password strength policy**
+- Added `_validate_password()` helper in `admin/routes.py` (imported `re`): checks min 8 chars, ≥1 uppercase, ≥1 number, ≥1 special character; returns first failing message or `None`
+- Applied to both `create_user()` (previously no validation) and `change_password()` (previously length-only)
+- Client-side: `.pwd-strength-input` class + adjacent `<ul class="pwd-req-list">` on both password fields; JS IIFE attaches `input` listener per field, shows/hides list and toggles `.met` class per rule as user types
+- CSS: `.pwd-req-list` + `.pwd-req-list li` + `.pwd-req-list li.met` added to `kanso.css` (○ gray → ✓ green)
+- Files changed: `blueprints/admin/routes.py`, `static/css/kanso.css`, `templates/settings.html`
+
+**Bug 18: Admin section — no gap between users table card and Create User card**
+- Root cause: Global `.kanso-card + .kanso-card { margin-top: 1px; }` rule too tight for adjacent section cards
+- Fix: `margin-top: 10px` inline on the Create User card div
+- File changed: `templates/settings.html`
+
+**Bug 19: Audit Logs — filter form flush against card edges; redundant inline styles on table card**
+- Root cause: Filter `.kanso-card` had no padding; content was flush to card edges. Table card had redundant `padding:0; overflow:hidden` and table had `margin:0` (both already provided by `.kanso-card` and `.kanso-table`)
+- Fix: Added `padding: 16px 18px` to filter card; cleaned up redundant inline styles on table card and table element
+- File changed: `templates/admin_audit_logs.html`
+
+---
+
+### Session 13 — Full Bug Summary
+
+| # | Area | Description |
+|---|------|-------------|
+| 14 | Settings / Data Management | Full redesign for local vs cloud mode after SQLite→PG migration |
+| 15 | Flutter `/api/debts` | Missing `uid_clause()` — all users saw all debts |
+| 16 | Settings / Danger Zone | False auto-backup claim; 4 tables missing from delete; not mode-aware |
+| 17 | Settings / Admin table | `.kanso-table` class had no CSS — zero padding, cramped layout |
+| — | Admin | Added Change Password + Delete User routes + inline UI |
+| — | Security | Password policy enforced server-side + live checklist client-side |
+| 18 | Settings / Admin cards | 1px gap between users table and Create User card |
+| 19 | Audit Logs | Filter card no padding; redundant inline styles cleaned up |

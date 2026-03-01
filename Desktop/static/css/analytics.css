@@ -5,9 +5,13 @@
     margin-bottom: 1.5rem;
 }
 
-/* ID-based selector — JS toggles .collapsed on #filterPanel */
-#filterPanel.collapsed {
+/* Collapsible panel body — JS toggles .collapsed on the body div */
+.anl-panel-body.collapsed {
     display: none;
+}
+/* Chevron rotates when panel is collapsed */
+.anl-chevron.rotated {
+    transform: rotate(-90deg);
 }
 
 /* Filter Form Elements */
