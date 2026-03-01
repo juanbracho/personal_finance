@@ -59,6 +59,7 @@ def create_app(config_class=None):
     from blueprints.analytics.routes import analytics_bp
     from blueprints.settings.routes import settings_bp
     from blueprints.admin.routes import admin_bp
+    from blueprints.onboarding.routes import onboarding_bp
 
     from auth import check_jwt, check_web_session, auth_bp
     api_bp.before_request(check_jwt)
@@ -73,6 +74,7 @@ def create_app(config_class=None):
     app.register_blueprint(analytics_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(onboarding_bp)
 
     @app.template_filter('currency')
     def currency_filter(value):

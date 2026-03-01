@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Welcome — Kanso{% endblock %}
+
+{% block content %}
+<div class="kanso-page" style="max-width: 600px; margin: 0 auto;">
+
+    <!-- Page header -->
+    <div class="kanso-page-header">
+        <h1 class="kanso-page-title">Welcome, {{ user.username }}!</h1>
+        <p class="kanso-page-subtitle">Let's get your account set up</p>
+    </div>
+
+    <form action="{{ url_for('onboarding.onboarding_complete') }}" method="POST">
+
+        <!-- Owner name card -->
+        <div class="kanso-section">
+            <div class="kanso-section-label">Step 1 — Your name</div>
+            <div class="kanso-card">
+                <label class="kanso-label" for="owner_name">
+                    What name should appear on your transactions?
+                </label>
+                <input
+                    type="text"
+                    id="owner_name"
+                    name="owner_name"
+                    class="kanso-input"
+                    value="{{ user.username }}"
+                    maxlength="50"
+                    required
+                    style="margin-top: 8px;"
+                >
+                <p style="margin-top: 8px; font-size: 12.5px; color: var(--text-muted);">
+                    This is how you'll identify your spending (e.g. your first name).
+                    You can add more owners later in Settings.
+                </p>
+            </div>
+        </div>
+
+        <!-- Starter categories card -->
+        <div class="kanso-section">
+            <div class="kanso-section-label">Step 2 — Starter budget categories</div>
+            <div class="kanso-card">
+                <p style="margin-bottom: 12px; font-size: 13.5px; color: var(--text-secondary);">
+                    We'll create these 13 categories for you:
+                </p>
+                <ul style="
+                    list-style: none;
+                    margin: 0;
+                    padding: 0;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 6px 16px;
+                ">
+                    {% for seed in category_seeds %}
+                    <li style="
+                        font-size: 13px;
+                        color: var(--text-secondary);
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    ">
+                        <span style="color: var(--primary); font-size: 10px;">&#9679;</span>
+                        {{ seed.category }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">
+                    You can adjust amounts and add more in Budget settings anytime.
+                </p>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div style="text-align: right; padding-bottom: 32px;">
+            <button type="submit" class="btn-kanso btn-kanso-primary">
+                Get Started &rarr;
+            </button>
+        </div>
+
+    </form>
+
+</div>
+{% endblock %}

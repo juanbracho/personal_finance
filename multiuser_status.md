@@ -19,8 +19,9 @@
 | 2 | Auth Overhaul (JWT, password hashing, session update) | ✅ Complete |
 | 3 | Route Scoping (user_id on all queries) | ✅ Complete |
 | 4 | Admin Panel & User Management | ✅ Complete |
-| 5 | New User Onboarding Flow | ⏳ Pending |
-| 6 | Flutter Update (JWT + 401 handling) | ⏳ Pending |
+| 5 | New User Onboarding Flow | ✅ Complete |
+| 6 | Flutter Update (JWT + 401 handling) | ✅ Complete |
+| 7 | Debug: end-to-end test of Phases 4 + 5 + 6 together | ⏳ Pending |
 
 ---
 
@@ -152,3 +153,27 @@ Phase 4 (Admin Panel / User Management) implemented:
 **Known issue:** Page loads are slow on Railway (observed Feb 2026). Investigate DB connection pooling / cold-start latency in a future session.
 
 **Phase 4 complete.** Next: Phase 5 (New User Onboarding Flow).
+
+### February 2026 — Session 8
+Phase 5 (New User Onboarding Flow) implemented:
+- Neon DB — `ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded BOOLEAN NOT NULL DEFAULT FALSE`; `UPDATE users SET onboarded = TRUE WHERE username = 'suricata'`
+- `models.py` — `onboarded` field added to `User` model
+- `auth.py` — after successful login, redirect to `/onboarding` if `not user.onboarded`; `/onboarding` and `/onboarding/complete` added to `_SKIP_ENDPOINTS` to prevent session-redirect loops
+- `blueprints/onboarding/__init__.py` — new (empty)
+- `blueprints/onboarding/routes.py` — GET `/onboarding` (welcome page); POST `/onboarding/complete` (seeds user_owners + budget_templates, marks onboarded=TRUE, logs audit)
+- `templates/onboarding.html` — welcome page; owner-name field pre-filled with username; 13 starter categories listed; single "Get Started →" submit
+- `app.py` — `onboarding_bp` imported and registered
+
+Dev mode: `/onboarding` redirects straight to dashboard (no-op).
+suricata: already marked `onboarded=TRUE` — goes straight to dashboard.
+
+**Phase 5 complete.** Next: Phase 6 (Flutter JWT + 401 handling).
+
+### February 2026 — Session 9
+Phase 6 (Flutter JWT + 401 handling) implemented:
+- `services/api_service.dart` — `static onUnauthorized` callback added; called (if set) before `throw ApiException` in both `_getRaw` and `_post` when `statusCode == 401`
+- `auth_notifier.dart` — `_sessionExpiredRemotely` bool field + getter added; `logout({bool expired})` sets it; `setLoggedIn(true)` resets it
+- `main.dart` — `import 'services/api_service.dart'` added; `ApiService.onUnauthorized` wired to `_authNotifier.logout(expired: true)` after `_authNotifier.init()`
+- `screens/login_screen.dart` — conditional banner rendered at top of login card when `authNotifier.sessionExpiredRemotely` is true; disappears automatically on next successful login
+
+**Phase 6 complete.** Next: Phase 7 (Debug: end-to-end test of Phases 4 + 5 + 6 together).

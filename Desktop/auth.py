@@ -130,7 +130,7 @@ def check_jwt():
 # ---------------------------------------------------------------------------
 
 _SKIP_PATHS = ('/static/', '/api/')
-_SKIP_ENDPOINTS = ('auth.login', 'auth.logout')
+_SKIP_ENDPOINTS = ('auth.login', 'auth.logout', 'onboarding.onboarding', 'onboarding.onboarding_complete')
 
 
 def _session_valid():
@@ -168,6 +168,9 @@ def check_web_session():
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if _auth_disabled():
+        return redirect(url_for('dashboards.dashboard'))
+
     if session.get('user_id') and _session_valid():
         return redirect(url_for('dashboards.dashboard'))
 
@@ -184,6 +187,8 @@ def login():
             session['login_time'] = time.time()
             session['role'] = user.role
             _log_audit('login_success', user_id=user.id, extra={'username': username})
+            if not user.onboarded:
+                return redirect(url_for('onboarding.onboarding'))
             next_url = request.args.get('next') or url_for('dashboards.dashboard')
             return redirect(next_url)
 

@@ -135,7 +135,7 @@
         </a>
 
         <!-- Sign out -->
-        {% if session.get('logged_in') %}
+        {% if session.get('user_id') %}
         <a href="{{ url_for('auth.logout') }}" class="kanso-signout" title="Sign out">
             Sign out
         </a>
