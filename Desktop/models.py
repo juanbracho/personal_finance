@@ -74,6 +74,27 @@ class CustomType(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'name'),)
 
 
+class CustomSubcategory(db.Model):
+    __tablename__ = 'custom_subcategories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    name = db.Column(db.Text, nullable=False)
+    category = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'name'),)
+
+
+class CustomAccount(db.Model):
+    __tablename__ = 'custom_accounts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    name = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'name'),)
+
+
 # ============================================================================
 # Existing models — user_id added (nullable for migration; made NOT NULL later)
 # ============================================================================

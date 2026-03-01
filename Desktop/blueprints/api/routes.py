@@ -417,51 +417,60 @@ def dashboard_summary():
 
 @api_bp.route('/categories/categories')
 def api_categories():
-    """Get categories with statistics"""
+    """Get categories. Starts from budget_templates so newly added categories (0 transactions)
+    appear immediately; LEFT JOINs transaction aggregates for stats."""
     try:
         year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
-        date_filter = "EXTRACT(YEAR FROM date)::integer = :year"
+        date_filter = "EXTRACT(YEAR FROM t.date)::integer = :year"
         params = {'year': year}
         if month != 'all':
-            date_filter += " AND EXTRACT(MONTH FROM date)::integer = :month"
+            date_filter += " AND EXTRACT(MONTH FROM t.date)::integer = :month"
             params['month'] = int(month)
         if owner != 'all':
-            date_filter += " AND owner = :owner"
+            date_filter += " AND t.owner = :owner"
             params['owner'] = owner
         uid_sql, uid_p = uid_clause()
-        # date_filter is used in the plain transactions query (no JOIN).
-        date_filter += f" {uid_sql}"
+        uid = uid_p.get('_uid')
         params.update(uid_p)
-        # For the LEFT JOIN query, budget_templates also has user_id, making the
-        # bare reference ambiguous in PostgreSQL. Use a table-qualified variant.
-        joined_filter = date_filter.replace('AND user_id', 'AND t.user_id')
+
+        bt_uid_cond = 'bt.user_id = :_uid' if uid else '1=1'
+        t_uid_cond = f"AND t.user_id = :_uid" if uid else ''
 
         with db.engine.connect() as conn:
+            # Anchor on budget_templates so zero-transaction categories are included
             categories_df = _df(conn, f"""
-                SELECT t.category,
-                       COUNT(*) as transaction_count,
-                       SUM(t.amount) as total_amount,
-                       AVG(t.amount) as avg_amount,
+                SELECT bt.category,
                        bt.budget_amount,
-                       MAX(t.date) as last_used,
-                       MIN(t.date) as first_used
-                FROM transactions t
-                LEFT JOIN budget_templates bt
-                       ON t.category = bt.category
-                      AND bt.is_active = true
-                      AND bt.user_id = t.user_id
-                WHERE {joined_filter}
-                GROUP BY t.category, bt.budget_amount
+                       bt.notes AS bt_type,
+                       COALESCE(agg.transaction_count, 0) AS transaction_count,
+                       COALESCE(agg.total_amount, 0)      AS total_amount,
+                       COALESCE(agg.avg_amount, 0)        AS avg_amount,
+                       agg.last_used,
+                       agg.first_used
+                FROM budget_templates bt
+                LEFT JOIN (
+                    SELECT category,
+                           COUNT(*) AS transaction_count,
+                           SUM(amount) AS total_amount,
+                           AVG(amount) AS avg_amount,
+                           MAX(date) AS last_used,
+                           MIN(date) AS first_used
+                    FROM transactions t
+                    WHERE {date_filter} {t_uid_cond}
+                    GROUP BY category
+                ) agg ON bt.category = agg.category
+                WHERE bt.is_active = true AND {bt_uid_cond}
                 ORDER BY total_amount DESC
             """, params)
 
+            # Most-common type per category (for categories that have transactions)
             type_df = _df(conn, f"""
-                SELECT category, type, COUNT(*) as type_count
-                FROM transactions
-                WHERE {date_filter}
+                SELECT category, type, COUNT(*) AS type_count
+                FROM transactions t
+                WHERE EXTRACT(YEAR FROM t.date)::integer = :year {t_uid_cond}
                 GROUP BY category, type
                 ORDER BY category, type_count DESC
             """, params)
@@ -473,15 +482,18 @@ def api_categories():
 
         result = []
         for _, row in categories_df.iterrows():
+            cat = str(row['category'])
+            # Prefer transaction-derived type; fall back to budget_templates.notes
+            cat_type = category_types.get(cat) or (str(row['bt_type']) if row['bt_type'] else '')
             result.append({
-                'name': str(row['category']),
-                'type': category_types.get(row['category'], ''),
+                'name': cat,
+                'type': cat_type,
                 'transaction_count': int(row['transaction_count']),
                 'total_amount': float(row['total_amount']),
                 'avg_amount': float(row['avg_amount']),
                 'budget_amount': float(row['budget_amount']) if row['budget_amount'] else 0.0,
-                'last_used': str(row['last_used']),
-                'first_used': str(row['first_used'])
+                'last_used': str(row['last_used']) if row['last_used'] else '—',
+                'first_used': str(row['first_used']) if row['first_used'] else '—',
             })
 
         print(f"📊 Returning {len(result)} categories")
@@ -493,7 +505,8 @@ def api_categories():
 
 @api_bp.route('/categories/subcategories')
 def api_subcategories():
-    """Get subcategories with statistics"""
+    """Get subcategories. UNIONs transaction-derived subcategories with custom_subcategories
+    (0 transactions) so newly added ones appear immediately."""
     try:
         year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
@@ -510,6 +523,7 @@ def api_subcategories():
         uid_sql, uid_p = uid_clause()
         date_filter += f" {uid_sql}"
         params.update(uid_p)
+        uid = uid_p.get('_uid')
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
@@ -527,6 +541,25 @@ def api_subcategories():
                 ORDER BY total_amount DESC
             """, params)
 
+            # Custom subcategories with no transactions yet
+            if uid is not None:
+                cs_rows = conn.execute(text("""
+                    SELECT name, category FROM custom_subcategories
+                    WHERE user_id = :uid
+                    AND name NOT IN (
+                        SELECT DISTINCT sub_category FROM transactions
+                        WHERE user_id = :uid AND sub_category IS NOT NULL AND sub_category != ''
+                    )
+                """), {'uid': uid}).fetchall()
+            else:
+                cs_rows = conn.execute(text("""
+                    SELECT name, category FROM custom_subcategories WHERE user_id IS NULL
+                    AND name NOT IN (
+                        SELECT DISTINCT sub_category FROM transactions
+                        WHERE sub_category IS NOT NULL AND sub_category != ''
+                    )
+                """)).fetchall()
+
         result = [{
             'name': str(row['name']),
             'category': str(row['category']),
@@ -537,6 +570,17 @@ def api_subcategories():
             'first_used': str(row['first_used'])
         } for _, row in df.iterrows()]
 
+        for row in cs_rows:
+            result.append({
+                'name': str(row[0]),
+                'category': str(row[1]),
+                'transaction_count': 0,
+                'total_amount': 0.0,
+                'avg_amount': 0.0,
+                'last_used': '—',
+                'first_used': '—',
+            })
+
         print(f"🏷️ Returning {len(result)} subcategories")
         return jsonify(result)
     except Exception as e:
@@ -546,7 +590,8 @@ def api_subcategories():
 
 @api_bp.route('/categories/owners')
 def api_owners():
-    """Get owners with statistics"""
+    """Get owners. UNIONs transaction-derived owners with user_owners entries
+    (0 transactions) so newly added owners appear immediately."""
     try:
         year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
@@ -559,6 +604,7 @@ def api_owners():
         uid_sql, uid_p = uid_clause()
         date_filter += f" {uid_sql}"
         params.update(uid_p)
+        uid = uid_p.get('_uid')
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
@@ -574,6 +620,18 @@ def api_owners():
                 ORDER BY total_amount DESC
             """, params)
 
+            # user_owners entries with no transactions yet
+            if uid is not None:
+                uo_rows = conn.execute(text("""
+                    SELECT name FROM user_owners
+                    WHERE user_id = :uid AND is_active = true
+                    AND name NOT IN (
+                        SELECT DISTINCT owner FROM transactions WHERE user_id = :uid
+                    )
+                """), {'uid': uid}).fetchall()
+            else:
+                uo_rows = []
+
         result = [{
             'name': str(row['name']),
             'transaction_count': int(row['transaction_count']),
@@ -582,6 +640,16 @@ def api_owners():
             'last_used': str(row['last_used']),
             'first_used': str(row['first_used'])
         } for _, row in df.iterrows()]
+
+        for row in uo_rows:
+            result.append({
+                'name': str(row[0]),
+                'transaction_count': 0,
+                'total_amount': 0.0,
+                'avg_amount': 0.0,
+                'last_used': '—',
+                'first_used': '—',
+            })
 
         print(f"👥 Returning {len(result)} owners")
         return jsonify(result)
@@ -592,7 +660,8 @@ def api_owners():
 
 @api_bp.route('/categories/accounts')
 def api_accounts():
-    """Get accounts with statistics"""
+    """Get accounts. UNIONs transaction-derived accounts with custom_accounts
+    (0 transactions) so newly added accounts appear immediately."""
     try:
         year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
@@ -605,6 +674,7 @@ def api_accounts():
         uid_sql, uid_p = uid_clause()
         date_filter += f" {uid_sql}"
         params.update(uid_p)
+        uid = uid_p.get('_uid')
 
         with db.engine.connect() as conn:
             df = _df(conn, f"""
@@ -620,6 +690,23 @@ def api_accounts():
                 ORDER BY total_amount DESC
             """, params)
 
+            # Custom accounts with no transactions yet
+            if uid is not None:
+                ca_rows = conn.execute(text("""
+                    SELECT name FROM custom_accounts
+                    WHERE user_id = :uid
+                    AND name NOT IN (
+                        SELECT DISTINCT account_name FROM transactions WHERE user_id = :uid
+                    )
+                """), {'uid': uid}).fetchall()
+            else:
+                ca_rows = conn.execute(text("""
+                    SELECT name FROM custom_accounts WHERE user_id IS NULL
+                    AND name NOT IN (
+                        SELECT DISTINCT account_name FROM transactions
+                    )
+                """)).fetchall()
+
         result = [{
             'name': str(row['name']),
             'transaction_count': int(row['transaction_count']),
@@ -628,6 +715,16 @@ def api_accounts():
             'last_used': str(row['last_used']),
             'first_used': str(row['first_used'])
         } for _, row in df.iterrows()]
+
+        for row in ca_rows:
+            result.append({
+                'name': str(row[0]),
+                'transaction_count': 0,
+                'total_amount': 0.0,
+                'avg_amount': 0.0,
+                'last_used': '—',
+                'first_used': '—',
+            })
 
         print(f"💳 Returning {len(result)} accounts")
         return jsonify(result)
@@ -896,31 +993,36 @@ def add_category():
 
 @api_bp.route('/categories/subcategories', methods=['POST'])
 def add_subcategory():
-    """Add a new subcategory"""
+    """Insert a new subcategory into custom_subcategories so it appears immediately."""
     try:
         data = request.get_json()
-        name = data['name'].strip()
-        category = data['category'].strip()
+        name = (data.get('name') or '').strip()
+        category = (data.get('category') or '').strip()
 
         if not name or not category:
             return jsonify({'success': False, 'error': 'Subcategory name and parent category required'}), 400
 
-        uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
-            count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE sub_category = :name {uid_sql}"
-            ), {'name': name, **uid_p}).scalar()
-            if count > 0:
-                return jsonify({'success': False, 'error': 'Subcategory already exists in transactions'}), 400
+        uid = current_user_id()
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
+            txn_count = conn.execute(text(
+                "SELECT COUNT(*) FROM transactions WHERE sub_category = :name"
+                + (" AND user_id = :uid" if uid else "")
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
-            cat_count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE category = :cat {uid_sql}"
-            ), {'cat': category, **uid_p}).scalar()
-            if cat_count == 0:
-                return jsonify({'success': False, 'error': 'Parent category does not exist'}), 400
+            cs_count = conn.execute(text(
+                f"SELECT COUNT(*) FROM custom_subcategories WHERE name = :name AND {uid_cond}"
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
-        print(f"✅ Subcategory ready to be added: {name} under {category}")
-        return jsonify({'success': True, 'message': f'Subcategory "{name}" ready to be used under "{category}"'})
+            if txn_count > 0 or cs_count > 0:
+                return jsonify({'success': False, 'error': f'Subcategory "{name}" already exists'}), 400
+
+            conn.execute(text(
+                "INSERT INTO custom_subcategories (user_id, name, category) VALUES (:uid, :name, :category)"
+            ), {'uid': uid, 'name': name, 'category': category})
+
+        print(f"✅ Custom subcategory '{name}' created under '{category}' for user {uid}")
+        return jsonify({'success': True, 'message': f'Subcategory "{name}" added under "{category}"'})
     except Exception as e:
         print(f"❌ Error adding subcategory: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -928,23 +1030,35 @@ def add_subcategory():
 
 @api_bp.route('/categories/owners', methods=['POST'])
 def add_owner():
-    """Add a new owner"""
+    """Insert a new owner into user_owners so it appears immediately."""
     try:
         data = request.get_json()
-        name = data['name'].strip()
+        name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'success': False, 'error': 'Owner name required'}), 400
 
+        uid = current_user_id()
         uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
-            count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE owner = :name {uid_sql}"
-            ), {'name': name, **uid_p}).scalar()
-            if count > 0:
-                return jsonify({'success': False, 'error': 'Owner already exists in transactions'}), 400
+        with db.engine.begin() as conn:
+            txn_count = conn.execute(text(
+                "SELECT COUNT(*) FROM transactions WHERE owner = :name"
+                + (" AND user_id = :uid" if uid else "")
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
-        print(f"✅ Owner ready to be added: {name}")
-        return jsonify({'success': True, 'message': f'Owner "{name}" ready to be used in transactions'})
+            uo_count = conn.execute(text(
+                "SELECT COUNT(*) FROM user_owners WHERE name = :name"
+                + (" AND user_id = :uid" if uid else " AND user_id IS NULL")
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
+
+            if txn_count > 0 or uo_count > 0:
+                return jsonify({'success': False, 'error': f'Owner "{name}" already exists'}), 400
+
+            conn.execute(text(
+                "INSERT INTO user_owners (user_id, name, is_active) VALUES (:uid, :name, true)"
+            ), {'uid': uid, 'name': name})
+
+        print(f"✅ Owner '{name}' added for user {uid}")
+        return jsonify({'success': True, 'message': f'Owner "{name}" added successfully'})
     except Exception as e:
         print(f"❌ Error adding owner: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -952,23 +1066,34 @@ def add_owner():
 
 @api_bp.route('/categories/accounts', methods=['POST'])
 def add_account():
-    """Add a new account"""
+    """Insert a new account into custom_accounts so it appears immediately."""
     try:
         data = request.get_json()
-        name = data['name'].strip()
+        name = (data.get('name') or '').strip()
         if not name:
             return jsonify({'success': False, 'error': 'Account name required'}), 400
 
-        uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
-            count = conn.execute(text(
-                f"SELECT COUNT(*) FROM transactions WHERE account_name = :name {uid_sql}"
-            ), {'name': name, **uid_p}).scalar()
-            if count > 0:
-                return jsonify({'success': False, 'error': 'Account already exists in transactions'}), 400
+        uid = current_user_id()
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
+            txn_count = conn.execute(text(
+                "SELECT COUNT(*) FROM transactions WHERE account_name = :name"
+                + (" AND user_id = :uid" if uid else "")
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
 
-        print(f"✅ Account ready to be added: {name}")
-        return jsonify({'success': True, 'message': f'Account "{name}" ready to be used in transactions'})
+            ca_count = conn.execute(text(
+                f"SELECT COUNT(*) FROM custom_accounts WHERE name = :name AND {uid_cond}"
+            ), {'name': name, **({'uid': uid} if uid else {})}).scalar()
+
+            if txn_count > 0 or ca_count > 0:
+                return jsonify({'success': False, 'error': f'Account "{name}" already exists'}), 400
+
+            conn.execute(text(
+                "INSERT INTO custom_accounts (user_id, name) VALUES (:uid, :name)"
+            ), {'uid': uid, 'name': name})
+
+        print(f"✅ Custom account '{name}' created for user {uid}")
+        return jsonify({'success': True, 'message': f'Account "{name}" added successfully'})
     except Exception as e:
         print(f"❌ Error adding account: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1013,12 +1138,32 @@ def migrate_categories():
             """), {'target': target, 'now': datetime.utcnow(), 'source': source, **uid_p})
             migrated_count = upd.rowcount
 
+            uid = uid_p.get('_uid')
+            uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+            extra = {'uid': uid} if uid else {}
+
             if item_type == 'category':
                 conn.execute(text(f"""
                     UPDATE budget_templates
                     SET category = :target, updated_at = :now
                     WHERE category = :source {uid_sql}
                 """), {'target': target, 'now': datetime.utcnow(), 'source': source, **uid_p})
+            elif item_type == 'subcategory':
+                conn.execute(text(
+                    f"DELETE FROM custom_subcategories WHERE name = :source AND {uid_cond}"
+                ), {'source': source, **extra})
+            elif item_type == 'owner':
+                conn.execute(text(
+                    f"UPDATE user_owners SET name = :target WHERE name = :source AND {uid_cond}"
+                ), {'target': target, 'source': source, **extra})
+            elif item_type == 'account':
+                conn.execute(text(
+                    f"DELETE FROM custom_accounts WHERE name = :source AND {uid_cond}"
+                ), {'source': source, **extra})
+            elif item_type == 'type':
+                conn.execute(text(
+                    f"DELETE FROM custom_types WHERE name = :source AND {uid_cond}"
+                ), {'source': source, **extra})
 
         print(f"✅ Migrated {migrated_count} transactions from {source} to {target}")
         return jsonify({
@@ -1059,22 +1204,29 @@ def delete_category(category_name):
 
 @api_bp.route('/categories/subcategories/<subcategory_name>', methods=['DELETE'])
 def delete_subcategory(subcategory_name):
-    """Delete a subcategory (only if no transactions)"""
+    """Delete a subcategory — blocks if transactions still use it; removes from custom_subcategories."""
     try:
         uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
             count = conn.execute(text(
                 f"SELECT COUNT(*) FROM transactions WHERE sub_category = :name {uid_sql}"
             ), {'name': subcategory_name, **uid_p}).scalar()
 
-        if count > 0:
-            return jsonify({
-                'success': False,
-                'error': f'Cannot delete subcategory with {count} transactions. Please migrate them first.'
-            }), 400
+            if count > 0:
+                return jsonify({
+                    'success': False,
+                    'error': f'Cannot delete subcategory with {count} transactions. Please migrate them first.',
+                    'transaction_count': count
+                }), 400
 
-        print(f"✅ Subcategory {subcategory_name} can be deleted (no transactions)")
-        return jsonify({'success': True, 'message': f'Subcategory "{subcategory_name}" removed from system'})
+            conn.execute(text(
+                f"DELETE FROM custom_subcategories WHERE name = :name AND {uid_cond}"
+            ), {'name': subcategory_name, **({'uid': uid} if uid else {})})
+
+        print(f"✅ Deleted subcategory: {subcategory_name}")
+        return jsonify({'success': True, 'message': f'Subcategory "{subcategory_name}" deleted successfully'})
     except Exception as e:
         print(f"❌ Error deleting subcategory: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1147,6 +1299,8 @@ def edit_subcategory(subcategory_name):
             return jsonify({'success': False, 'error': 'Subcategory name required'}), 400
 
         uid_sql, uid_p = uid_clause()
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
         with db.engine.begin() as conn:
             if new_category:
                 conn.execute(text(f"""
@@ -1155,11 +1309,19 @@ def edit_subcategory(subcategory_name):
                     WHERE sub_category = :old_name {uid_sql}
                 """), {'new_name': new_name, 'new_cat': new_category,
                        'now': datetime.utcnow(), 'old_name': subcategory_name, **uid_p})
+                conn.execute(text(
+                    f"UPDATE custom_subcategories SET name = :new_name, category = :new_cat"
+                    f" WHERE name = :old_name AND {uid_cond}"
+                ), {'new_name': new_name, 'new_cat': new_category, 'old_name': subcategory_name,
+                    **({'uid': uid} if uid else {})})
             else:
                 conn.execute(text(f"""
                     UPDATE transactions SET sub_category = :new_name, updated_at = :now
                     WHERE sub_category = :old_name {uid_sql}
                 """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': subcategory_name, **uid_p})
+                conn.execute(text(
+                    f"UPDATE custom_subcategories SET name = :new_name WHERE name = :old_name AND {uid_cond}"
+                ), {'new_name': new_name, 'old_name': subcategory_name, **({'uid': uid} if uid else {})})
 
         print(f"✅ Updated subcategory from {subcategory_name} to {new_name}")
         return jsonify({'success': True, 'message': 'Subcategory updated successfully'})
@@ -1170,7 +1332,7 @@ def edit_subcategory(subcategory_name):
 
 @api_bp.route('/categories/owners/<owner_name>', methods=['PUT'])
 def edit_owner(owner_name):
-    """Edit an existing owner"""
+    """Edit an existing owner — updates both transactions and user_owners."""
     try:
         data = request.get_json()
         new_name = data['name'].strip()
@@ -1180,11 +1342,17 @@ def edit_owner(owner_name):
             return jsonify({'success': True, 'message': 'No changes needed'})
 
         uid_sql, uid_p = uid_clause()
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
         with db.engine.begin() as conn:
             conn.execute(text(f"""
                 UPDATE transactions SET owner = :new_name, updated_at = :now
                 WHERE owner = :old_name {uid_sql}
             """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': owner_name, **uid_p})
+
+            conn.execute(text(
+                f"UPDATE user_owners SET name = :new_name WHERE name = :old_name AND {uid_cond}"
+            ), {'new_name': new_name, 'old_name': owner_name, **({'uid': uid} if uid else {})})
 
         print(f"✅ Renamed owner from {owner_name} to {new_name}")
         return jsonify({'success': True, 'message': 'Owner renamed successfully'})
@@ -1195,7 +1363,7 @@ def edit_owner(owner_name):
 
 @api_bp.route('/categories/accounts/<account_name>', methods=['PUT'])
 def edit_account(account_name):
-    """Edit an existing account"""
+    """Edit an existing account — updates both transactions and custom_accounts."""
     try:
         data = request.get_json()
         new_name = data['name'].strip()
@@ -1205,11 +1373,17 @@ def edit_account(account_name):
             return jsonify({'success': True, 'message': 'No changes needed'})
 
         uid_sql, uid_p = uid_clause()
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
         with db.engine.begin() as conn:
             conn.execute(text(f"""
                 UPDATE transactions SET account_name = :new_name, updated_at = :now
                 WHERE account_name = :old_name {uid_sql}
             """), {'new_name': new_name, 'now': datetime.utcnow(), 'old_name': account_name, **uid_p})
+
+            conn.execute(text(
+                f"UPDATE custom_accounts SET name = :new_name WHERE name = :old_name AND {uid_cond}"
+            ), {'new_name': new_name, 'old_name': account_name, **({'uid': uid} if uid else {})})
 
         print(f"✅ Renamed account from {account_name} to {new_name}")
         return jsonify({'success': True, 'message': 'Account renamed successfully'})
@@ -1250,20 +1424,26 @@ def delete_owner(owner_name):
 
 @api_bp.route('/categories/accounts/<account_name>', methods=['DELETE'])
 def delete_account(account_name):
-    """Delete an account (only if no transactions use it)."""
+    """Delete an account — blocks if transactions still use it; removes from custom_accounts."""
     try:
         uid_sql, uid_p = uid_clause()
-        with db.engine.connect() as conn:
+        uid = uid_p.get('_uid')
+        uid_cond = 'user_id = :uid' if uid else 'user_id IS NULL'
+        with db.engine.begin() as conn:
             count = conn.execute(text(
                 f"SELECT COUNT(*) FROM transactions WHERE account_name = :name {uid_sql}"
             ), {'name': account_name, **uid_p}).scalar()
 
-        if count > 0:
-            return jsonify({
-                'success': False,
-                'error': f'Cannot delete: {count} transactions use this account. Migrate them first.',
-                'transaction_count': count
-            }), 400
+            if count > 0:
+                return jsonify({
+                    'success': False,
+                    'error': f'Cannot delete: {count} transactions use this account. Migrate them first.',
+                    'transaction_count': count
+                }), 400
+
+            conn.execute(text(
+                f"DELETE FROM custom_accounts WHERE name = :name AND {uid_cond}"
+            ), {'name': account_name, **({'uid': uid} if uid else {})})
 
         print(f"✅ Deleted account: {account_name}")
         return jsonify({'success': True, 'message': f'Account "{account_name}" deleted'})
