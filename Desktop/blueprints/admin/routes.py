@@ -87,6 +87,58 @@ def activate_user(user_id):
     return redirect(url_for('settings.index'))
 
 
+@admin_bp.route('/users/<int:user_id>/change-password', methods=['POST'])
+def change_password(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('settings.index'))
+
+    new_password = request.form.get('new_password', '')
+    if len(new_password) < 8:
+        flash('Password must be at least 8 characters.', 'error')
+        return redirect(url_for('settings.index'))
+
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    _log_audit('admin_password_change', current_user_id(), extra={'target_user_id': user_id})
+    flash(f'Password for "{user.username}" updated successfully.', 'success')
+    return redirect(url_for('settings.index'))
+
+
+@admin_bp.route('/users/<int:user_id>/delete', methods=['POST'])
+def delete_user(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('settings.index'))
+
+    if user.id == current_user_id():
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('settings.index'))
+
+    username = user.username
+
+    # Delete all user data in FK-safe order, then the user record itself
+    data_tables = [
+        'debt_payments', 'debt_accounts', 'budget_commitments',
+        'budget_subcategory_templates', 'monthly_budgets', 'unexpected_expenses',
+        'budget_templates', 'transactions',
+        'custom_types', 'custom_subcategories', 'custom_accounts',
+        'user_owners', 'revoked_tokens'
+    ]
+    with db.engine.begin() as conn:
+        for table in data_tables:
+            conn.execute(text(f"DELETE FROM {table} WHERE user_id = :uid"), {'uid': user_id})
+
+    db.session.delete(user)
+    db.session.commit()
+
+    _log_audit('user_deleted', current_user_id(), extra={'deleted_username': username})
+    flash(f'User "{username}" and all their data have been deleted.', 'warning')
+    return redirect(url_for('settings.index'))
+
+
 @admin_bp.route('/audit-logs')
 def audit_logs():
     filter_user_id = request.args.get('user_id', '').strip()

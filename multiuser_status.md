@@ -7,7 +7,7 @@
 
 **Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
 **Overall Progress:** Phase 6 complete ✅
-**Last Session:** March 2026
+**Last Session:** February 2026 — Session 13 (Bugs 14–17 + admin user management: Change Password, Delete User)
 
 ---
 
@@ -270,6 +270,9 @@ Phase 7 continued — Bug fixes from end-to-end Railway testing:
 - `base.html` — removed standalone "Admin" nav link (admins reach admin tools via Settings)
 - `admin.html` — still exists but unreachable; audit logs page at `/admin/audit-logs` still works
 
+### February 2026 — Session 13
+Phase 7 continued — Settings page overhaul + cross-user data leak in Flutter:
+
 **Bug 14: Data Management section broken / misleading after SQLite → PostgreSQL migration**
 - Root cause: The entire Data Management UI was designed around SQLite local files. When migrating to PostgreSQL (Neon), backup/restore routes were stubbed out (`flash("not available")`) but the template still rendered the old layout — "Export Database" button calling dead `downloadDatabase()` JS, "Import Database" row with a `.db` file picker, orange "Cloud Hosting Notice" that referenced the old SQLite backup flow, and "Create Local Backup" that flashedand redirected on both local and cloud. The feature was never rethought for the new stack.
 - Fix: Full Data Management redesign split into two modes based on `_auth_disabled()`:
@@ -292,3 +295,15 @@ Phase 7 continued — Bug fixes from end-to-end Railway testing:
 - Fix (backend): Added the four missing tables to the FK-safe delete list in `delete_all_data()`
 - Fix (template): Removed false auto-backup claim; description now conditional (`local_mode`: "all financial data" / cloud: "all your financial data"); added "Download backup →" link pointing to `export_my_data` so users can save a copy before wiping
 - Files changed: `blueprints/settings/routes.py` (`delete_all_data()` table list), `templates/settings.html` (danger zone description)
+
+**Bug 17: Administration table in Settings cramped / no padding (missing CSS class)**
+- Root cause: `<table class="kanso-table">` was used in `settings.html` but `.kanso-table` had no CSS definition anywhere — browser rendered the table with zero cell padding and default table layout, making columns run together
+- Fix: Added `.kanso-table` ruleset to `kanso.css` (after `.kanso-row-action`): `border-collapse:collapse`, `font-size:13.5px`; `thead th` gets `12px 16px` padding, uppercase faint label style, bottom border; `tbody td` gets `12px 16px` padding, row separator, `vertical-align:middle`; hover row highlight
+- Also removed redundant `style="overflow:hidden; margin-bottom:1px;"` from the wrapping card div (already provided by `.kanso-card` and `.kanso-card + .kanso-card`) and `style="margin:0;"` from the table tag
+- Files changed: `static/css/kanso.css` (new `.kanso-table` block), `templates/settings.html` (inline style cleanup)
+
+**Feature: Admin — Change Password + Delete User**
+- Added `POST /admin/users/<id>/change-password` — validates ≥ 8 chars, re-hashes, audit logs `admin_password_change`
+- Added `POST /admin/users/<id>/delete` — deletes all user data (same FK-safe table order as `delete_all_data` + `revoked_tokens`), then removes the `User` record; blocked for self; audit logs `user_deleted` with username
+- Template: Actions column replaced with a flex button group (Deactivate/Activate, Change Pwd, Delete); Deactivate and Delete hidden for the currently logged-in admin (`session.get('user_id')`); "Change Pwd" toggles an inline `<tr>` form row beneath the user row with a password input + Set/Cancel buttons; `togglePwdForm(userId)` JS added
+- Files changed: `blueprints/admin/routes.py`, `templates/settings.html`
