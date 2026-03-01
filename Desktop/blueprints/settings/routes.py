@@ -33,11 +33,12 @@ def _serial(obj):
 
 
 def _export_all_data(uid):
-    """Return dict of all 8 data tables, optionally scoped to uid."""
+    """Return dict of all 12 data tables, optionally scoped to uid."""
     tables = [
         'transactions', 'budget_templates', 'budget_subcategory_templates',
         'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
-        'debt_payments', 'budget_commitments'
+        'debt_payments', 'budget_commitments',
+        'user_owners', 'custom_types', 'custom_subcategories', 'custom_accounts'
     ]
     uid_where = "WHERE user_id = :uid" if uid is not None else ""
     uid_p = {"uid": uid} if uid is not None else {}
@@ -106,10 +107,130 @@ def download_database():
     return redirect(url_for('settings.export_my_data'))
 
 
+def _import_data(data, uid):
+    """
+    Validate and atomically restore data from a parsed JSON backup dict.
+    - uid: current_user_id() in cloud, None in dev.
+    - In cloud mode: all row user_ids are overwritten with uid.
+    - In dev mode: original user_ids are preserved.
+    Raises ValueError on bad structure. Raises on DB error (caller rolls back).
+    """
+    KNOWN_TABLES = {
+        'transactions', 'budget_templates', 'budget_subcategory_templates',
+        'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
+        'debt_payments', 'budget_commitments',
+        'user_owners', 'custom_types', 'custom_subcategories', 'custom_accounts'
+    }
+
+    # 1. Structural validation
+    if not isinstance(data, dict):
+        raise ValueError("Invalid backup format: root must be a JSON object.")
+    unknown = set(data.keys()) - KNOWN_TABLES
+    if unknown:
+        raise ValueError(f"Unrecognised tables in backup: {unknown}")
+    for key, rows in data.items():
+        if not isinstance(rows, list):
+            raise ValueError(f"Table '{key}' must be an array of rows.")
+
+    # 2. In cloud mode, rewrite every user_id to the current user
+    if uid is not None:
+        for rows in data.values():
+            for row in rows:
+                if 'user_id' in row:
+                    row['user_id'] = uid
+
+    # 3. Delete (FK-safe order) + Insert (reverse order) in one transaction
+    DELETE_ORDER = [
+        'debt_payments', 'debt_accounts', 'budget_commitments',
+        'budget_subcategory_templates', 'monthly_budgets', 'unexpected_expenses',
+        'budget_templates', 'transactions',
+        'custom_types', 'custom_subcategories', 'custom_accounts', 'user_owners'
+    ]
+    INSERT_ORDER = list(reversed(DELETE_ORDER))
+
+    uid_where = "WHERE user_id = :uid" if uid is not None else ""
+    uid_p = {"uid": uid} if uid is not None else {}
+
+    with db.engine.begin() as conn:
+        # Delete existing data
+        for table in DELETE_ORDER:
+            conn.execute(text(f"DELETE FROM {table} {uid_where}"), uid_p)
+
+        # Insert rows from backup
+        for table in INSERT_ORDER:
+            rows = data.get(table, [])
+            if not rows:
+                continue
+            cols = list(rows[0].keys())
+            col_list = ', '.join(f'"{c}"' for c in cols)
+            placeholders = ', '.join(f':{c}' for c in cols)
+            for row in rows:
+                conn.execute(text(
+                    f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
+                ), row)
+
+        # Reset Postgres sequences to avoid future PK conflicts
+        if db.engine.dialect.name == 'postgresql':
+            for table in KNOWN_TABLES:
+                conn.execute(text(
+                    f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                    f"COALESCE((SELECT MAX(id) FROM {table}), 0))"
+                ))
+
+
 @settings_bp.route('/upload-database', methods=['POST'])
 def upload_database():
-    """Database import — deferred to Phase 4."""
-    flash('Database import is not yet available. Coming in a future release.', 'info')
+    """Redirect old stub URL to the real import endpoint."""
+    return redirect(url_for('settings.import_data'), 307)
+
+
+@settings_bp.route('/import-data', methods=['POST'])
+def import_data():
+    """Restore all user data from an uploaded JSON backup."""
+    from werkzeug.utils import secure_filename
+
+    # 1. File presence check
+    if 'import_file' not in request.files:
+        flash('No file selected.', 'error')
+        return redirect(url_for('settings.index'))
+
+    file = request.files['import_file']
+    if not file or file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('settings.index'))
+
+    # 2. Security: filename sanitisation + extension check
+    filename = secure_filename(file.filename)
+    if not filename.endswith('.json'):
+        flash('Only .json backup files are accepted.', 'error')
+        return redirect(url_for('settings.index'))
+
+    # 3. Size guard (10 MB ceiling)
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > 10 * 1024 * 1024:
+        flash('File too large (max 10 MB).', 'error')
+        return redirect(url_for('settings.index'))
+
+    # 4. Parse JSON
+    try:
+        data = json.load(file)
+    except json.JSONDecodeError as e:
+        flash(f'Invalid JSON file: {e}', 'error')
+        return redirect(url_for('settings.index'))
+
+    # 5. Import
+    try:
+        uid = current_user_id()
+        _import_data(data, uid)
+        _log_audit('import_data', uid)
+        flash('Data restored successfully from backup.', 'success')
+    except ValueError as e:
+        flash(f'Invalid backup file: {e}', 'error')
+    except Exception as e:
+        flash(f'Import failed: {e}', 'error')
+
     return redirect(url_for('settings.index'))
 
 

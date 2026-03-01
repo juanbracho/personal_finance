@@ -130,6 +130,29 @@
                 </div>
             </div>
 
+            <!-- Import / Restore — always shown -->
+            <div class="kanso-row">
+                <div class="kanso-row-icon warning">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 17V8m0 0l-3 3m3-3l3 3"/>
+                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                    </svg>
+                </div>
+                <div class="kanso-row-body">
+                    <div class="kanso-row-title">Import / Restore</div>
+                    <div class="kanso-row-desc">Restore all your data from a previously exported JSON backup</div>
+                </div>
+                <div class="kanso-row-action">
+                    <button type="button" class="btn-kanso btn-kanso-ghost" onclick="openImportModal()">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                            <path d="M10 17V8m0 0l-3 3m3-3l3 3"/>
+                            <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                        </svg>
+                        Import
+                    </button>
+                </div>
+            </div>
+
             {% if local_mode %}
             <!-- Create Local Backup — local mode only -->
             <div class="kanso-row">
@@ -415,6 +438,80 @@
     </div>
 
 </div><!-- /kanso-page -->
+
+<!-- ── Import / Restore modal ── -->
+<div id="importModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; width:min(520px,94vw); padding:28px 28px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.4); position:relative;">
+
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div style="font-size:16px; font-weight:600; color:var(--text);">Import / Restore Data</div>
+            <button onclick="closeImportModal()" style="background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:20px; line-height:1; padding:2px 6px;">&times;</button>
+        </div>
+
+        <!-- Warning banner -->
+        <div style="background:rgba(var(--danger-rgb,220,53,69),0.1); border:1px solid rgba(var(--danger-rgb,220,53,69),0.3); border-radius:8px; padding:12px 14px; margin-bottom:22px; font-size:13px; color:var(--text-muted); line-height:1.5;">
+            <strong style="color:var(--danger);">⚠ This will permanently replace all your current data</strong>
+            with the contents of the uploaded file. This cannot be undone.
+        </div>
+
+        <form action="{{ url_for('settings.import_data') }}" method="POST" enctype="multipart/form-data" id="importForm">
+
+            <!-- Step 1 -->
+            <div style="margin-bottom:20px;">
+                <div style="font-size:12px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Step 1 — Save your current data</div>
+                <a href="{{ url_for('settings.export_my_data') }}" target="_blank"
+                   class="btn-kanso btn-kanso-ghost"
+                   style="display:inline-flex; margin-bottom:12px;">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                        <path d="M10 3v9m0 0l-3-3m3 3l3-3"/>
+                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                    </svg>
+                    Download my current data
+                </a>
+                <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; color:var(--text-muted); cursor:pointer; user-select:none;">
+                    <input type="checkbox" id="importBackupCheck" onchange="updateImportBtn()"
+                           style="width:15px; height:15px; accent-color:var(--primary); cursor:pointer;">
+                    I have downloaded my backup
+                </label>
+            </div>
+
+            <!-- Step 2 -->
+            <div id="importStep2" style="opacity:0.35; pointer-events:none; transition:opacity .2s;">
+                <div style="font-size:12px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Step 2 — Upload backup file</div>
+
+                <label style="display:block; margin-bottom:14px;">
+                    <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">Choose JSON file</div>
+                    <input type="file" name="import_file" id="importFileInput" accept=".json"
+                           onchange="updateImportBtn()"
+                           style="font-size:13px; color:var(--text);">
+                </label>
+
+                <label style="display:block; margin-bottom:6px; font-size:13px; color:var(--text-muted);">
+                    Type <code>IMPORT</code> to confirm:
+                </label>
+                <input type="text" id="importConfirmInput" autocomplete="off"
+                       placeholder="IMPORT"
+                       oninput="updateImportBtn()"
+                       class="kanso-input"
+                       style="max-width:200px; margin-bottom:0;">
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:18px; border-top:1px solid var(--border-subtle);">
+                <button type="button" class="btn-kanso btn-kanso-ghost" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" id="importSubmitBtn" class="btn-kanso btn-kanso-danger-solid" disabled>
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <path d="M10 17V8m0 0l-3 3m3-3l3 3"/>
+                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
+                    </svg>
+                    Restore Data
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -578,6 +675,37 @@ function togglePwdForm(userId) {
     const row = document.getElementById('pwd-form-' + userId);
     row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
+
+// ── Import modal ───────────────────────────────────────────
+function openImportModal() {
+    document.getElementById('importModal').style.display = 'flex';
+}
+
+function closeImportModal() {
+    document.getElementById('importModal').style.display = 'none';
+    document.getElementById('importBackupCheck').checked = false;
+    document.getElementById('importFileInput').value = '';
+    document.getElementById('importConfirmInput').value = '';
+    updateImportBtn();
+}
+
+function updateImportBtn() {
+    const checked = document.getElementById('importBackupCheck').checked;
+    const step2 = document.getElementById('importStep2');
+    const file = document.getElementById('importFileInput').files[0];
+    const word = document.getElementById('importConfirmInput').value;
+    const btn = document.getElementById('importSubmitBtn');
+
+    step2.style.opacity = checked ? '1' : '0.35';
+    step2.style.pointerEvents = checked ? 'auto' : 'none';
+
+    btn.disabled = !(checked && file && word === 'IMPORT');
+}
+
+// Close modal on backdrop click
+document.getElementById('importModal').addEventListener('click', function(e) {
+    if (e.target === this) closeImportModal();
+});
 
 // ── Delete confirmation ────────────────────────────────────
 function confirmDelete() {
