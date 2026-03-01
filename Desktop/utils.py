@@ -4,13 +4,29 @@ from sqlalchemy import text, inspect
 
 
 def local_now():
-    """Return the current datetime in the APP_TIMEZONE (set via env var on Railway).
-    Falls back to UTC when the var is missing or the timezone name is invalid.
+    """Return the current datetime in the client's timezone.
+
+    Priority:
+      1. 'kanso_tz' cookie set by base.html JS (IANA name, e.g. 'America/Chicago')
+      2. APP_TIMEZONE env var (Railway fallback)
+      3. UTC (ultimate fallback)
+
     Returns a naive datetime so it's a drop-in replacement for datetime.now().
     """
     try:
         from zoneinfo import ZoneInfo
-        tz_name = os.environ.get('APP_TIMEZONE', 'UTC')
+        from urllib.parse import unquote
+        tz_name = None
+        try:
+            from flask import request as _req, has_request_context
+            if has_request_context():
+                raw = _req.cookies.get('kanso_tz', '')
+                if raw:
+                    tz_name = unquote(raw)
+        except Exception:
+            pass
+        if not tz_name:
+            tz_name = os.environ.get('APP_TIMEZONE', 'UTC')
         return datetime.now(tz=ZoneInfo(tz_name)).replace(tzinfo=None)
     except Exception:
         return datetime.now()

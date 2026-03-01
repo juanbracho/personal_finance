@@ -32,6 +32,42 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
+
+    <!-- Timezone detection — runs synchronously before body renders.
+         (1) Writes the browser's IANA timezone to a cookie so Flask can use it
+             on every request via local_now().
+         (2) On the first ever visit the cookie doesn't exist yet, so Flask would
+             fall back to UTC. Guard against that: if we're on a date-sensitive
+             page and the params are missing, redirect immediately with the
+             browser's correct local month/year before any content is shown. -->
+    <script>
+        (function() {
+            var tz = '';
+            try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) {}
+
+            var cookieAlreadySet = document.cookie.indexOf('kanso_tz=') !== -1;
+
+            if (tz) {
+                document.cookie = 'kanso_tz=' + encodeURIComponent(tz)
+                    + '; path=/; max-age=31536000; SameSite=Strict';
+            }
+
+            // First-visit safety net only — after the cookie is set Flask handles it.
+            if (!cookieAlreadySet) {
+                var path = window.location.pathname;
+                var isDatePage = /\/dashboard\//.test(path) || /^\/budget/.test(path);
+                if (isDatePage) {
+                    var params = new URLSearchParams(window.location.search);
+                    if (!params.has('month') || !params.has('year')) {
+                        var now = new Date();
+                        params.set('month', now.getMonth() + 1); // getMonth() is 0-based
+                        params.set('year', now.getFullYear());
+                        window.location.replace(path + '?' + params.toString());
+                    }
+                }
+            }
+        })();
+    </script>
 </head>
 <body>
 
