@@ -11,6 +11,38 @@ def _df(conn, sql, params=None):
     return pd.read_sql_query(text(sql), conn, params=params or {})
 
 
+# ── Dialect-aware date helpers (Postgres vs SQLite) ───────────────────────────
+
+def _year_eq(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"CAST(strftime('%Y', {col}) AS INTEGER) = :year"
+    return f"EXTRACT(YEAR FROM {col})::integer = :year"
+
+
+def _month_eq(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"CAST(strftime('%m', {col}) AS INTEGER) = :month"
+    return f"EXTRACT(MONTH FROM {col})::integer = :month"
+
+
+def _month_lte(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"CAST(strftime('%m', {col}) AS INTEGER) <= :month"
+    return f"EXTRACT(MONTH FROM {col})::integer <= :month"
+
+
+def _ym_str(col='date'):
+    if db.engine.dialect.name == 'sqlite':
+        return f"strftime('%Y-%m', {col})"
+    return f"TO_CHAR({col}, 'YYYY-MM')"
+
+
+def _date_3m_ago():
+    if db.engine.dialect.name == 'sqlite':
+        return "date('now', '-3 months')"
+    return "CURRENT_DATE - INTERVAL '3 months'"
+
+
 def dashboard_overview_view(year, month, owner, available_years, available_owners):
     """Dashboard Overview - Enhanced with additional metrics"""
 
@@ -18,7 +50,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
         uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
             # Build filter conditions
-            date_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
+            date_filter = f"{_month_eq()} AND {_year_eq()}"
             params = {"month": month, "year": year}
 
             if owner != 'all':
@@ -61,7 +93,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             current_total = sum(amount for _, amount, _ in monthly_spending)
 
             # Year-to-date
-            ytd_filter = "EXTRACT(YEAR FROM date)::integer = :year AND EXTRACT(MONTH FROM date)::integer <= :month"
+            ytd_filter = f"{_year_eq()} AND {_month_lte()}"
             ytd_params = {"year": year, "month": month}
             if owner != 'all':
                 ytd_filter += " AND owner = :owner"
@@ -143,12 +175,12 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             owner_clause = "AND owner = :owner" if owner != 'all' else ""
             trend_params.update(uid_p)
             trend_df = _df(conn, f"""
-                SELECT TO_CHAR(date, 'YYYY-MM') as month_year, SUM(amount) as total
+                SELECT {_ym_str()} as month_year, SUM(amount) as total
                 FROM transactions
-                WHERE date >= CURRENT_DATE - INTERVAL '3 months'
+                WHERE date >= {_date_3m_ago()}
                 AND COALESCE(is_active, true) = true
                 {owner_clause} {uid_sql}
-                GROUP BY TO_CHAR(date, 'YYYY-MM')
+                GROUP BY {_ym_str()}
                 ORDER BY month_year DESC
                 LIMIT 3
             """, trend_params)
@@ -247,7 +279,7 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
     try:
         uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
-            spending_filter = "EXTRACT(MONTH FROM date)::integer = :month AND EXTRACT(YEAR FROM date)::integer = :year"
+            spending_filter = f"{_month_eq()} AND {_year_eq()}"
             spending_params = {"month": month, "year": year}
             if owner != 'all':
                 spending_filter += " AND owner = :owner"
@@ -458,15 +490,15 @@ def dashboard_categories_view(available_years, available_owners):
                         SELECT COUNT(*) as count, SUM(amount) as total, AVG(amount) as avg
                         FROM transactions
                         WHERE category = :category
-                        AND EXTRACT(YEAR FROM date)::integer = :year {uid_sql}
+                        AND {_year_eq()} {uid_sql}
                     """), {"category": category_name, "year": current_year, **uid_p}).fetchone()
                 else:
                     stats = conn.execute(text(f"""
                         SELECT COUNT(*) as count, SUM(amount) as total, AVG(amount) as avg
                         FROM transactions
                         WHERE category = :category
-                        AND EXTRACT(YEAR FROM date)::integer = :year
-                        AND EXTRACT(MONTH FROM date)::integer = :month {uid_sql}
+                        AND {_year_eq()}
+                        AND {_month_eq()} {uid_sql}
                     """), {"category": category_name, "year": current_year, "month": int(current_month), **uid_p}).fetchone()
 
                 categories_data.append({

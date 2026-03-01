@@ -151,31 +151,92 @@ def _import_data(data, uid):
     uid_where = "WHERE user_id = :uid" if uid is not None else ""
     uid_p = {"uid": uid} if uid is not None else {}
 
+    # Logical FK columns within user data (not enforced by DB constraints)
+    # child_table → (child_fk_col, parent_table)
+    FK_REFS = {
+        'debt_payments': ('debt_account_id', 'debt_accounts'),
+    }
+
     with db.engine.begin() as conn:
         # Delete existing data
         for table in DELETE_ORDER:
             conn.execute(text(f"DELETE FROM {table} {uid_where}"), uid_p)
 
-        # Insert rows from backup
-        for table in INSERT_ORDER:
-            rows = data.get(table, [])
-            if not rows:
-                continue
-            cols = list(rows[0].keys())
-            col_list = ', '.join(f'"{c}"' for c in cols)
-            placeholders = ', '.join(f':{c}' for c in cols)
-            for row in rows:
-                conn.execute(text(
-                    f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
-                ), row)
+        if uid is not None:
+            # Cloud / multi-user mode:
+            # Strip the 'id' column entirely so we never collide with other
+            # users' rows.  Use RETURNING id to build old→new id maps for FK
+            # remapping across tables.
+            id_maps = {}
+            for table in INSERT_ORDER:
+                rows = data.get(table, [])
+                if not rows:
+                    id_maps[table] = {}
+                    continue
 
-        # Reset Postgres sequences to avoid future PK conflicts
-        if db.engine.dialect.name == 'postgresql':
-            for table in KNOWN_TABLES:
-                conn.execute(text(
-                    f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-                    f"COALESCE((SELECT MAX(id) FROM {table}), 0))"
-                ))
+                # Remap FK columns before insert, using parent id_maps
+                fk_info = FK_REFS.get(table)
+                if fk_info:
+                    fk_col, ref_table = fk_info
+                    ref_map = id_maps.get(ref_table, {})
+                    for row in rows:
+                        if row.get(fk_col) is not None:
+                            row[fk_col] = ref_map.get(row[fk_col], row[fk_col])
+
+                cols = [c for c in rows[0].keys() if c != 'id']
+                col_list = ', '.join(f'"{c}"' for c in cols)
+                placeholders = ', '.join(f':{c}' for c in cols)
+                id_maps[table] = {}
+                for row in rows:
+                    row_data = {k: v for k, v in row.items() if k != 'id'}
+                    old_id = row.get('id')
+                    result = conn.execute(
+                        text(f"INSERT INTO {table} ({col_list}) VALUES ({placeholders}) RETURNING id"),
+                        row_data
+                    )
+                    new_id = result.scalar()
+                    if old_id is not None:
+                        id_maps[table][old_id] = new_id
+
+            # transactions.debt_payment_id references debt_payments.id, but
+            # transactions are inserted before debt_payments in INSERT_ORDER,
+            # so fix those links with a post-insert UPDATE.
+            dp_map = id_maps.get('debt_payments', {})
+            if dp_map:
+                for old_id, new_id in dp_map.items():
+                    conn.execute(
+                        text("UPDATE transactions SET debt_payment_id = :new "
+                             "WHERE debt_payment_id = :old AND user_id = :uid"),
+                        {'new': new_id, 'old': old_id, 'uid': uid}
+                    )
+
+        else:
+            # Dev / single-user mode (typically SQLite):
+            # Keep original IDs — no other users to conflict with.
+            for table in INSERT_ORDER:
+                rows = data.get(table, [])
+                if not rows:
+                    continue
+                cols = list(rows[0].keys())
+                col_list = ', '.join(f'"{c}"' for c in cols)
+                placeholders = ', '.join(f':{c}' for c in cols)
+                for row in rows:
+                    conn.execute(text(
+                        f"INSERT INTO {table} ({col_list}) VALUES ({placeholders})"
+                    ), row)
+
+            # On Postgres dev mode, explicit IDs don't advance sequences;
+            # reset them so future inserts get fresh IDs.
+            if db.engine.dialect.name == 'postgresql':
+                for table in KNOWN_TABLES:
+                    seq = conn.execute(text(
+                        f"SELECT pg_get_serial_sequence('{table}', 'id')"
+                    )).scalar()
+                    if seq:
+                        conn.execute(text(
+                            f"SELECT setval('{seq}', "
+                            f"GREATEST(COALESCE((SELECT MAX(id) FROM {table}), 1), 1))"
+                        ))
 
 
 @settings_bp.route('/upload-database', methods=['POST'])
@@ -229,7 +290,10 @@ def import_data():
     except ValueError as e:
         flash(f'Invalid backup file: {e}', 'error')
     except Exception as e:
-        flash(f'Import failed: {e}', 'error')
+        from flask import current_app
+        current_app.logger.error(f'Import error: {e}', exc_info=True)
+        flash('Import failed. The backup file may be from an incompatible version. '
+              'No data was changed.', 'error')
 
     return redirect(url_for('settings.index'))
 

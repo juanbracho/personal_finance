@@ -7,7 +7,7 @@
 
 **Active Phase:** Phase 7 — Bug Fixes (post-Neon migration)
 **Overall Progress:** Phase 6 complete ✅
-**Last Session:** March 2026 — Session 14 (Analytics page — collapsible panels + YoY matrix fixes)
+**Last Session:** March 2026 — Session 15 (JSON backup import/restore + SQLite compatibility fixes)
 
 ---
 
@@ -352,6 +352,29 @@ Phase 7 continued — Analytics page UI improvements + local dev bug fixes:
 - Fix 2: Corrected fallback template path to `analytics.html`
 - File changed: `blueprints/analytics/routes.py`
 
+### March 2026 — Session 15
+Phase 7 continued — JSON backup import/restore + post-testing bug fixes:
+
+**Feature: JSON Backup Import / Restore**
+- Pre-condition fixed: `_export_all_data()` was exporting only 8 tables while `delete_all_data()` clears 12; added the 4 missing tables (`user_owners`, `custom_types`, `custom_subcategories`, `custom_accounts`) to the export
+- New `_import_data(data, uid)` helper: structural validation (root must be `{}`, only known tables, each value must be `[]`) → `user_id` rewriting (cloud mode) → atomic delete+insert in one transaction → sequence reset
+- New `POST /settings/import-data` route: file presence + `.json` extension + 10 MB ceiling + JSON parse + `_import_data()` + `_log_audit('import_data', uid)`; clean flash messages (no raw SQL exposed)
+- Old stub `POST /settings/upload-database` now 307-redirects to `/import-data`
+- UI: "Import / Restore" row added to Data Management section (always visible, both modes); opens a two-phase modal — Step 1: download link + "I have downloaded my backup" checkbox; Step 2 (unlocks after checkbox): `.json` file picker + type `IMPORT` confirm input; submit button gated on all three conditions
+- Files changed: `blueprints/settings/routes.py`, `templates/settings.html`
+
+**Bug 22: Dashboard blank on SQLite (EXTRACT / TO_CHAR syntax)**
+- Root cause: Local dev app defaults to SQLite when `DATABASE_URL` is unset (`config.py` fallback). All three dashboard view functions (`dashboard_overview_view`, `dashboard_budget_view`, `dashboard_categories_view`) and `get_available_years_and_owners()` in `utils.py` used Postgres-specific syntax — `EXTRACT(YEAR FROM date)::integer`, `EXTRACT(MONTH FROM date)::integer`, `TO_CHAR(date, 'YYYY-MM')`, `CURRENT_DATE - INTERVAL '3 months'` — which SQLite raises `OperationalError: near "FROM": syntax error` on. The broad `except` block silently swallowed the error and returned an empty render.
+- Fix: Added 5 dialect-aware helpers to `views.py` — `_year_eq()`, `_month_eq()`, `_month_lte()`, `_ym_str()`, `_date_3m_ago()` — each emitting SQLite-compatible `CAST(strftime(...) AS INTEGER)` / `strftime(...)` / `date('now', ...)` or Postgres equivalents based on `db.engine.dialect.name`. Applied across all 6 affected query locations in the three view functions. Fixed `get_available_years_and_owners()` in `utils.py` with the same inline dialect check.
+- Files changed: `blueprints/dashboards/views.py`, `utils.py`
+
+**Bug 23: Cloud import PK conflict + raw SQL in error message**
+- Root cause 1: `_import_data()` inserted backup rows with their original `id` values. In a multi-user Postgres DB, those IDs may already belong to another user's rows in the same table — causing `UniqueViolation: duplicate key value violates unique constraint "..._pkey"` and rolling back the entire import.
+- Root cause 2: The `except Exception` handler flashed the raw SQLAlchemy exception string, exposing internal SQL, parameter values (including other users' `user_id`s), and table names to the end user.
+- Fix (PK conflict): In cloud mode (`uid is not None`), the import now strips the `id` column from every INSERT and uses `RETURNING id` to capture Postgres-assigned IDs. A `FK_REFS` map (`debt_payments → debt_account_id → debt_accounts`) drives pre-insert FK remapping using the `id_maps` dict built from parent-table inserts. `transactions.debt_payment_id` (which references `debt_payments` inserted after transactions) is fixed via a post-insert `UPDATE` within the same atomic transaction. Dev/SQLite mode keeps original IDs unchanged (single-user, no conflict risk). Dev mode on Postgres resets sequences safely using `pg_get_serial_sequence` + `GREATEST(COALESCE(MAX(id), 1), 1)`.
+- Fix (error message): Replaced `flash(f'Import failed: {e}')` with a generic user-friendly message; raw exception is logged server-side via `current_app.logger.error()` only.
+- File changed: `blueprints/settings/routes.py`
+
 ---
 
 ### Session 13 — Full Bug Summary
@@ -366,3 +389,18 @@ Phase 7 continued — Analytics page UI improvements + local dev bug fixes:
 | — | Security | Password policy enforced server-side + live checklist client-side |
 | 18 | Settings / Admin cards | 1px gap between users table and Create User card |
 | 19 | Audit Logs | Filter card no padding; redundant inline styles cleaned up |
+
+### Session 14 — Full Bug Summary
+
+| # | Area | Description |
+|---|------|-------------|
+| 20 | Analytics / YoY matrix | Zero-padded month keys `'01'–'12'` didn't match integer keys `1–12` in JSON |
+| 21 | Analytics / local SQLite | `EXTRACT(...)::integer` syntax + wrong fallback template path → 500 on SQLite |
+
+### Session 15 — Full Bug / Feature Summary
+
+| # | Area | Description |
+|---|------|-------------|
+| — | Settings / Data | **Feature:** JSON backup import/restore with two-phase safety modal |
+| 22 | Dashboard / local SQLite | `EXTRACT` / `TO_CHAR` / `INTERVAL` Postgres syntax failed on SQLite → blank dashboard |
+| 23 | Settings / Import | Cloud import PK conflict when backup IDs clash with other users' rows; raw SQL exposed in flash |

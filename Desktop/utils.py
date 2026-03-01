@@ -78,8 +78,11 @@ def get_available_years_and_owners():
     try:
         uid = current_user_id()
         with db.engine.connect() as conn:
-            years_result = conn.execute(text("""
-                SELECT DISTINCT EXTRACT(YEAR FROM date)::integer AS year
+            year_expr = ("CAST(strftime('%Y', date) AS INTEGER)"
+                         if db.engine.dialect.name == 'sqlite'
+                         else "EXTRACT(YEAR FROM date)::integer")
+            years_result = conn.execute(text(f"""
+                SELECT DISTINCT {year_expr} AS year
                 FROM transactions
                 ORDER BY year DESC
             """))
