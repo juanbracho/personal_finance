@@ -65,12 +65,12 @@ function loadOverviewCharts() {
     
     // Get data from template variables (if available)
     const monthlySpending = getTemplateData('monthlySpending') || [];
-    const topCategories = getTemplateData('topCategories') || [];
-    const monthlyTrend = getTemplateData('monthlyTrend') || [];
-    
+    const categoryTrend = getTemplateData('categoryTrend') || [];
+    const subcategoryTrend = getTemplateData('subcategoryTrend') || [];
+
     console.log('📊 Monthly spending data:', monthlySpending);
-    console.log('📊 Top categories data:', topCategories);
-    console.log('📊 Monthly trend data:', monthlyTrend);
+    console.log('📊 Category trend data:', categoryTrend);
+    console.log('📊 Subcategory trend data:', subcategoryTrend);
     
     // Create charts if data exists
     if (monthlySpending.length > 0) {
@@ -79,14 +79,14 @@ function loadOverviewCharts() {
         showNoDataMessage('spendingTypeChart', 'No spending data for current period');
     }
     
-    if (topCategories.length > 0) {
-        createTopCategoriesChart(topCategories);
+    if (categoryTrend.length > 0) {
+        createTopCategoriesChart(categoryTrend);
     } else {
         showNoDataMessage('topCategoriesChart', 'No category data for current period');
     }
     
-    if (monthlyTrend.length > 0) {
-        createMonthlyTrendChart(monthlyTrend);
+    if (subcategoryTrend.length > 0) {
+        createMonthlyTrendChart(subcategoryTrend);
     } else {
         showNoDataMessage('monthlyTrendChart', 'Insufficient data for trend analysis');
     }
@@ -140,42 +140,51 @@ function createSpendingTypeChart(data) {
     Plotly.newPlot('spendingTypeChart', chartData, layout, { responsive: true, displayModeBar: false });
 }
 
-function createTopCategoriesChart(data) {
-    console.log('Creating top categories chart with data:', data);
+// Top 5 Categories – 3-Month Trend Chart
+function createTopCategoriesChart(trendData) {
+    console.log('Creating category trend chart with data:', trendData);
+
+    if (!trendData || trendData.length === 0) {
+        showNoDataMessage('topCategoriesChart', 'No category data for current period');
+        return;
+    }
 
     const theme = document.documentElement.dataset.theme || 'warm-ink';
     const colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+    const lineColors = [colors.primary, colors.needs, colors.wants, colors.savings, colors.business];
 
-    const chartData = [{
-        x: data.map(item => item.total),
-        y: data.map(item => item.category),
-        type: 'bar',
-        orientation: 'h',
-        marker: { color: colors.primary, opacity: 0.85 },
-        text: data.map(item => `$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`),
-        textposition: 'outside',
-        hovertemplate: '<b>%{y}</b><br>Amount: $%{x:,.2f}<extra></extra>'
-    }];
+    const traces = trendData.map((series, i) => ({
+        x: series.months.map(m => m.month),
+        y: series.months.map(m => m.total),
+        name: series.category,
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: lineColors[i % lineColors.length], width: 2 },
+        marker: { color: lineColors[i % lineColors.length], size: 7 },
+        hovertemplate: `<b>${series.category}</b><br>%{x}<br>$%{y:,.2f}<extra></extra>`
+    }));
 
     const layout = {
         ...chartConfig.layout,
-        title: { text: 'Top 5 Categories', font: { color: colors.text, size: 13 } },
-        xaxis: { title: 'Amount ($)', showgrid: true, gridcolor: colors.grid, color: colors.text },
-        yaxis: { title: '', automargin: true, color: colors.text },
+        title: { text: 'Top 5 Categories Trend', font: { color: colors.text, size: 13 } },
+        xaxis: { title: 'Month', showgrid: true, gridcolor: colors.grid, color: colors.text },
+        yaxis: { title: 'Amount ($)', showgrid: true, gridcolor: colors.grid, color: colors.text },
         paper_bgcolor: colors.bg,
         plot_bgcolor: colors.bg,
         font: { color: colors.text },
         height: 300,
-        showlegend: false
+        showlegend: true,
+        legend: { orientation: 'h', x: 0, y: -0.25, font: { size: 10, color: colors.text } },
+        margin: { t: 40, b: 80, l: 50, r: 20 }
     };
 
-    Plotly.newPlot('topCategoriesChart', chartData, layout, { responsive: true, displayModeBar: false });
+    Plotly.newPlot('topCategoriesChart', traces, layout, { responsive: true, displayModeBar: false });
 }
 
 
-// Monthly Trend Chart
+// Top 5 Subcategories – 3-Month Trend Chart
 function createMonthlyTrendChart(trendData) {
-    console.log('Creating monthly trend chart with data:', trendData);
+    console.log('Creating subcategory trend chart with data:', trendData);
 
     if (!trendData || trendData.length === 0) {
         showNoDataMessage('monthlyTrendChart', 'No trend data available');
@@ -184,32 +193,34 @@ function createMonthlyTrendChart(trendData) {
 
     const theme = document.documentElement.dataset.theme || 'warm-ink';
     const colors = CHART_COLORS[theme] || CHART_COLORS['warm-ink'];
+    const lineColors = [colors.primary, colors.needs, colors.wants, colors.savings, colors.business];
 
-    const chartData = [{
-        x: trendData.map(item => item.month),
-        y: trendData.map(item => item.total),
+    const traces = trendData.map((series, i) => ({
+        x: series.months.map(m => m.month),
+        y: series.months.map(m => m.total),
+        name: series.subcategory,
         type: 'scatter',
         mode: 'lines+markers',
-        line: { color: colors.primary, width: 3 },
-        marker: { color: colors.primary, size: 8 },
-        text: trendData.map(item => `$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`),
-        textposition: 'top center',
-        hovertemplate: '<b>%{x}</b><br>Spending: $%{y:,.2f}<extra></extra>'
-    }];
+        line: { color: lineColors[i % lineColors.length], width: 2 },
+        marker: { color: lineColors[i % lineColors.length], size: 7 },
+        hovertemplate: `<b>${series.subcategory}</b><br>%{x}<br>$%{y:,.2f}<extra></extra>`
+    }));
 
     const layout = {
         ...chartConfig.layout,
-        title: { text: '3-Month Trend', font: { color: colors.text, size: 13 } },
+        title: { text: 'Top 5 Subcategories Trend', font: { color: colors.text, size: 13 } },
         xaxis: { title: 'Month', showgrid: true, gridcolor: colors.grid, color: colors.text },
         yaxis: { title: 'Amount ($)', showgrid: true, gridcolor: colors.grid, color: colors.text },
         paper_bgcolor: colors.bg,
         plot_bgcolor: colors.bg,
         font: { color: colors.text },
         height: 300,
-        showlegend: false
+        showlegend: true,
+        legend: { orientation: 'h', x: 0, y: -0.25, font: { size: 10, color: colors.text } },
+        margin: { t: 40, b: 80, l: 50, r: 20 }
     };
 
-    Plotly.newPlot('monthlyTrendChart', chartData, layout, { responsive: true, displayModeBar: false });
+    Plotly.newPlot('monthlyTrendChart', traces, layout, { responsive: true, displayModeBar: false });
 }
 
 // Categories Management

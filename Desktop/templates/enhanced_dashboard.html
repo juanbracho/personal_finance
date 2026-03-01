@@ -154,20 +154,8 @@ window.templateData = {
             {% endfor %}
         {% endif %}
     ],
-    topCategories: [
-        {% if top_categories and top_categories|length > 0 %}
-            {% for category, total, count in top_categories %}
-            { category: '{{ category }}', total: {{ total }}, count: {{ count }} }{{ ',' if not loop.last }}
-            {% endfor %}
-        {% endif %}
-    ],
-    monthlyTrend: [
-        {% if monthly_trend %}
-            {% for trend_item in monthly_trend %}
-            { month: '{{ trend_item.month }}', total: {{ trend_item.total }} }{{ ',' if not loop.last else '' }}
-            {% endfor %}
-        {% endif %}
-    ],
+    categoryTrend: {{ category_trend | tojson }},
+    subcategoryTrend: {{ subcategory_trend | tojson }},
     ownerComparison: [
         {% if owner_comparison %}
             {% for owner_data in owner_comparison %}

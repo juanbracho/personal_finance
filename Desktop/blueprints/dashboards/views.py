@@ -69,15 +69,36 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
             monthly_spending = [(row['type'], float(row['total']), int(row['count']))
                                 for _, row in monthly_spending_df.iterrows()]
 
-            # Top 5 categories
-            top_categories_df = _df(conn, f"""
-                SELECT category, SUM(amount) as total, COUNT(*) as count
+            # Top 5 categories – 3-month trend
+            cat_trend_params = {"owner": owner} if owner != 'all' else {}
+            cat_owner_clause = "AND owner = :owner" if owner != 'all' else ""
+            cat_trend_params.update(uid_p)
+            cat_trend_df = _df(conn, f"""
+                SELECT category, {_ym_str()} as month_year, SUM(amount) as total
                 FROM transactions
-                WHERE {date_filter} AND COALESCE(is_active, true) = true
-                GROUP BY category ORDER BY total DESC LIMIT 5
-            """, params)
-            top_categories = [(row['category'], float(row['total']), int(row['count']))
-                              for _, row in top_categories_df.iterrows()]
+                WHERE date >= {_date_3m_ago()}
+                AND COALESCE(is_active, true) = true
+                AND category IS NOT NULL AND category <> ''
+                {cat_owner_clause} {uid_sql}
+                GROUP BY category, {_ym_str()}
+                ORDER BY category, month_year
+            """, cat_trend_params)
+
+            top_categories = []  # kept for error-path fallback
+            category_trend = []
+            if not cat_trend_df.empty:
+                cat_totals = cat_trend_df.groupby('category')['total'].sum()
+                top5_cats = cat_totals.nlargest(5).index.tolist()
+                cat_months = sorted(cat_trend_df['month_year'].unique())
+                for cat in top5_cats:
+                    cat_df = cat_trend_df[cat_trend_df['category'] == cat]
+                    month_map = {row['month_year']: float(row['total'])
+                                 for _, row in cat_df.iterrows()}
+                    category_trend.append({
+                        'category': cat,
+                        'months': [{'month': m, 'total': month_map.get(m, 0.0)}
+                                   for m in cat_months]
+                    })
 
             # Previous year same month
             prev_params = {"month": month, "year": year - 1}
@@ -170,23 +191,36 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                 'account_name': row['account_name']
             } for _, row in recent_df.iterrows()]
 
-            # 3-month spending trend
+            # Top 5 subcategories – 3-month trend
             trend_params = {"owner": owner} if owner != 'all' else {}
             owner_clause = "AND owner = :owner" if owner != 'all' else ""
             trend_params.update(uid_p)
             trend_df = _df(conn, f"""
-                SELECT {_ym_str()} as month_year, SUM(amount) as total
+                SELECT sub_category, {_ym_str()} as month_year, SUM(amount) as total
                 FROM transactions
                 WHERE date >= {_date_3m_ago()}
                 AND COALESCE(is_active, true) = true
+                AND sub_category IS NOT NULL AND sub_category <> ''
                 {owner_clause} {uid_sql}
-                GROUP BY {_ym_str()}
-                ORDER BY month_year DESC
-                LIMIT 3
+                GROUP BY sub_category, {_ym_str()}
+                ORDER BY sub_category, month_year
             """, trend_params)
-            monthly_trend = [{'month': row['month_year'], 'total': float(row['total'])}
-                             for _, row in trend_df.iterrows()]
-            monthly_trend.reverse()
+
+            monthly_trend = []  # kept for error-path fallback
+            subcategory_trend = []
+            if not trend_df.empty:
+                totals = trend_df.groupby('sub_category')['total'].sum()
+                top5 = totals.nlargest(5).index.tolist()
+                months_sorted = sorted(trend_df['month_year'].unique())
+                for sub in top5:
+                    sub_df = trend_df[trend_df['sub_category'] == sub]
+                    month_map = {row['month_year']: float(row['total'])
+                                 for _, row in sub_df.iterrows()}
+                    subcategory_trend.append({
+                        'subcategory': sub,
+                        'months': [{'month': m, 'total': month_map.get(m, 0.0)}
+                                   for m in months_sorted]
+                    })
 
             # Total debt
             try:
@@ -233,6 +267,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                              available_years=available_years, available_owners=available_owners,
                              monthly_spending=monthly_spending,
                              top_categories=top_categories,
+                             category_trend=category_trend,
                              current_total=current_total,
                              prev_year_total=prev_year_total,
                              month_change=month_change,
@@ -246,6 +281,7 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                              },
                              recent_transactions=recent_transactions,
                              monthly_trend=monthly_trend,
+                             subcategory_trend=subcategory_trend,
                              total_debt=total_debt,
                              owner_comparison=owner_comparison,
                              yearly_data={}, category_trends={}, monthly_data=[],
@@ -263,9 +299,9 @@ def dashboard_overview_view(year, month, owner, available_years, available_owner
                              available_owners=available_owners,
                              current_total=0, prev_year_total=0, month_change=0,
                              ytd_total=0, prev_ytd_total=0, ytd_change=0,
-                             monthly_spending=[], top_categories=[],
+                             monthly_spending=[], top_categories=[], category_trend=[],
                              budget_performance={'over_budget_count': 0, 'under_budget_count': 0, 'on_track_count': 0},
-                             recent_transactions=[], monthly_trend=[], total_debt=0,
+                             recent_transactions=[], monthly_trend=[], subcategory_trend=[], total_debt=0,
                              owner_comparison=[], yearly_data={}, category_trends={},
                              monthly_data=[], budget_analysis=[], categories_data=[],
                              total_initial_budget=0, total_effective_budget=0,
@@ -441,7 +477,7 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                              living_budget=living_budget,
                              current_total=0, prev_year_total=0, month_change=0,
                              ytd_total=0, prev_ytd_total=0, ytd_change=0,
-                             monthly_spending=[], top_categories=[],
+                             monthly_spending=[], top_categories=[], category_trend=[],
                              yearly_data={}, category_trends={}, monthly_data=[], categories_data=[])
 
     except Exception as e:
@@ -459,11 +495,11 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
                              commitment_count=0, living_budget=0,
                              current_total=0, prev_year_total=0, month_change=0,
                              ytd_total=0, prev_ytd_total=0, ytd_change=0,
-                             monthly_spending=[], top_categories=[],
+                             monthly_spending=[], top_categories=[], category_trend=[],
                              yearly_data={}, category_trends={}, monthly_data=[],
                              categories_data=[],
                              budget_performance={'over_budget_count': 0, 'under_budget_count': 0, 'on_track_count': 0},
-                             recent_transactions=[], monthly_trend=[], total_debt=0,
+                             recent_transactions=[], monthly_trend=[], subcategory_trend=[], total_debt=0,
                              owner_comparison=[], error=str(e))
 
 
@@ -517,7 +553,7 @@ def dashboard_categories_view(available_years, available_owners):
                              categories_data=categories_data,
                              current_total=0, prev_year_total=0, month_change=0,
                              ytd_total=0, prev_ytd_total=0, ytd_change=0,
-                             monthly_spending=[], top_categories=[],
+                             monthly_spending=[], top_categories=[], category_trend=[],
                              yearly_data={}, category_trends={}, monthly_data=[],
                              budget_analysis=[], total_initial_budget=0,
                              total_effective_budget=0, total_unexpected_expenses=0,
@@ -534,7 +570,7 @@ def dashboard_categories_view(available_years, available_owners):
                              categories_data=[],
                              current_total=0, prev_year_total=0, month_change=0,
                              ytd_total=0, prev_ytd_total=0, ytd_change=0,
-                             monthly_spending=[], top_categories=[],
+                             monthly_spending=[], top_categories=[], category_trend=[],
                              yearly_data={}, category_trends={}, monthly_data=[],
                              budget_analysis=[], total_initial_budget=0,
                              total_effective_budget=0, total_unexpected_expenses=0,
