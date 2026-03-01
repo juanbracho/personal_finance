@@ -241,3 +241,27 @@ Phase 7 continued — Categories CRUD overhaul (Overview > Categories view):
 **Pending after this session:**
 - Deploy all changes to Railway
 - Phase 7 end-to-end test: Phases 4 (Admin) + 5 (Onboarding) + 6 (Flutter 401) together
+
+### March 2026 — Session 12
+Phase 7 continued — Bug fixes from end-to-end Railway testing:
+
+**Bug 9: Migration modal transaction count shows only current year**
+- Root cause: `transaction_count` in category/subcategory list endpoints is year-filtered; modal header used that value but migration_preview (and actual migration) operates on all years
+- Fix: `migration_preview` endpoint now runs a COUNT(*) without LIMIT to get true all-years total; returns `{total_count, transactions}` instead of bare array; JS updates modal count from `total_count` after preview loads
+- Files changed: `blueprints/api/routes.py`, `static/js/dashboard.js`
+
+**Bug 10: Onboarding "Get Started" → 502 Bad Gateway**
+- Root cause: `INSERT INTO user_owners` in `onboarding_complete` omitted `is_active`; column is NOT NULL with no DB-level DEFAULT (SQLAlchemy `default=True` is Python-side only); Postgres rejected the INSERT, crashing the Gunicorn worker
+- Fix: Added `is_active = TRUE` explicitly to the INSERT
+- File changed: `blueprints/onboarding/routes.py`
+
+**Bug 11: Onboarding page content flush against card edges**
+- Fix: Added `style="padding: 20px;"` to both `.kanso-card` divs in onboarding template
+- File changed: `templates/onboarding.html`
+
+**Bug 12: Settings page → 502 Bad Gateway**
+- Root cause 1: `url_for('settings.create_backup')` in template referenced a non-existent route; Jinja2 raises BuildError at render time
+- Root cause 2: Route passes `db_exists=True, db_size=None`; template did `None / 1024 / 1024` → TypeError
+- Fix 1: Added stub routes `create_backup`, `restore_backup`, `delete_backup` (flash "not available on cloud")
+- Fix 2: Template size display now guards `db_size` with truthiness check
+- Files changed: `blueprints/settings/routes.py`, `templates/settings.html`

@@ -116,6 +116,25 @@ def upload_database():
     return redirect(url_for('settings.index'))
 
 
+@settings_bp.route('/create-backup', methods=['POST'])
+def create_backup():
+    """Local backup — not applicable on cloud/Neon deployments."""
+    flash('Local backups are not available on cloud deployments. Use Export My Data instead.', 'info')
+    return redirect(url_for('settings.index'))
+
+
+@settings_bp.route('/restore-backup/<filename>', methods=['POST'])
+def restore_backup(filename):
+    flash('Local backups are not available on cloud deployments.', 'info')
+    return redirect(url_for('settings.index'))
+
+
+@settings_bp.route('/delete-backup/<filename>', methods=['POST'])
+def delete_backup(filename):
+    flash('Local backups are not available on cloud deployments.', 'info')
+    return redirect(url_for('settings.index'))
+
+
 @settings_bp.route('/delete-all-data', methods=['POST'])
 def delete_all_data():
     """Delete all data from the database — DANGER ZONE"""
