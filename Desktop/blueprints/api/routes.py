@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime, date, timedelta
-from utils import ensure_budget_tables, uid_clause
+from utils import ensure_budget_tables, uid_clause, local_now
 import pandas as pd
 from models import db
 from sqlalchemy import text
@@ -130,8 +130,8 @@ def category_spending():
 def budget_analysis():
     """Get comprehensive budget analysis for a specific month/year"""
     try:
-        month = request.args.get('month', datetime.now().month, type=int)
-        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', local_now().month, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         owner = request.args.get('owner', 'all')
 
         spending_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
@@ -217,8 +217,8 @@ def budget_analysis():
 def budget_subcategories():
     """Get budget analysis with subcategory breakdown."""
     try:
-        month = request.args.get('month', datetime.now().month, type=int)
-        year = request.args.get('year', datetime.now().year, type=int)
+        month = request.args.get('month', local_now().month, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         owner = request.args.get('owner', 'all')
 
         spending_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
@@ -340,8 +340,8 @@ def budget_subcategories():
 def dashboard_summary():
     """Get dashboard summary data for quick overview"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
-        month = request.args.get('month', datetime.now().month, type=int)
+        year = request.args.get('year', local_now().year, type=int)
+        month = request.args.get('month', local_now().month, type=int)
         owner = request.args.get('owner', 'all')
 
         date_filter = ("EXTRACT(MONTH FROM date)::integer = :month"
@@ -419,7 +419,7 @@ def dashboard_summary():
 def api_categories():
     """Get categories with statistics"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
@@ -488,7 +488,7 @@ def api_categories():
 def api_subcategories():
     """Get subcategories with statistics"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
@@ -541,7 +541,7 @@ def api_subcategories():
 def api_owners():
     """Get owners with statistics"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
 
         date_filter = "EXTRACT(YEAR FROM date)::integer = :year"
@@ -587,7 +587,7 @@ def api_owners():
 def api_accounts():
     """Get accounts with statistics"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
 
         date_filter = "EXTRACT(YEAR FROM date)::integer = :year"
@@ -634,7 +634,7 @@ def api_types():
     """Get types with statistics"""
     try:
         all_years = request.args.get('all_years', '0') == '1'
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 
@@ -1146,7 +1146,7 @@ def edit_account(account_name):
 def api_categories_statistics():
     """Get statistics for all category types"""
     try:
-        year = request.args.get('year', datetime.now().year, type=int)
+        year = request.args.get('year', local_now().year, type=int)
         month = request.args.get('month', 'all')
         owner = request.args.get('owner', 'all')
 

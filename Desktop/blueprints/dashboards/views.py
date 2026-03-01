@@ -3,7 +3,7 @@ from datetime import datetime
 from models import db
 from sqlalchemy import text
 import pandas as pd
-from utils import uid_clause
+from utils import uid_clause, local_now
 
 
 def _df(conn, sql, params=None):
@@ -438,7 +438,7 @@ def dashboard_budget_view(year, month, owner, available_years, available_owners)
 def dashboard_categories_view(available_years, available_owners):
     """Dashboard Categories Management"""
     try:
-        current_year = request.args.get('year', datetime.now().year, type=int)
+        current_year = request.args.get('year', local_now().year, type=int)
         current_month = request.args.get('month', 'all')
         uid_sql, uid_p = uid_clause()
 
@@ -496,7 +496,7 @@ def dashboard_categories_view(available_years, available_owners):
         import traceback
         traceback.print_exc()
         return render_template('enhanced_dashboard.html',
-                             view='categories', current_year=datetime.now().year,
+                             view='categories', current_year=local_now().year,
                              current_month='all', current_owner='all',
                              available_years=available_years, available_owners=available_owners,
                              categories_data=[],

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 from datetime import datetime
-from utils import get_available_years_and_owners, ensure_budget_tables
+from utils import get_available_years_and_owners, ensure_budget_tables, local_now
 from .views import (
     dashboard_overview_view,
     dashboard_budget_view,
@@ -20,8 +20,8 @@ def enhanced_dashboard(view='overview'):
     """Enhanced dashboard with multiple views"""
     
     # Get filter parameters
-    selected_year = request.args.get('year', datetime.now().year, type=int)
-    selected_month = request.args.get('month', datetime.now().month, type=int)
+    selected_year = request.args.get('year', local_now().year, type=int)
+    selected_month = request.args.get('month', local_now().month, type=int)
     selected_owner = request.args.get('owner', 'all')
     
     print(f"🎯 Loading dashboard view: {view}")

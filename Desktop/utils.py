@@ -1,5 +1,19 @@
+import os
 from datetime import datetime
 from sqlalchemy import text, inspect
+
+
+def local_now():
+    """Return the current datetime in the APP_TIMEZONE (set via env var on Railway).
+    Falls back to UTC when the var is missing or the timezone name is invalid.
+    Returns a naive datetime so it's a drop-in replacement for datetime.now().
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        tz_name = os.environ.get('APP_TIMEZONE', 'UTC')
+        return datetime.now(tz=ZoneInfo(tz_name)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
 
 
 def current_user_id():
@@ -69,7 +83,7 @@ def get_available_years_and_owners():
             available_owners = [row[0] for row in owners_result if row[0] is not None]
 
         if not available_years:
-            current_year = datetime.now().year
+            current_year = local_now().year
             available_years = [current_year - 1, current_year, current_year + 1]
 
         if not available_owners:

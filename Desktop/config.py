@@ -34,6 +34,10 @@ class Config:
     # Allowed CORS origins for the web frontend.
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS') or '*'
 
+    # IANA timezone name used by local_now() to pick the correct default month/year.
+    # Set APP_TIMEZONE on Railway to match the owner's timezone, e.g. America/Chicago.
+    APP_TIMEZONE = os.environ.get('APP_TIMEZONE', 'UTC')
+
 
 class ProductionConfig(Config):
     """Configuration for Railway cloud deployment.

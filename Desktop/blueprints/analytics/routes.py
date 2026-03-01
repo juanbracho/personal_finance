@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from models import db
 from sqlalchemy import text
-from utils import uid_clause
+from utils import uid_clause, local_now
 
 analytics_bp = Blueprint('analytics', __name__, url_prefix='/analytics')
 
@@ -120,7 +120,7 @@ def analytics_dashboard():
                 seen.add(t)
                 available_types.append(t)
 
-        end_date = datetime.now()
+        end_date = local_now()
         start_date = end_date - timedelta(days=180)
 
         return render_template('analytics.html',
@@ -138,14 +138,14 @@ def analytics_dashboard():
         import traceback
         traceback.print_exc()
         return render_template('analytics/analytics.html',
-                             available_years=[datetime.now().year - 1, datetime.now().year],
+                             available_years=[local_now().year - 1, local_now().year],
                              available_owners=[],
                              available_categories=[],
                              available_accounts=[],
                              available_subcategories=[],
                              available_types=['Needs', 'Wants', 'Savings', 'Business'],
-                             default_start_date=(datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d'),
-                             default_end_date=datetime.now().strftime('%Y-%m-%d'),
+                             default_start_date=(local_now() - timedelta(days=180)).strftime('%Y-%m-%d'),
+                             default_end_date=local_now().strftime('%Y-%m-%d'),
                              error=str(e))
 
 

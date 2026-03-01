@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify
 from datetime import datetime
 from models import db
 from sqlalchemy import text
-from utils import ensure_budget_tables, uid_clause, current_user_id
+from utils import ensure_budget_tables, uid_clause, current_user_id, local_now
 import pandas as pd
 from budget_recommender import (
     calculate_subcategory_recommendations,
@@ -63,8 +63,8 @@ def sync_budgets_from_commitments(conn, uid=None):
 @budgets_bp.route('/')
 def budget_management():
     """Budget management page"""
-    selected_year = request.args.get('year', datetime.now().year, type=int)
-    selected_month = request.args.get('month', datetime.now().month, type=int)
+    selected_year = request.args.get('year', local_now().year, type=int)
+    selected_month = request.args.get('month', local_now().month, type=int)
 
     try:
         with db.engine.connect() as conn:
