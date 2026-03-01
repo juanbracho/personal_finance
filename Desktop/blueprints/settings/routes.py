@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, Response, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, Response, session, send_file
 import os
 import sys
 import shutil
@@ -11,9 +11,45 @@ from config import get_app_version
 from models import db, User
 from sqlalchemy import text
 from utils import current_user_id
-from auth import require_admin, _log_audit
+from auth import require_admin, _log_audit, _auth_disabled
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
+
+
+def _is_local_mode():
+    return _auth_disabled()
+
+
+def _backups_dir():
+    base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'backups'))
+    os.makedirs(base, exist_ok=True)
+    return base
+
+
+def _serial(obj):
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    return str(obj)
+
+
+def _export_all_data(uid):
+    """Return dict of all 8 data tables, optionally scoped to uid."""
+    tables = [
+        'transactions', 'budget_templates', 'budget_subcategory_templates',
+        'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
+        'debt_payments', 'budget_commitments'
+    ]
+    uid_where = "WHERE user_id = :uid" if uid is not None else ""
+    uid_p = {"uid": uid} if uid is not None else {}
+    data = {}
+    with db.engine.connect() as conn:
+        for table in tables:
+            try:
+                rows = conn.execute(text(f"SELECT * FROM {table} {uid_where}"), uid_p).mappings().all()
+                data[table] = [dict(row) for row in rows]
+            except Exception:
+                data[table] = []
+    return data
 
 
 @settings_bp.route('/')
@@ -23,11 +59,22 @@ def index():
     users = None
     if session.get('role') == 'admin':
         users = db.session.query(User).order_by(User.created_at).all()
+    local_mode = _is_local_mode()
+    backups = []
+    if local_mode:
+        bdir = _backups_dir()
+        for f in sorted(os.listdir(bdir), reverse=True):
+            if f.endswith('.json'):
+                fp = os.path.join(bdir, f)
+                stat = os.stat(fp)
+                backups.append({'filename': f, 'size': stat.st_size,
+                                'created': datetime.fromtimestamp(stat.st_mtime)})
     return render_template('settings.html',
                          db_exists=True,
                          db_size=None,
                          db_modified=None,
-                         backups=[],
+                         backups=backups,
+                         local_mode=local_mode,
                          version=version_info['version'],
                          build_date=version_info['build_date'],
                          build_number=version_info['build_number'],
@@ -39,28 +86,8 @@ def export_my_data():
     """Export the current user's own data as JSON."""
     try:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        data = {}
-        tables = [
-            'transactions', 'budget_templates', 'budget_subcategory_templates',
-            'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
-            'debt_payments', 'budget_commitments'
-        ]
         uid = current_user_id()
-        uid_where = "WHERE user_id = :uid" if uid is not None else ""
-        uid_p = {"uid": uid} if uid is not None else {}
-        with db.engine.connect() as conn:
-            for table in tables:
-                try:
-                    rows = conn.execute(text(f"SELECT * FROM {table} {uid_where}"), uid_p).mappings().all()
-                    data[table] = [dict(row) for row in rows]
-                except Exception:
-                    data[table] = []
-
-        def _serial(obj):
-            if hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            return str(obj)
-
+        data = _export_all_data(uid=uid)
         _log_audit('export_personal_data', current_user_id())
         json_str = json.dumps(data, default=_serial, indent=2)
         return Response(
@@ -75,42 +102,8 @@ def export_my_data():
 
 @settings_bp.route('/download-database')
 def download_database():
-    """Full unscoped database export — admin only."""
-    guard = require_admin()
-    if guard is not None:
-        return guard
-
-    try:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        data = {}
-        tables = [
-            'transactions', 'budget_templates', 'budget_subcategory_templates',
-            'monthly_budgets', 'unexpected_expenses', 'debt_accounts',
-            'debt_payments', 'budget_commitments'
-        ]
-        with db.engine.connect() as conn:
-            for table in tables:
-                try:
-                    rows = conn.execute(text(f"SELECT * FROM {table}")).mappings().all()
-                    data[table] = [dict(row) for row in rows]
-                except Exception:
-                    data[table] = []
-
-        def _serial(obj):
-            if hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            return str(obj)
-
-        _log_audit('download_database_admin', current_user_id())
-        json_str = json.dumps(data, default=_serial, indent=2)
-        return Response(
-            json_str,
-            mimetype='application/json',
-            headers={'Content-Disposition': f'attachment;filename=finance_full_export_{timestamp}.json'}
-        )
-    except Exception as e:
-        flash(f'Error exporting data: {str(e)}', 'error')
-        return redirect(url_for('settings.index'))
+    """Redirects to export_my_data (previously admin-only full dump)."""
+    return redirect(url_for('settings.export_my_data'))
 
 
 @settings_bp.route('/upload-database', methods=['POST'])
@@ -122,20 +115,47 @@ def upload_database():
 
 @settings_bp.route('/create-backup', methods=['POST'])
 def create_backup():
-    """Local backup — not applicable on cloud/Neon deployments."""
-    flash('Local backups are not available on cloud deployments. Use Export My Data instead.', 'info')
+    if not _is_local_mode():
+        flash('Local backups are not available on cloud deployments.', 'info')
+        return redirect(url_for('settings.index'))
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'backup_{timestamp}.json'
+        data = _export_all_data(uid=None)
+        path = os.path.join(_backups_dir(), filename)
+        with open(path, 'w') as f:
+            json.dump(data, f, default=_serial, indent=2)
+        flash(f'Backup saved: {filename}', 'success')
+    except Exception as e:
+        flash(f'Backup failed: {str(e)}', 'error')
     return redirect(url_for('settings.index'))
 
 
-@settings_bp.route('/restore-backup/<filename>', methods=['POST'])
+@settings_bp.route('/restore-backup/<filename>', methods=['GET'])
 def restore_backup(filename):
-    flash('Local backups are not available on cloud deployments.', 'info')
-    return redirect(url_for('settings.index'))
+    if not _is_local_mode():
+        flash('Not available on cloud deployments.', 'info')
+        return redirect(url_for('settings.index'))
+    filename = os.path.basename(filename)
+    path = os.path.join(_backups_dir(), filename)
+    if not os.path.exists(path):
+        flash('Backup not found.', 'error')
+        return redirect(url_for('settings.index'))
+    return send_file(path, as_attachment=True, download_name=filename, mimetype='application/json')
 
 
 @settings_bp.route('/delete-backup/<filename>', methods=['POST'])
 def delete_backup(filename):
-    flash('Local backups are not available on cloud deployments.', 'info')
+    if not _is_local_mode():
+        flash('Not available on cloud deployments.', 'info')
+        return redirect(url_for('settings.index'))
+    filename = os.path.basename(filename)
+    path = os.path.join(_backups_dir(), filename)
+    if os.path.exists(path) and filename.endswith('.json'):
+        os.remove(path)
+        flash(f'Backup "{filename}" deleted.', 'success')
+    else:
+        flash('Backup not found.', 'error')
     return redirect(url_for('settings.index'))
 
 

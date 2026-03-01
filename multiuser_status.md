@@ -238,10 +238,6 @@ Phase 7 continued — Categories CRUD overhaul (Overview > Categories view):
 
 `user_owners` was already present — now properly used by the add/edit/list owner flow.
 
-**Pending after this session:**
-- Deploy all changes to Railway
-- Phase 7 end-to-end test: Phases 4 (Admin) + 5 (Onboarding) + 6 (Flutter 401) together
-
 ### March 2026 — Session 12
 Phase 7 continued — Bug fixes from end-to-end Railway testing:
 
@@ -265,3 +261,14 @@ Phase 7 continued — Bug fixes from end-to-end Railway testing:
 - Fix 1: Added stub routes `create_backup`, `restore_backup`, `delete_backup` (flash "not available on cloud")
 - Fix 2: Template size display now guards `db_size` with truthiness check
 - Files changed: `blueprints/settings/routes.py`, `templates/settings.html`
+
+**Bug 13: Admin panel moved into Settings page**
+- Admin section now appears at the bottom of Settings (above Danger Zone) for admin users only
+- `settings/routes.py` — queries `User` list when `session.role == 'admin'`, passes `users` to template
+- `settings.html` — admin section conditionally rendered (`{% if users is not none %}`) with users table + create-user form (with proper `padding: 20px`)
+- `admin/routes.py` — GET `/admin/` now redirects to `settings.index`; all POST action redirects changed from `admin.admin_dashboard` → `settings.index`
+- `base.html` — removed standalone "Admin" nav link (admins reach admin tools via Settings)
+- `admin.html` — still exists but unreachable; audit logs page at `/admin/audit-logs` still works
+
+**Pending:**
+- Data Management redesign (cloud vs local mode with appropriate export options per deployment context)

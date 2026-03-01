@@ -90,20 +90,23 @@
     <div class="kanso-section">
         <div class="kanso-section-label">Data Management</div>
 
-        <!-- Railway / cloud hosting notice -->
-        <div class="kanso-tip-box" style="margin-bottom:12px; background:var(--warning-dim); border-left-color:var(--warning);">
-            <div style="font-weight:600; color:var(--warning); margin-bottom:4px;">Cloud Hosting Notice</div>
+        {% if local_mode %}
+        <div class="kanso-tip-box" style="margin-bottom:12px;">
             <div style="font-size:12.5px; color:var(--text-muted);">
-                If running on Railway (or any container platform), the server filesystem resets on every redeploy or restart.
-                <strong style="color:var(--text);">Export Database → keep the .db file locally → Import if you need to restore</strong> is the only safe backup flow
-                unless you have a persistent <strong style="color:var(--text);">Railway Volume</strong> mounted at <code>data/</code>.
-                "Create Local Backup" and the backup history below are useful for local/self-hosted installs only.
+                Running in local mode. Your database: Neon / local PostgreSQL.
             </div>
         </div>
+        {% else %}
+        <div class="kanso-tip-box" style="margin-bottom:12px;">
+            <div style="font-size:12.5px; color:var(--text-muted);">
+                Your data is securely stored in the cloud. Export a personal copy anytime.
+            </div>
+        </div>
+        {% endif %}
 
         <div class="kanso-card">
 
-            <!-- Export -->
+            <!-- Export My Data — always shown -->
             <div class="kanso-row">
                 <div class="kanso-row-icon success">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -112,39 +115,8 @@
                     </svg>
                 </div>
                 <div class="kanso-row-body">
-                    <div class="kanso-row-title">Export Database</div>
-                    <div class="kanso-row-desc">Download a timestamped backup to your Downloads folder</div>
-                </div>
-                <div class="kanso-row-action">
-                    <button id="downloadBtn"
-                            onclick="downloadDatabase()"
-                            class="btn-kanso btn-kanso-ghost"
-                            {% if not db_exists %}disabled{% endif %}>
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M10 3v9m0 0l-3-3m3 3l3-3"/>
-                            <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
-                        </svg>
-                        Download
-                    </button>
-                </div>
-            </div>
-            <div id="downloadFeedback" class="kanso-feedback success" style="display:none; margin:0 18px 12px;">
-                <i class="fas fa-check-circle"></i>
-                <span id="downloadMessage"></span>
-            </div>
-
-            <!-- Export My Data -->
-            <div class="kanso-row">
-                <div class="kanso-row-icon" style="color:var(--primary);">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10 3v9m0 0l-3-3m3 3l3-3"/>
-                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
-                        <circle cx="10" cy="10" r="7" stroke-dasharray="2 2" opacity="0.4"/>
-                    </svg>
-                </div>
-                <div class="kanso-row-body">
                     <div class="kanso-row-title">Export My Data</div>
-                    <div class="kanso-row-desc">Download only your own data as a JSON file</div>
+                    <div class="kanso-row-desc">Download all your financial data as a JSON file</div>
                 </div>
                 <div class="kanso-row-action">
                     <a href="{{ url_for('settings.export_my_data') }}"
@@ -158,48 +130,8 @@
                 </div>
             </div>
 
-            <!-- Import -->
-            <div class="kanso-row">
-                <div class="kanso-row-icon">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10 14V5m0 0L7 8m3-3l3 3"/>
-                        <path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/>
-                    </svg>
-                </div>
-                <div class="kanso-row-body">
-                    <div class="kanso-row-title">Import Database</div>
-                    <div class="kanso-row-desc">Restore from a <code>.db</code> backup — current data is backed up first</div>
-                </div>
-                <div class="kanso-row-action">
-                    <form action="{{ url_for('settings.upload_database') }}"
-                          method="POST"
-                          enctype="multipart/form-data"
-                          id="importForm"
-                          style="display:flex; align-items:center; gap:8px;">
-                        <label class="kanso-file-label" for="database_file">
-                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                                <path d="M4 4h7l5 5v9H4z"/><path d="M11 4v5h5"/>
-                            </svg>
-                            Choose file
-                        </label>
-                        <span class="kanso-file-name" id="importFileName">No file chosen</span>
-                        <input type="file"
-                               id="database_file"
-                               name="database_file"
-                               accept=".db"
-                               required
-                               style="display:none;"
-                               onchange="document.getElementById('importFileName').textContent = this.files[0]?.name || 'No file chosen'">
-                        <button type="submit"
-                                class="btn-kanso btn-kanso-primary"
-                                onclick="return confirm('This will replace your current database. A backup will be created first. Continue?')">
-                            Upload
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Create local backup -->
+            {% if local_mode %}
+            <!-- Create Local Backup — local mode only -->
             <div class="kanso-row">
                 <div class="kanso-row-icon warning">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -209,13 +141,11 @@
                 </div>
                 <div class="kanso-row-body">
                     <div class="kanso-row-title">Create Local Backup</div>
-                    <div class="kanso-row-desc">Saved to <code>data/backups/</code> inside the app</div>
+                    <div class="kanso-row-desc">Save a JSON backup to <code>data/backups/</code> on this machine</div>
                 </div>
                 <div class="kanso-row-action">
                     <form action="{{ url_for('settings.create_backup') }}" method="POST">
-                        <button type="submit"
-                                class="btn-kanso btn-kanso-ghost"
-                                {% if not db_exists %}disabled{% endif %}>
+                        <button type="submit" class="btn-kanso btn-kanso-ghost">
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 10a7 7 0 1014 0A7 7 0 003 10z"/>
                                 <path d="M10 7v3l2 2"/>
@@ -225,11 +155,13 @@
                     </form>
                 </div>
             </div>
+            {% endif %}
 
         </div>
     </div>
 
-    <!-- ── Backup history ── -->
+    <!-- ── Backup history — local mode only ── -->
+    {% if local_mode %}
     <div class="kanso-section">
         <div class="kanso-section-label">Backup History</div>
         <div class="kanso-card">
@@ -243,15 +175,12 @@
                         </svg>
                     </div>
                     <div class="backup-item-name" title="{{ backup.filename }}">{{ backup.filename }}</div>
-                    <div class="backup-item-meta">{{ "%.2f"|format(backup.size / 1024 / 1024) }} MB &nbsp;·&nbsp; {{ backup.created.strftime('%b %-d, %Y') }}</div>
+                    <div class="backup-item-meta">{{ "%.1f"|format(backup.size / 1024) }} KB &nbsp;·&nbsp; {{ backup.created.strftime('%b %-d, %Y') }}</div>
                     <div class="backup-item-actions">
-                        <form action="{{ url_for('settings.restore_backup', filename=backup.filename) }}" method="POST" style="display:inline;">
-                            <button type="submit"
-                                    class="btn-kanso btn-kanso-ghost btn-kanso-sm"
-                                    onclick="return confirm('Replace current database with this backup?')">
-                                Restore
-                            </button>
-                        </form>
+                        <a href="{{ url_for('settings.restore_backup', filename=backup.filename) }}"
+                           class="btn-kanso btn-kanso-ghost btn-kanso-sm">
+                            Download
+                        </a>
                         <form action="{{ url_for('settings.delete_backup', filename=backup.filename) }}" method="POST" style="display:inline;">
                             <button type="submit"
                                     class="btn-kanso btn-kanso-danger btn-kanso-sm"
@@ -270,6 +199,7 @@
             {% endif %}
         </div>
     </div>
+    {% endif %}
 
     <!-- ── Administration (admin only) ── -->
     {% if users is not none %}
@@ -554,40 +484,6 @@ function checkAppReconnection() {
                     el.textContent = 'Update complete! Please refresh the page manually.';
                 }
             });
-    }, 1000);
-}
-
-// ── Database export ────────────────────────────────────────
-function downloadDatabase() {
-    const btn = document.getElementById('downloadBtn');
-    const feedback = document.getElementById('downloadFeedback');
-    const message = document.getElementById('downloadMessage');
-
-    btn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15"><path d="M10 3v9m0 0l-3-3m3 3l3-3"/><path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/></svg> Exporting…`;
-    btn.disabled = true;
-    feedback.style.display = 'none';
-
-    const now = new Date();
-    const ts = now.getFullYear()
-        + String(now.getMonth()+1).padStart(2,'0')
-        + String(now.getDate()).padStart(2,'0') + '_'
-        + String(now.getHours()).padStart(2,'0')
-        + String(now.getMinutes()).padStart(2,'0')
-        + String(now.getSeconds()).padStart(2,'0');
-    const filename = `kanso_backup_${ts}.db`;
-
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = '{{ url_for("settings.download_database") }}';
-    document.body.appendChild(iframe);
-
-    setTimeout(() => {
-        btn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="15" height="15"><path d="M10 3v9m0 0l-3-3m3 3l3-3"/><path d="M3 14v1a2 2 0 002 2h10a2 2 0 002-2v-1"/></svg> Download`;
-        btn.disabled = false;
-        message.textContent = `Exported as ${filename}`;
-        feedback.style.display = 'flex';
-        setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe); }, 2000);
-        setTimeout(() => { feedback.style.display = 'none'; }, 10000);
     }, 1000);
 }
 
