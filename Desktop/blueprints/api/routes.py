@@ -933,6 +933,12 @@ def api_migration_preview():
 
         uid_sql, uid_p = uid_clause()
         with db.engine.connect() as conn:
+            count_row = conn.execute(
+                text(f"SELECT COUNT(*) FROM transactions WHERE {field} = :name AND COALESCE(is_active, true) = true {uid_sql}"),
+                {'name': name, **uid_p}
+            ).fetchone()
+            total_count = int(count_row[0]) if count_row else 0
+
             df = _df(conn, f"""
                 SELECT date, description, amount, category,
                        sub_category, owner, account_name
@@ -942,7 +948,7 @@ def api_migration_preview():
                 LIMIT 50
             """, {'name': name, **uid_p})
 
-        result = [{
+        transactions = [{
             'date': str(row['date']),
             'description': str(row['description']),
             'amount': float(row['amount']),
@@ -952,8 +958,8 @@ def api_migration_preview():
             'account_name': str(row['account_name'])
         } for _, row in df.iterrows()]
 
-        print(f"🔍 Returning preview of {len(result)} transactions for {item_type}: {name}")
-        return jsonify(result)
+        print(f"🔍 Returning preview of {total_count} transactions for {item_type}: {name}")
+        return jsonify({'total_count': total_count, 'transactions': transactions})
     except Exception as e:
         print(f"❌ Error getting migration preview: {e}")
         return jsonify({'error': str(e)}), 500

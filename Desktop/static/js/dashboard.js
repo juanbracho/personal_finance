@@ -940,7 +940,11 @@ function showMigrationModal(type, name, transactionCount) {
     
     fetch(`/api/categories/migration_preview?type=${type}&name=${encodeURIComponent(name)}`)
         .then(response => response.json())
-        .then(transactions => {
+        .then(data => {
+            const totalCount = data.total_count ?? 0;
+            const transactions = data.transactions ?? [];
+            // Update the modal header count to reflect ALL years
+            countEl.textContent = totalCount;
             let html = '';
             transactions.slice(0, 10).forEach(transaction => {
                 html += `
@@ -949,8 +953,8 @@ function showMigrationModal(type, name, transactionCount) {
                     </div>
                 `;
             });
-            if (transactions.length > 10) {
-                html += `<div class="text-muted mt-2"><small>...and ${transactions.length - 10} more transactions</small></div>`;
+            if (totalCount > 10) {
+                html += `<div class="text-muted mt-2"><small>...and ${totalCount - 10} more transactions</small></div>`;
             }
             previewEl.innerHTML = html || '<div class="text-muted">No transactions found</div>';
         })

@@ -196,3 +196,48 @@ Phase 7 — Bug fixes discovered after deploying to Railway + Neon:
 - Root cause: `api_categories()` in `blueprints/api/routes.py` uses a LEFT JOIN between `transactions` and `budget_templates`; both tables have a `user_id` column; PostgreSQL threw "column reference 'user_id' is ambiguous"; exception was silently caught and returned `{error: ...}`; JS received a non-array and displayed empty state
 - Fix: Introduced `joined_filter` (same as `date_filter` but with `AND t.user_id` instead of `AND user_id`) for the LEFT JOIN query; also added `AND bt.user_id = t.user_id` to the JOIN condition for proper multi-user scoping
 - File changed: `blueprints/api/routes.py` — `api_categories()` function only
+
+### March 2026 — Session 11
+Phase 7 continued — Categories CRUD overhaul (Overview > Categories view):
+
+**Bug 4: Delete with active transactions required two clicks**
+- Root cause: After migration modal completed, `executeMigration()` only reloaded the tab but did not auto-call the DELETE endpoint; user had to click delete a second time
+- Fix: Added `_pendingDeleteAfterMigration` flag in `dashboard.js`; set before opening migration modal; after successful migration, auto-calls DELETE endpoint and resets flag; `hidden.bs.modal` listener resets flag if user cancels
+- File changed: `static/js/dashboard.js`
+
+**Bug 5: Add Type did nothing (no error, no result)**
+- Root cause: Types are not stored in their own table — they exist only as `transactions.type` column values. `add_type()` was returning 200 success without writing anything. `api_types()` queries transactions only, so a new type with 0 transactions never appeared.
+- Fix: Created `custom_types` table on Neon (`id, user_id, name, created_at, UNIQUE(user_id,name)`). `add_type()` now INSERTs into it. `api_types()` UNIONs transaction-derived types with `custom_types` rows that have no transactions yet. `edit_type()` and `delete_type()` also update/remove the `custom_types` row.
+- DB migration: `CREATE TABLE custom_types` applied to Neon main branch
+- Files changed: `models.py` (CustomType model), `blueprints/api/routes.py` (all 4 type endpoints)
+
+**Bug 6: Add Subcategory, Add Owner, Add Account all did nothing (same root cause)**
+- Root cause: Same as Bug 5. Subcategories and accounts have no backing table (derived from transactions). Owners have `user_owners` but `add_owner()` was not inserting into it, and `api_owners()` was not querying it.
+- Fix (subcategories): Created `custom_subcategories` table (`id, user_id, name, category, created_at`). `add_subcategory()` inserts into it. `api_subcategories()` UNIONs with zero-txn rows. `edit_subcategory()` / `delete_subcategory()` sync the table.
+- Fix (owners): `add_owner()` now inserts into `user_owners`. `api_owners()` UNIONs `user_owners` entries with no transactions. `edit_owner()` now also updates `user_owners`.
+- Fix (accounts): Created `custom_accounts` table (`id, user_id, name, created_at`). `add_account()` inserts into it. `api_accounts()` UNIONs with zero-txn rows. `edit_account()` / `delete_account()` sync the table.
+- DB migrations: `CREATE TABLE custom_subcategories`, `CREATE TABLE custom_accounts` applied to Neon main branch
+- Files changed: `models.py` (CustomSubcategory, CustomAccount models), `blueprints/api/routes.py` (all GET/POST/PUT/DELETE for subcategories, owners, accounts)
+
+**Bug 7: api_categories() missed newly added categories (zero transactions)**
+- Root cause: The GET query anchored on `transactions` with a LEFT JOIN to `budget_templates`; categories with 0 transactions (just added) were invisible even though their `budget_templates` row existed.
+- Fix: Flipped the query — now anchors on `budget_templates` with a LEFT JOIN to a transaction aggregate subquery; zero-transaction categories appear with zeroed stats. Type falls back to `budget_templates.notes` when no transactions exist.
+- File changed: `blueprints/api/routes.py` — `api_categories()` only
+
+**Bug 8: migrate_categories() left orphaned rows in backing tables**
+- Root cause: After migrating transactions from source → target, the source entry in `custom_types` / `custom_subcategories` / `custom_accounts` / `user_owners` was not cleaned up.
+- Fix: `migrate_categories()` now also cleans/renames the relevant backing table row after migrating transactions (DELETE for custom_* tables; UPDATE name for user_owners).
+- File changed: `blueprints/api/routes.py` — `migrate_categories()` only
+
+**Schema summary — new tables added to Neon:**
+| Table | Purpose |
+|-------|---------|
+| `custom_types` | Pre-created types before any transactions use them |
+| `custom_subcategories` | Pre-created subcategories (name + parent category) |
+| `custom_accounts` | Pre-created account names |
+
+`user_owners` was already present — now properly used by the add/edit/list owner flow.
+
+**Pending after this session:**
+- Deploy all changes to Railway
+- Phase 7 end-to-end test: Phases 4 (Admin) + 5 (Onboarding) + 6 (Flutter 401) together
