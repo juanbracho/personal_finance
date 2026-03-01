@@ -48,8 +48,8 @@ def onboarding_complete():
 
     with db.engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO user_owners (user_id, name)
-            VALUES (:uid, :name)
+            INSERT INTO user_owners (user_id, name, is_active)
+            VALUES (:uid, :name, TRUE)
             ON CONFLICT (user_id, name) DO NOTHING
         """), {'uid': uid, 'name': owner_name})
 
